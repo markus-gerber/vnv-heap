@@ -1,4 +1,6 @@
 use std::{alloc::Layout, mem::size_of, ptr::{null_mut, NonNull}, sync::atomic::{AtomicU16, Ordering}};
+use log::debug;
+
 use crate::{allocation_options::AllocationOptions, modules::{allocator::AllocatorModule, page_storage::PageStorageModule}};
 
 /// Converts the identifying offset to a in ram ptr.
@@ -232,12 +234,12 @@ impl<A: AllocatorModule> VNVHeapManager<A> {
             return res;
         }
 
+        debug!("Mapping heap {self:p}");
+
         // not already in memory, load now...
         let map_res = unsafe { 
             page_storage.map(self.offset, self.size)
         }.unwrap();
-
-        drop(page_storage);
 
         self.heap_ptr = map_res.as_ptr() as *mut A;
         unsafe {
@@ -246,11 +248,13 @@ impl<A: AllocatorModule> VNVHeapManager<A> {
     }
 
     /// Unmaps this heap and syncs all pending changes back to the page storage
-    fn unmap<P: PageStorageModule>(&mut self, page_storage: &mut P) {
+    pub(crate) fn unmap<P: PageStorageModule>(&mut self, page_storage: &mut P) {
         if self.heap_ptr.is_null() {
             // already unmapped
             return;
         }
+
+        debug!("Unmapping heap {self:p}");
 
         // TODO: race conditions: should be fine...
         // but maybe think about it one more time
@@ -284,6 +288,8 @@ impl<A: AllocatorModule> VNVHeapManager<A> {
             // not dirty, nothing to sync
             return;
         }
+
+        debug!("Persisting heap {self:p}");
 
         // TODO think about how to handle unwrap, maybe just ignore errors?
         page_storage.persist(NonNull::new(self.heap_ptr as *mut u8).unwrap(), self.size).unwrap();

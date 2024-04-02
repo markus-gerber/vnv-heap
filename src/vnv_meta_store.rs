@@ -1,26 +1,31 @@
-use std::{alloc::Layout, mem::{align_of, size_of, MaybeUninit}, ptr::null_mut, slice};
+use std::{alloc::Layout, marker::PhantomData, mem::{align_of, size_of, MaybeUninit}, ptr::null_mut, slice};
 
 use libc::{c_void, mmap, munmap, MAP_ANONYMOUS, MAP_FAILED, MAP_PRIVATE, PROT_READ, PROT_WRITE};
+use log::debug;
 
 use crate::{allocation_options::AllocationOptions, modules::{allocator::AllocatorModule, page_storage::PageStorageModule}, util::get_page_size, vnv_heap_manager::{calc_min_pages_of_new_heap, VNVHeapManager}, vnv_meta_store_item::VNVMetaStoreItem, vnv_mut_ref::VNVMutRef};
 
 /// An object that is used to identify a specific allocation (on which heap and which offset on that heap?)
 /// 
 /// This Identifier is used for getting references and deallocating a `VNVObject`
-pub(crate) struct AllocationIdentifier<A: AllocatorModule> {
+pub(crate) struct AllocationIdentifier<T, A: AllocatorModule> {
     heap_ptr: *mut VNVHeapManager<A>,
-    offset: usize
+    offset: usize,
+
+    /// bind generic T to this struct, to prevent bugs
+    _phantom_data: PhantomData<T>
 }
 
 /// Tries to allocate a specific memory layout on a heap
 /// 
 /// Fails if there is not enough space left on this heap.
-unsafe fn try_allocate<T, A: AllocatorModule, S: PageStorageModule>(options: AllocationOptions<T>, page_storage: &mut S, heap: &mut VNVHeapManager<A>) -> Result<AllocationIdentifier<A>, AllocationOptions<T>> {
+unsafe fn try_allocate<T, A: AllocatorModule, S: PageStorageModule>(options: AllocationOptions<T>, page_storage: &mut S, heap: &mut VNVHeapManager<A>) -> Result<AllocationIdentifier<T, A>, AllocationOptions<T>> {
     let offset = unsafe { heap.allocate(options, page_storage) }?;
 
     Ok(AllocationIdentifier {
         heap_ptr: heap as *mut VNVHeapManager<A>,
-        offset
+        offset,
+        _phantom_data: PhantomData
     })
 }
 
@@ -99,11 +104,13 @@ impl<A: AllocatorModule, S: PageStorageModule> VNVMetaStore<A, S> {
     /// Allocates `layout`. If no empty heap is found, it will create one
     /// 
     /// **Safety**: This function is unsafe as you have to make sure that this allocated memory will get deallocated again eventually
-    pub(crate) unsafe fn allocate<T>(&mut self, options: AllocationOptions<T>, page_storage: &mut S) -> AllocationIdentifier<A> {
+    pub(crate) unsafe fn allocate<T>(&mut self, options: AllocationOptions<T>, page_storage: &mut S) -> AllocationIdentifier<T, A> {
         let options = match self.allocate_on_fitting_heap(options, page_storage) {
             Ok(res) => return res,
             Err(options) => options
         };
+
+        debug!("Tried to allocate {} bytes but no fitting heap found. Creating new one...", options.layout.size());
 
         // find empty meta store item
         let mut curr = self.head;
@@ -126,6 +133,8 @@ impl<A: AllocatorModule, S: PageStorageModule> VNVMetaStore<A, S> {
             curr = curr_ref.next;
         }
 
+        debug!("Could not find free slot in a VNVMetaStoreItem. Adding new one...");
+
         let size_in_pages = calc_min_pages_of_new_heap::<A>(self.page_size, &options.layout);
         let size = size_in_pages * self.page_size;        
         let prev_offset = self.curr_storage_offset as u64;
@@ -140,30 +149,30 @@ impl<A: AllocatorModule, S: PageStorageModule> VNVMetaStore<A, S> {
     }
 
 
-    pub(crate) unsafe fn deallocate(&mut self, layout: &Layout, page_storage: &mut S, identifier: &AllocationIdentifier<A>) {
+    pub(crate) unsafe fn deallocate<T>(&mut self, layout: &Layout, page_storage: &mut S, identifier: &AllocationIdentifier<T, A>) {
         // can safely get mutable reference as at
         // this moment no other part of code has mutable reference
         let heap_ref = identifier.heap_ptr.as_mut().unwrap();
         heap_ref.dealloc(identifier.offset, layout, page_storage);
     }
 
-    pub(crate) unsafe fn get_mut<T>(&mut self, identifier: &AllocationIdentifier<A>, page_storage: &mut S) -> *mut T {
+    pub(crate) unsafe fn get_mut<T>(&mut self, identifier: &AllocationIdentifier<T, A>, page_storage: &mut S) -> *mut T {
         let heap_ref = identifier.heap_ptr.as_mut().unwrap();
         heap_ref.get_mut(identifier.offset, page_storage)
     }
 
-    pub(crate) unsafe fn get_ref<T>(&mut self, identifier: &AllocationIdentifier<A>, page_storage: &mut S) -> *const T {
+    pub(crate) unsafe fn get_ref<T>(&mut self, identifier: &AllocationIdentifier<T, A>, page_storage: &mut S) -> *const T {
         let heap_ref = identifier.heap_ptr.as_mut().unwrap();
         heap_ref.get_ref(identifier.offset, page_storage)        
     }
 
 
-    pub(crate) unsafe fn release_mut<T>(&mut self, identifier: &AllocationIdentifier<A>, data: &mut T) {
+    pub(crate) unsafe fn release_mut<T>(&mut self, identifier: &AllocationIdentifier<T, A>, data: &mut T) {
         let heap_ref = identifier.heap_ptr.as_mut().unwrap();
         heap_ref.release_mut::<T, S>(data);
     }
 
-    pub(crate) unsafe fn release_ref<T>(&mut self, identifier: &AllocationIdentifier<A>, data: &T) {
+    pub(crate) unsafe fn release_ref<T>(&mut self, identifier: &AllocationIdentifier<T, A>, data: &T) {
         let heap_ref = identifier.heap_ptr.as_mut().unwrap();
         heap_ref.release_ref::<T, S>(data);    
     }
@@ -173,7 +182,7 @@ impl<A: AllocatorModule, S: PageStorageModule> VNVMetaStore<A, S> {
     /// Fails if all of the current heaps do not have enough memory left to allocate `layout`.
     /// 
     /// **Safety**: This function is unsafe as you have to make sure that this allocated memory will get deallocated again eventually
-    unsafe fn allocate_on_fitting_heap<T>(&mut self, mut options: AllocationOptions<T>, page_storage: &mut S) -> Result<AllocationIdentifier<A>, AllocationOptions<T>> {
+    unsafe fn allocate_on_fitting_heap<T>(&mut self, mut options: AllocationOptions<T>, page_storage: &mut S) -> Result<AllocationIdentifier<T, A>, AllocationOptions<T>> {
         // TODO: change this later
         let mut curr = self.head;
         while !curr.is_null() {
@@ -214,6 +223,7 @@ impl<A: AllocatorModule, S: PageStorageModule> VNVMetaStore<A, S> {
         // pointer to MetaStoreItem object at start of page
         let meta_ptr = base_ptr as *mut VNVMetaStoreItem<A, S>;
 
+        debug!("Adding new VNVMetaStoreItem: capacity={}", manager_slice.len());
         unsafe {
             // write so uninitialized data does not get dropped
             meta_ptr.write(VNVMetaStoreItem::new(manager_slice));
@@ -287,11 +297,15 @@ impl<A: AllocatorModule, S: PageStorageModule> Drop for VNVMetaStore<A, S>  {
 
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use std::{array, ptr::null_mut};
-    use crate::{modules::{allocator::buddy::BuddyAllocatorModule, page_storage::{mmap::MMapPageStorageModule, PageStorageModule}}, vnv_heap_manager::VNVHeapManager, vnv_meta_store_item::VNVMetaStoreItem};
+    use crate::{modules::{allocator::{buddy::BuddyAllocatorModule, AllocatorModule}, page_storage::{mmap::MMapPageStorageModule, PageStorageModule}}, vnv_heap_manager::VNVHeapManager, vnv_meta_store_item::VNVMetaStoreItem};
 
-    use super::{get_aligned_manager_slice, VNVMetaStore};
+    use super::{get_aligned_manager_slice, AllocationIdentifier, VNVMetaStore};
+
+    pub(crate) fn allocation_identifier_to_heap<T, A: AllocatorModule>(identifier: &AllocationIdentifier<T, A>) -> &mut VNVHeapManager<A> {
+        unsafe { identifier.heap_ptr.as_mut() }.unwrap()
+    }
 
     /// check if `push_back` works as expected
     #[test]

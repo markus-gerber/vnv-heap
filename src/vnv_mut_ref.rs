@@ -4,12 +4,12 @@ use crate::{modules::{allocator::AllocatorModule, page_replacement::PageReplacem
 
 pub struct VNVMutRef<'a, 'b, T: Sized, A: AllocatorModule + 'static, R: PageReplacementModule, P: PageStorageModule> {
     vnv_heap: Rc<RefCell<VNVHeapInner<A, R, P>>>,
-    allocation_identifier: &'b AllocationIdentifier<A>,
+    allocation_identifier: &'b AllocationIdentifier<T, A>,
     data_ref: &'a mut T
 }
 
 impl<'a, 'b, T: Sized, A: AllocatorModule, R: PageReplacementModule, P: PageStorageModule> VNVMutRef<'a, 'b, T, A, R, P> {
-    pub(crate) unsafe fn new(vnv_heap: Rc<RefCell<VNVHeapInner<A, R, P>>>, allocation_identifier: &'b AllocationIdentifier<A>, data_ref: &'a mut T) -> Self {
+    pub(crate) unsafe fn new(vnv_heap: Rc<RefCell<VNVHeapInner<A, R, P>>>, allocation_identifier: &'b AllocationIdentifier<T, A>, data_ref: &'a mut T) -> Self {
         VNVMutRef {
             vnv_heap,
             allocation_identifier,

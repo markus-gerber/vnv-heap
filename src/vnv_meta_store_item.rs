@@ -1,5 +1,7 @@
 use std::{mem::MaybeUninit, ptr::null_mut};
 
+use log::debug;
+
 use crate::{modules::{allocator::AllocatorModule, page_storage::PageStorageModule}, vnv_heap_manager::VNVHeapManager};
 
 /// An item inside the `VNVMetaStore` list.
@@ -51,6 +53,8 @@ impl<'a, A: AllocatorModule, S: PageStorageModule> VNVMetaStoreItem<'a, A, S> {
         if self.element_count >= self.data.len() {
             return Err(());
         }
+
+        debug!("Creating Heap Manager {}: offset={}, size={}", self.element_count, offset, size);
 
         let x= &mut self.data[self.element_count];
         // call write: don't drop uninitialized data

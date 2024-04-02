@@ -4,12 +4,12 @@ use crate::{modules::{allocator::AllocatorModule, page_replacement::PageReplacem
 
 pub struct VNVObject<T, A: AllocatorModule + 'static, R: PageReplacementModule, S: PageStorageModule> {
     vnv_heap: Rc<RefCell<VNVHeapInner<A, R, S>>>,
-    allocation_identifier: AllocationIdentifier<A>,
+    allocation_identifier: AllocationIdentifier<T, A>,
     phantom_data: PhantomData<T>
 }
 
 impl<T: Sized, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule> VNVObject<T, A, R, S> {
-    pub(crate) fn new(vnv_heap: Rc<RefCell<VNVHeapInner<A, R, S>>>, identifier: AllocationIdentifier<A>) -> Self {
+    pub(crate) fn new(vnv_heap: Rc<RefCell<VNVHeapInner<A, R, S>>>, identifier: AllocationIdentifier<T, A>) -> Self {
         VNVObject {
             vnv_heap,
             allocation_identifier: identifier,
@@ -43,5 +43,17 @@ impl<'a, T: Sized, A: AllocatorModule, R: PageReplacementModule, S: PageStorageM
         unsafe {
             obj.deallocate(&layout, &mut self.allocation_identifier);
         }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test {
+    use crate::{modules::{allocator::AllocatorModule, page_replacement::PageReplacementModule, page_storage::PageStorageModule}, vnv_meta_store::AllocationIdentifier};
+
+    use super::VNVObject;
+
+    /// just for testing purposes
+    pub(crate) fn obj_to_allocation_identifier<T: Sized, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule>(obj: &VNVObject<T, A, R, S>) -> &AllocationIdentifier<T, A> {
+        &obj.allocation_identifier
     }
 }

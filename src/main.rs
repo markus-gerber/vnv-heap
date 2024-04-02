@@ -9,10 +9,18 @@ mod vnv_ref;
 mod modules;
 mod util;
 
+use env_logger::{Builder, Env};
 use modules::{allocator::buddy::BuddyAllocatorModule, page_replacement::EmptyPageReplacementModule, page_storage::mmap::MMapPageStorageModule};
 use vnv_heap::VNVHeap;
 
 fn main() {
+
+    Builder::from_env(Env::default())
+        .filter_level(log::LevelFilter::Trace)
+        .format_module_path(false)
+        .init();
+
+
     let storage = MMapPageStorageModule::new("test.data").unwrap();
 
     let heap: VNVHeap<BuddyAllocatorModule<16>, EmptyPageReplacementModule, MMapPageStorageModule> = VNVHeap::new(EmptyPageReplacementModule, storage);
