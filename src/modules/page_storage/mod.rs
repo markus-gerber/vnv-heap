@@ -2,7 +2,6 @@ pub mod mmap;
 
 use std::ptr::NonNull;
 
-// TODO: think about which functions need to be unsafe...
 pub trait PageStorageModule {
     /// Map data region [offset, offset + size)
     /// 

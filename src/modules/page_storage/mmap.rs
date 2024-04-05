@@ -75,43 +75,8 @@ impl PageStorageModule for MMapPageStorageModule {
     }
     
     fn add_new_region(&mut self, size: usize) -> Result<u64, ()> {
-        /*
-        NOT NEEDED?
-        self.file.seek(std::io::SeekFrom::End(0)).map_err(|_| ())?;
-
-        // as normally only multiple of page sizer are added do bundled write with STD_PAGE_SIZE
-
-        // page size of most systems
-        // its no problem if actual page size is not the STD_PAGE_SIZE here
-        // because write will success any way (just slower tho)
-        const STD_PAGE_SIZE: usize = 4096;
-        const WRITE_ARR: [u8; STD_PAGE_SIZE] = [0; STD_PAGE_SIZE];
-
-        let mut write_counter = 0;
-        while write_counter + STD_PAGE_SIZE < size {
-            self.file.write_all(&WRITE_ARR).map_err(|_| ())?;
-            write_counter += STD_PAGE_SIZE;
-        }
-
-        // do single writes now for the rest
-        let rest_count = size - write_counter;
-        if rest_count != 0 {
-            println!("[DEBUG] MMapPageStorageModule: add_new_region needs to do {} unbundled writes", rest_count);
-            for _ in 0..(size - write_counter) {
-                self.file.write_all(&[0]).map_err(|_| ())?;
-            }
-        }
-
-        self.file.flush().unwrap();
-
-        let prev_size = self.file_size;
-        self.file_size += size;
-
-        Ok(prev_size)
-        */
-
         let new_size = self.file_size + (size as u64);
-        self.file.set_len(new_size as u64).map_err(|_| ())?;
+        self.file.set_len(new_size).map_err(|_| ())?;
 
         // memorize previous file size for returning offset pointer
         let prev_size = self.file_size;

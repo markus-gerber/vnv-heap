@@ -5,7 +5,6 @@ mod linked_list;
 use std::{cmp::{max, min}, mem::size_of, ptr::{null, NonNull}};
 use super::AllocatorModule;
 
-// TODO nooooo deal with pointers :((
 pub struct BuddyAllocatorModule<const ORDER: usize> {
     /// Pointer to current start of heap
     /// 
@@ -170,7 +169,7 @@ impl<const ORDER: usize> AllocatorModule for BuddyAllocatorModule<ORDER> {
     }*/
 
     fn calc_min_size_for_layout(layout: &std::alloc::Layout) -> usize {
-        layout.size().next_power_of_two()
+        max(layout.size(), size_of::<usize>()).next_power_of_two()
     }
 
     unsafe fn on_ptr_change(&mut self, old_base_ptr: *mut u8, new_base_ptr: *mut u8) {

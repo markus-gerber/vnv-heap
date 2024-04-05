@@ -26,7 +26,7 @@ impl<T: Sized, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModul
         }
     }
 
-    pub fn get_mut<'a>(&mut self) -> VNVMutRef<'_, '_, T, A, R, S> {
+    pub fn get_mut(&mut self) -> VNVMutRef<'_, '_, T, A, R, S> {
         let mut heap = self.vnv_heap.borrow_mut();
         unsafe {
             let ptr: *mut T =  heap.get_mut(&self.allocation_identifier);
@@ -36,12 +36,12 @@ impl<T: Sized, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModul
     }
 }
 
-impl<'a, T: Sized, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule> Drop for VNVObject<T, A, R, S> {
+impl<T: Sized, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule> Drop for VNVObject<T, A, R, S> {
     fn drop(&mut self) {
         let layout = Layout::new::<T>();
         let mut obj = self.vnv_heap.borrow_mut();
         unsafe {
-            obj.deallocate(&layout, &mut self.allocation_identifier);
+            obj.deallocate(&layout, &self.allocation_identifier);
         }
     }
 }

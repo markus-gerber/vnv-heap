@@ -16,12 +16,12 @@ unsafe fn ptr_to_offset<A: AllocatorModule>(heap: &mut A, ptr: *mut u8) -> usize
     let offset = ptr.offset_from((heap as *mut A) as *mut u8);
     debug_assert!(offset >= 0, "offset has to be positive");
 
-    return offset as usize;
+    offset as usize
 }
 
 fn aligned_alloc_module_offset<A: AllocatorModule>() -> usize {
     let layout = Layout::new::<A>();
-    // TODO is this correct?
+
     let aligned_layout = layout.align_to(size_of::<usize>()).unwrap();
     let padded_layout = aligned_layout.pad_to_align();
 
@@ -103,6 +103,10 @@ impl<A: AllocatorModule> VNVHeapManager<A> {
             size: size,
             heap_ptr: base_ptr as *mut A,
         }
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        self.size
     }
 
     /// Checks if this heap has any space left to allocate `layout`
@@ -302,9 +306,56 @@ impl<A: AllocatorModule> VNVHeapManager<A> {
 
 #[cfg(test)]
 mod test {
-    use std::sync::atomic::Ordering;
+    use std::{mem::size_of, sync::atomic::Ordering};
 
-    use crate::{allocation_options::AllocationOptions, modules::{allocator::buddy::BuddyAllocatorModule, page_storage::{mmap::MMapPageStorageModule, PageStorageModule}}, vnv_heap_manager::{offset_to_ptr, ptr_to_offset, VNVHeapManager}};
+    use crate::{allocation_options::AllocationOptions, modules::{allocator::{buddy::BuddyAllocatorModule, AllocatorModule}, page_storage::{mmap::MMapPageStorageModule, PageStorageModule}}, util::ceil_div, vnv_heap_manager::{offset_to_ptr, ptr_to_offset, VNVHeapManager}};
+
+    use super::aligned_alloc_module_offset;
+
+    #[test]
+    fn test_aligned_alloc_module_offset() {
+        fn test_type<T: AllocatorModule>() {
+            let ceiled_size = ceil_div(size_of::<T>(), size_of::<usize>()) * size_of::<usize>();
+            assert_eq!(aligned_alloc_module_offset::<T>(), ceiled_size);
+        }
+
+        struct Test1 {
+            _x: u8
+        }
+        struct Test2 {
+            _x: usize
+        }
+        struct Test3 {
+            _x: usize,
+            _y: u8
+        }
+        
+        macro_rules! impl_allocator_module {
+            ($t:ident) => {
+                impl AllocatorModule for $t {
+                fn new() -> Self { panic!("dummy implementation") }
+                    unsafe fn init(&mut self, _start: *mut u8, _size: usize) -> usize { panic!("dummy implementation") }
+                    unsafe fn allocate(&mut self, _layout: &std::alloc::Layout, _max_alloc_size: usize) -> Result<(std::ptr::NonNull<u8>, usize), ()> { panic!("dummy implementation") }
+                    unsafe fn dealloc(&mut self, _ptr: std::ptr::NonNull<u8>, _layout: &std::alloc::Layout, _max_alloc_size: usize) -> usize { panic!("dummy implementation") }
+                    unsafe fn on_ptr_change(&mut self, _old_base_ptr: *mut u8, _new_base_ptr: *mut u8) { panic!("dummy implementation") }
+                    fn calc_min_size_for_layout(_layout: &std::alloc::Layout) -> usize { panic!("dummy implementation") }
+                }
+            }
+        }
+
+        impl_allocator_module!(Test1);
+        impl_allocator_module!(Test2);
+        impl_allocator_module!(Test3);
+
+        assert_eq!(aligned_alloc_module_offset::<Test1>(), size_of::<usize>());
+        test_type::<Test1>();
+        
+        assert_eq!(aligned_alloc_module_offset::<Test2>(), size_of::<usize>());
+        test_type::<Test2>();
+        
+        assert_eq!(aligned_alloc_module_offset::<Test3>(), size_of::<usize>() * 2);
+        test_type::<Test3>();
+    }
 
     /// Tests allocation on a heap.
     /// Writes some data, saves it, unmaps it, maps it again and checks that it contains the required data. 

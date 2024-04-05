@@ -1,6 +1,6 @@
 
 use std::{alloc::Layout, cell::RefCell, rc::Rc};
-use crate::{allocation_options::AllocationOptions, modules::{allocator::AllocatorModule, page_replacement::PageReplacementModule, page_storage::PageStorageModule}, vnv_meta_store::{AllocationIdentifier, VNVMetaStore}, vnv_object::VNVObject};
+use crate::{allocation_options::AllocationOptions, modules::{allocator::AllocatorModule, page_replacement::PageReplacementModule, page_storage::PageStorageModule}, vnv_heap_manager::VNVHeapManager, vnv_meta_store::{AllocationIdentifier, VNVMetaStore}, vnv_object::VNVObject};
 
 pub struct VNVHeap<A: AllocatorModule + 'static, R: PageReplacementModule, S: PageStorageModule> {
     // TODO remove the use of std allocator
@@ -33,7 +33,7 @@ pub(crate) struct VNVHeapInner<A: AllocatorModule + 'static, R: PageReplacementM
     page_storage_module: S
 }
 
-impl<'a, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule> VNVHeapInner<A, R, S> {
+impl<A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule> VNVHeapInner<A, R, S> {
     pub(crate) unsafe fn allocate<T>(&mut self, options: AllocationOptions<T>) -> AllocationIdentifier<T, A>{
         self.meta_store.allocate(options, &mut self.page_storage_module)
     }
@@ -57,25 +57,32 @@ impl<'a, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule> VNV
     pub(crate) unsafe fn release_ref<T>(&mut self, identifier: &AllocationIdentifier<T, A>, data: &T) {
         self.meta_store.release_ref(identifier, data);
     }
+
 }
 
 #[cfg(test)]
 mod test {
     use std::{array, cell::RefCell, fmt::Debug};
-    use crate::{modules::{allocator::{buddy::BuddyAllocatorModule, AllocatorModule}, page_replacement::{EmptyPageReplacementModule, PageReplacementModule}, page_storage::{mmap::MMapPageStorageModule, PageStorageModule}}, vnv_meta_store::test::allocation_identifier_to_heap, vnv_object::{test::obj_to_allocation_identifier, VNVObject}};
-    use super::VNVHeap;
+    use crate::{modules::{allocator::{buddy::BuddyAllocatorModule, AllocatorModule}, page_replacement::{EmptyPageReplacementModule, PageReplacementModule}, page_storage::{mmap::MMapPageStorageModule, PageStorageModule}}, vnv_heap_manager::VNVHeapManager, vnv_meta_store::test::allocation_identifier_to_heap, vnv_object::{test::obj_to_allocation_identifier, VNVObject}};
+    use super::{VNVHeap, VNVHeapInner};
 
-    fn test_eq<T: PartialEq + Debug, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule>(obj: &mut VNVObject<T, A, R, S>, value: T) {
-        let obj_ref = obj.get();
-        assert_eq!(*obj_ref, value);
+    impl<A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule> VNVHeapInner<A, R, S> {
+        pub(crate) unsafe fn unmap_heap(&mut self, heap: *mut VNVHeapManager<A>) {
+            self.meta_store.unmap_heap(heap, &mut self.page_storage_module);
+        }
     }
 
     /// unmaps the heap in which `obj` is stored
     fn unmap_heap<T, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule>(heap: &mut VNVHeap<A, R, S>, obj: &mut VNVObject<T, A, R, S>) {
         let identifier = obj_to_allocation_identifier(obj);
         let heap_manager = allocation_identifier_to_heap(identifier);
-        let storage_module = &mut (*heap.inner).borrow_mut().page_storage_module;
-        heap_manager.unmap(storage_module);
+        let inner = &mut (*heap.inner).borrow_mut();
+        unsafe { inner.unmap_heap(heap_manager) };
+    }
+
+    fn test_eq<T: PartialEq + Debug, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule>(obj: &mut VNVObject<T, A, R, S>, value: T) {
+        let obj_ref = obj.get();
+        assert_eq!(*obj_ref, value);
     }
 
     #[test]

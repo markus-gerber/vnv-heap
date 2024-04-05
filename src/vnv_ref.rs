@@ -9,7 +9,7 @@ pub struct VNVRef<'a, 'b, T: Sized, A: AllocatorModule + 'static, R: PageReplace
     data_ref: &'a T
 }
 
-impl<'a, 'b, 'c, T: Sized, A: AllocatorModule, R: PageReplacementModule, P: PageStorageModule> VNVRef<'a, 'b, T, A, R, P> {
+impl<'a, 'b, T: Sized, A: AllocatorModule, R: PageReplacementModule, P: PageStorageModule> VNVRef<'a, 'b, T, A, R, P> {
     pub(crate) unsafe fn new(vnv_heap: Rc<RefCell<VNVHeapInner<A, R, P>>>, allocation_identifier: &'b AllocationIdentifier<T, A>, data_ref: &'a T) -> Self {
         VNVRef {
             vnv_heap,

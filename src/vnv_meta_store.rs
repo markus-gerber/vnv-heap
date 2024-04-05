@@ -166,7 +166,6 @@ impl<A: AllocatorModule, S: PageStorageModule> VNVMetaStore<A, S> {
         heap_ref.get_ref(identifier.offset, page_storage)        
     }
 
-
     pub(crate) unsafe fn release_mut<T>(&mut self, identifier: &AllocationIdentifier<T, A>, data: &mut T) {
         let heap_ref = identifier.heap_ptr.as_mut().unwrap();
         heap_ref.release_mut::<T, S>(data);
@@ -175,6 +174,10 @@ impl<A: AllocatorModule, S: PageStorageModule> VNVMetaStore<A, S> {
     pub(crate) unsafe fn release_ref<T>(&mut self, identifier: &AllocationIdentifier<T, A>, data: &T) {
         let heap_ref = identifier.heap_ptr.as_mut().unwrap();
         heap_ref.release_ref::<T, S>(data);    
+    }
+
+    pub(crate) unsafe fn unmap_heap(&mut self, heap_ptr: *mut VNVHeapManager<A>, page_storage: &mut S) {
+        heap_ptr.as_mut().unwrap().unmap(page_storage)
     }
 
     /// Searches for a fitting heap to allocate a new memory layout.
@@ -303,8 +306,8 @@ pub(crate) mod test {
 
     use super::{get_aligned_manager_slice, AllocationIdentifier, VNVMetaStore};
 
-    pub(crate) fn allocation_identifier_to_heap<T, A: AllocatorModule>(identifier: &AllocationIdentifier<T, A>) -> &mut VNVHeapManager<A> {
-        unsafe { identifier.heap_ptr.as_mut() }.unwrap()
+    pub(crate) fn allocation_identifier_to_heap<T, A: AllocatorModule>(identifier: &AllocationIdentifier<T, A>) -> *mut VNVHeapManager<A> {
+        identifier.heap_ptr
     }
 
     /// check if `push_back` works as expected
