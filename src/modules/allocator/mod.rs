@@ -22,7 +22,7 @@ pub trait AllocatorModule {
     /// Deallocates memory
     /// 
     /// returns the new `max_size_hint` (the upper limit of a size limit, excluding alignment)
-    unsafe fn dealloc(&mut self, ptr: NonNull<u8>, layout: &Layout, max_alloc_size: usize) -> usize;
+    unsafe fn deallocate(&mut self, ptr: NonNull<u8>, layout: &Layout, max_alloc_size: usize) -> usize;
 
     /// Will be called once the base pointer of this heap has changed.
     /// This can happen once a heap has been unmapped and mapped again.

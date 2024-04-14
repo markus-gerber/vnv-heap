@@ -1,10 +1,25 @@
 // pub(crate) mod debug;
 
+pub(crate) mod bit_array;
+
 use libc::{sysconf, _SC_PAGE_SIZE};
 
+// TODO remove this
 pub(crate) fn get_page_size() -> usize {
     unsafe { sysconf(_SC_PAGE_SIZE) as usize }
 }
+
+pub(crate) fn padding_needed_for(offset: usize, alignment: usize) -> usize {
+    let misalignment = offset % alignment;
+    if misalignment > 0 {
+        // round up to next multiple of `alignment`
+        alignment - misalignment
+    } else {
+        // already a multiple of `alignment`
+        0
+    }
+}
+
 
 /// efficient way to calculate: ceil(x / y)
 pub(crate) fn ceil_div(x: usize, y: usize) -> usize {

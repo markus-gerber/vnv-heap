@@ -107,7 +107,7 @@ impl<const ORDER: usize> AllocatorModule for BuddyAllocatorModule<ORDER> {
         Err(())
     }
 
-    unsafe fn dealloc(&mut self, ptr: std::ptr::NonNull<u8>, layout: &std::alloc::Layout, max_alloc_size: usize) -> usize {
+    unsafe fn deallocate(&mut self, ptr: std::ptr::NonNull<u8>, layout: &std::alloc::Layout, max_alloc_size: usize) -> usize {
         let size = max(
             layout.size().next_power_of_two(),
             max(layout.align(), size_of::<usize>()),

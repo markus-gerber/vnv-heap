@@ -3,6 +3,8 @@ pub mod mmap;
 use std::ptr::NonNull;
 
 pub trait PageStorageModule {
+    // TODO change NonNull<u8> to *mut u8
+
     /// Map data region [offset, offset + size)
     /// 
     /// **Note**: `offset`` and `size` has to be multiples of a page size (e.g. sysconf(_SC_PAGESIZE))
