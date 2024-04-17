@@ -1,4 +1,4 @@
-use std::alloc::{GlobalAlloc, Layout, System};
+use core::alloc::{GlobalAlloc, Layout, System};
 
 use libc::{c_void, write, STDOUT_FILENO};
 

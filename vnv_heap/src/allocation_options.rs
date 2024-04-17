@@ -1,4 +1,4 @@
-use std::alloc::Layout;
+use core::alloc::Layout;
 
 pub(crate) struct AllocationOptions<T> {
     pub(crate) layout: Layout,

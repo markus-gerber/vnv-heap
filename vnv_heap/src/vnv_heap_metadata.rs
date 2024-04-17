@@ -1,4 +1,4 @@
-use std::alloc::Layout;
+use core::alloc::Layout;
 
 use crate::{modules::allocator::AllocatorModule, vnv_resident_heap::VNVResidentHeap};
 

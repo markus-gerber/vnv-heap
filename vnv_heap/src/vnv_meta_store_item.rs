@@ -1,4 +1,4 @@
-use std::{mem::MaybeUninit, ptr::null_mut};
+use core::{mem::MaybeUninit, ptr::null_mut};
 
 use log::debug;
 
@@ -87,7 +87,7 @@ mod test {
     use crate::{
         modules::allocator::buddy::BuddyAllocatorModule, vnv_heap_metadata::VNVHeapMetadata,
     };
-    use std::{array, mem::MaybeUninit};
+    use core::{array, mem::MaybeUninit};
 
     /// tests if capacity is never exceeded and get works as expected
     #[test]

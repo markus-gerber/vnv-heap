@@ -1,3 +1,4 @@
+#[cfg(feature = "libc")]
 pub mod mmap;
 
 /// A module that provides dynamic memory blocks during runtime

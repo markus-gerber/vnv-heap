@@ -1,6 +1,6 @@
 pub mod buddy;
 
-use std::{alloc::Layout, ptr::NonNull};
+use core::{alloc::Layout, ptr::NonNull};
 
 pub trait AllocatorModule {
     /// Creates a new allocator module object.

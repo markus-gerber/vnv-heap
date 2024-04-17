@@ -1,4 +1,4 @@
-use std::{alloc::Layout, ptr::{null_mut, NonNull}};
+use core::{alloc::Layout, ptr::{null_mut, NonNull}};
 
 use log::{debug, warn};
 

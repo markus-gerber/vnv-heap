@@ -1,4 +1,4 @@
-use std::{alloc::Layout, cell::RefCell, marker::PhantomData};
+use core::{alloc::Layout, cell::RefCell, marker::PhantomData};
 
 use crate::{
     modules::{

@@ -1,6 +1,11 @@
-pub mod mmap;
+/// mmap makes use of libc and std
+///
+/// std dependency could be removed by opening files with native libc functions
+/// this is currently not necessary tho
+#[cfg(all(not(no_std), feature = "libc"))]
+pub mod file_mmap;
 
-use std::ptr::NonNull;
+use core::ptr::NonNull;
 
 pub trait PageStorageModule {
     // TODO change NonNull<u8> to *mut u8

@@ -1,23 +1,10 @@
-mod allocation_options;
-mod modules;
-mod util;
-mod vnv_heap;
-mod vnv_heap_metadata;
-mod vnv_meta_store;
-mod vnv_meta_store_item;
-mod vnv_mut_ref;
-mod vnv_object;
-mod vnv_ref;
-mod vnv_resident_heap;
-mod vnv_resident_heap_manager;
 
 use env_logger::{Builder, Env};
-use modules::{
+use vnv_heap::modules::{
     allocator::buddy::BuddyAllocatorModule, memory_provider::mmap::MMapMemoryProvider,
-    page_replacement::EmptyPageReplacementModule, page_storage::mmap::MMapPageStorageModule,
+    page_replacement::EmptyPageReplacementModule, page_storage::file_mmap::FileMMapPageStorageModule,
 };
-use vnv_heap::VNVHeap;
-use vnv_resident_heap_manager::VNVResidentHeapManagerConfig;
+use vnv_heap::{VNVHeap, VNVResidentHeapManagerConfig};
 
 fn main() {
     Builder::from_env(Env::default())
@@ -25,7 +12,7 @@ fn main() {
         .format_module_path(false)
         .init();
 
-    let storage = MMapPageStorageModule::new("test.data").unwrap();
+    let storage = FileMMapPageStorageModule::new("test.data").unwrap();
     let config = VNVResidentHeapManagerConfig {
         max_dirty_size: 4096 * 4,
         max_resident_size: 4096 * 8,
@@ -34,7 +21,7 @@ fn main() {
     let heap: VNVHeap<
         BuddyAllocatorModule<16>,
         EmptyPageReplacementModule,
-        MMapPageStorageModule,
+        FileMMapPageStorageModule,
         MMapMemoryProvider,
     > = VNVHeap::new(EmptyPageReplacementModule, storage, config);
 

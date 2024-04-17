@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ops::Deref};
+use core::{cell::RefCell, ops::Deref};
 
 use crate::{
     modules::{

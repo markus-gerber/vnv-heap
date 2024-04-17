@@ -2,7 +2,7 @@
 
 mod linked_list;
 
-use std::{cmp::{max, min}, mem::size_of, ptr::{null, NonNull}};
+use core::{cmp::{max, min}, mem::size_of, ptr::{null, NonNull}};
 use super::AllocatorModule;
 
 pub struct BuddyAllocatorModule<const ORDER: usize> {
@@ -52,7 +52,7 @@ impl<const ORDER: usize> AllocatorModule for BuddyAllocatorModule<ORDER> {
         max_bucket_size
     }
 
-    unsafe fn allocate(&mut self, layout: &std::alloc::Layout, max_alloc_size: usize) -> Result<(NonNull<u8>, usize), ()> {
+    unsafe fn allocate(&mut self, layout: &core::alloc::Layout, max_alloc_size: usize) -> Result<(NonNull<u8>, usize), ()> {
         let size = max(
             layout.size().next_power_of_two(),
             max(layout.align(), size_of::<usize>()),
@@ -107,7 +107,7 @@ impl<const ORDER: usize> AllocatorModule for BuddyAllocatorModule<ORDER> {
         Err(())
     }
 
-    unsafe fn deallocate(&mut self, ptr: std::ptr::NonNull<u8>, layout: &std::alloc::Layout, max_alloc_size: usize) -> usize {
+    unsafe fn deallocate(&mut self, ptr: core::ptr::NonNull<u8>, layout: &core::alloc::Layout, max_alloc_size: usize) -> usize {
         let size = max(
             layout.size().next_power_of_two(),
             max(layout.align(), size_of::<usize>()),
@@ -168,7 +168,7 @@ impl<const ORDER: usize> AllocatorModule for BuddyAllocatorModule<ORDER> {
         }
     }*/
 
-    fn calc_min_size_for_layout(layout: &std::alloc::Layout) -> usize {
+    fn calc_min_size_for_layout(layout: &core::alloc::Layout) -> usize {
         max(layout.size(), size_of::<usize>()).next_power_of_two()
     }
 

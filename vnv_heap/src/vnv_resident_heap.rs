@@ -1,4 +1,4 @@
-use std::{
+use core::{
     alloc::Layout,
     mem::size_of,
     ptr::NonNull,
@@ -239,7 +239,7 @@ impl<A: AllocatorModule> VNVResidentHeap<A> {
 /*
 #[cfg(test)]
 mod test {
-    use std::{mem::size_of, sync::atomic::Ordering};
+    use core::{mem::size_of, sync::atomic::Ordering};
 
     use crate::{allocation_options::AllocationOptions, modules::{allocator::{buddy::BuddyAllocatorModule, AllocatorModule}, page_storage::{mmap::MMapPageStorageModule, PageStorageModule}}, util::{ceil_div, get_page_size}, vnv_resident_heap::{offset_to_ptr, ptr_to_offset, VNVResidentHeap}};
 
@@ -268,10 +268,10 @@ mod test {
                 impl AllocatorModule for $t {
                 fn new() -> Self { panic!("dummy implementation") }
                     unsafe fn init(&mut self, _start: *mut u8, _size: usize) -> usize { panic!("dummy implementation") }
-                    unsafe fn allocate(&mut self, _layout: &std::alloc::Layout, _max_alloc_size: usize) -> Result<(std::ptr::NonNull<u8>, usize), ()> { panic!("dummy implementation") }
-                    unsafe fn deallocate(&mut self, _ptr: std::ptr::NonNull<u8>, _layout: &std::alloc::Layout, _max_alloc_size: usize) -> usize { panic!("dummy implementation") }
+                    unsafe fn allocate(&mut self, _layout: &core::alloc::Layout, _max_alloc_size: usize) -> Result<(core::ptr::NonNull<u8>, usize), ()> { panic!("dummy implementation") }
+                    unsafe fn deallocate(&mut self, _ptr: core::ptr::NonNull<u8>, _layout: &core::alloc::Layout, _max_alloc_size: usize) -> usize { panic!("dummy implementation") }
                     unsafe fn on_ptr_change(&mut self, _old_base_ptr: *mut u8, _new_base_ptr: *mut u8) { panic!("dummy implementation") }
-                    fn calc_min_size_for_layout(_layout: &std::alloc::Layout) -> usize { panic!("dummy implementation") }
+                    fn calc_min_size_for_layout(_layout: &core::alloc::Layout) -> usize { panic!("dummy implementation") }
                 }
             }
         }

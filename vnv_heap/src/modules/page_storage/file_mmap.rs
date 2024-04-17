@@ -3,7 +3,7 @@ use libc::{c_void, mmap, msync, munmap, MAP_FAILED, MAP_SHARED, MS_SYNC, PROT_RE
 
 use super::PageStorageModule;
 
-pub struct MMapPageStorageModule {
+pub struct FileMMapPageStorageModule {
     /// underlying file which will be mapped
     file: ManuallyDrop<File>,
 
@@ -14,9 +14,9 @@ pub struct MMapPageStorageModule {
     file_size: u64
 }
 
-impl MMapPageStorageModule {
+impl FileMMapPageStorageModule {
     /// Creates as new storage module which uses mmap and msync under the hood
-    pub fn new(filepath: &'static str) -> std::io::Result<MMapPageStorageModule> {
+    pub fn new(filepath: &'static str) -> std::io::Result<FileMMapPageStorageModule> {
         let file = File::options()
             .read(true)
             .write(true)
@@ -25,7 +25,7 @@ impl MMapPageStorageModule {
 
         let file_size = file.metadata().unwrap().len();
 
-        Ok(MMapPageStorageModule {
+        Ok(FileMMapPageStorageModule {
             file: ManuallyDrop::new(file),
             file_path: filepath,
             file_size: file_size
@@ -33,7 +33,7 @@ impl MMapPageStorageModule {
     }
 }
 
-impl PageStorageModule for MMapPageStorageModule {
+impl PageStorageModule for FileMMapPageStorageModule {
     unsafe fn map(&mut self, offset: u64, size: usize) -> Result<std::ptr::NonNull<u8>, ()> {
         let res = unsafe {
             mmap(null_mut(), size, PROT_READ | PROT_WRITE, MAP_SHARED, self.file.as_raw_fd(), offset as i64)
@@ -88,7 +88,7 @@ impl PageStorageModule for MMapPageStorageModule {
     }
 }
 
-impl Drop for MMapPageStorageModule {
+impl Drop for FileMMapPageStorageModule {
     fn drop(&mut self) {
         // drop and close file before removing
         // note that after this call, file should never be accessed again...
@@ -106,7 +106,7 @@ impl Drop for MMapPageStorageModule {
 mod test {
     use std::ptr::slice_from_raw_parts_mut;
     use crate::modules::page_storage::PageStorageModule;
-    use super::MMapPageStorageModule;
+    use super::FileMMapPageStorageModule;
 
     /// test if sync saves all data, mmap restores it after data was unmaped
     #[test]
@@ -119,7 +119,7 @@ mod test {
             source_slice[i] = (i + 1) as u8;
         }
 
-        let mut storage = MMapPageStorageModule::new("mmap_test.tmp").unwrap();
+        let mut storage = FileMMapPageStorageModule::new("mmap_test.tmp").unwrap();
         assert_eq!(storage.file.metadata().unwrap().len(), storage.file_size, "cached file size does not match the actual file size!");
         assert_eq!(storage.file_size, 0, "size of file should be zero first (it should be fresh file)!");
 

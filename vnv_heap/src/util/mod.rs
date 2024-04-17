@@ -2,11 +2,19 @@
 
 pub(crate) mod bit_array;
 
-use libc::{sysconf, _SC_PAGE_SIZE};
 
 // TODO remove this
+#[cfg(feature = "libc")]
 pub(crate) fn get_page_size() -> usize {
+    use libc::{sysconf, _SC_PAGE_SIZE};
+
     unsafe { sysconf(_SC_PAGE_SIZE) as usize }
+}
+
+// TODO remove this
+#[cfg(not(feature = "libc"))]
+pub(crate) fn get_page_size() -> usize {
+    todo!()
 }
 
 pub(crate) fn padding_needed_for(offset: usize, alignment: usize) -> usize {

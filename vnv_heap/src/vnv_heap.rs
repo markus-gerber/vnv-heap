@@ -9,7 +9,7 @@ use crate::{
     vnv_resident_heap::VNVResidentHeap,
     vnv_resident_heap_manager::VNVResidentHeapManagerConfig,
 };
-use std::{alloc::Layout, cell::RefCell, rc::Rc};
+use core::{alloc::Layout, cell::RefCell};
 
 pub struct VNVHeap<
     A: AllocatorModule + 'static,
@@ -17,7 +17,6 @@ pub struct VNVHeap<
     S: PageStorageModule,
     M: MemoryProviderModule,
 > {
-    // TODO remove the use of std allocator
     inner: RefCell<VNVHeapInner<A, R, S, M>>,
 }
 
@@ -109,7 +108,7 @@ impl<
 /*
 #[cfg(test)]
 mod test {
-    use std::{array, cell::RefCell, fmt::Debug};
+    use core::{array, cell::RefCell, fmt::Debug};
     use crate::{modules::{allocator::{buddy::BuddyAllocatorModule, AllocatorModule}, page_replacement::{EmptyPageReplacementModule, PageReplacementModule}, page_storage::{mmap::MMapPageStorageModule, PageStorageModule}}, vnv_resident_heap::VNVResidentHeap, vnv_meta_store::test::allocation_identifier_to_heap, vnv_object::{test::obj_to_allocation_identifier, VNVObject}};
     use super::{VNVHeap, VNVHeapInner};
 

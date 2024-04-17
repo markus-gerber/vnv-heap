@@ -1,4 +1,4 @@
-use std::{
+use core::{
     alloc::Layout,
     marker::PhantomData,
     mem::{align_of, size_of, MaybeUninit},
@@ -670,7 +670,7 @@ impl<A: AllocatorModule, S: PageStorageModule, M: MemoryProviderModule> Drop
 /*
 #[cfg(test)]
 pub(crate) mod test {
-    use std::{array, ptr::null_mut};
+    use core::{array, ptr::null_mut};
     use crate::{modules::{allocator::{buddy::BuddyAllocatorModule, AllocatorModule}, page_storage::{mmap::MMapPageStorageModule, PageStorageModule}}, vnv_resident_heap::VNVResidentHeap, vnv_meta_store_item::VNVMetaStoreItem};
 
     use super::{get_aligned_manager_slice, AllocationIdentifier, VNVMetaStore};

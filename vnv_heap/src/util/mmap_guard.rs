@@ -1,4 +1,4 @@
-use std::{
+use core::{
     mem::{size_of, ManuallyDrop},
     ops::{Deref, DerefMut},
     ptr::null_mut,
@@ -49,7 +49,7 @@ impl<T: MMapGuardInner> MMapGuard<T> {
         }
 
         let base_ptr = base_ptr as *mut u8;
-        unsafe { std::ptr::write(base_ptr as *mut T, data) };
+        unsafe { core::ptr::write(base_ptr as *mut T, data) };
 
         // reference to newly initialized data
         let data = unsafe { (base_ptr as *mut T).as_mut().unwrap() };
