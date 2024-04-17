@@ -18,7 +18,7 @@ pub struct VNVHeap<
     M: MemoryProviderModule,
 > {
     // TODO remove the use of std allocator
-    inner: Rc<RefCell<VNVHeapInner<A, R, S, M>>>,
+    inner: RefCell<VNVHeapInner<A, R, S, M>>,
 }
 
 impl<
@@ -31,10 +31,10 @@ impl<
 {
     pub fn new(page_replacement: R, page_storage: S, config: VNVResidentHeapManagerConfig) -> Self {
         VNVHeap {
-            inner: Rc::new(RefCell::new(VNVHeapInner {
+            inner: RefCell::new(VNVHeapInner {
                 meta_store: VNVMetaStore::new(page_storage, config),
                 page_replacement_module: page_replacement,
-            })),
+            }),
         }
     }
 
@@ -43,7 +43,7 @@ impl<
         let allocation_options = AllocationOptions::new(initial_value);
         let identifier = unsafe { inner.allocate(allocation_options) };
 
-        VNVObject::new(Rc::clone(&self.inner), identifier)
+        VNVObject::new(&self.inner, identifier)
     }
 }
 

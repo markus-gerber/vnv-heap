@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ops::Deref, rc::Rc};
+use std::{cell::RefCell, ops::Deref};
 
 use crate::{
     modules::{
@@ -12,31 +12,33 @@ use crate::{
 pub struct VNVRef<
     'a,
     'b,
+    'c,
     T: Sized,
     A: AllocatorModule + 'static,
     R: PageReplacementModule,
     P: PageStorageModule,
     M: MemoryProviderModule,
 > {
-    vnv_heap: Rc<RefCell<VNVHeapInner<A, R, P, M>>>,
+    vnv_heap: &'a RefCell<VNVHeapInner<A, R, P, M>>,
     allocation_identifier: &'b AllocationIdentifier<T, A>,
-    data_ref: &'a T,
+    data_ref: &'c T,
 }
 
 impl<
         'a,
         'b,
+        'c,
         T: Sized,
         A: AllocatorModule,
         R: PageReplacementModule,
         P: PageStorageModule,
         M: MemoryProviderModule,
-    > VNVRef<'a, 'b, T, A, R, P, M>
+    > VNVRef<'a, 'b, 'c, T, A, R, P, M>
 {
     pub(crate) unsafe fn new(
-        vnv_heap: Rc<RefCell<VNVHeapInner<A, R, P, M>>>,
+        vnv_heap: &'a RefCell<VNVHeapInner<A, R, P, M>>,
         allocation_identifier: &'b AllocationIdentifier<T, A>,
-        data_ref: &'a T,
+        data_ref: &'c T,
     ) -> Self {
         VNVRef {
             vnv_heap,
@@ -52,7 +54,7 @@ impl<
         R: PageReplacementModule,
         P: PageStorageModule,
         M: MemoryProviderModule,
-    > Deref for VNVRef<'_, '_, T, A, R, P, M>
+    > Deref for VNVRef<'_, '_, '_, T, A, R, P, M>
 {
     type Target = T;
 
@@ -67,7 +69,7 @@ impl<
         R: PageReplacementModule,
         P: PageStorageModule,
         M: MemoryProviderModule,
-    > Drop for VNVRef<'_, '_, T, A, R, P, M>
+    > Drop for VNVRef<'_, '_, '_, T, A, R, P, M>
 {
     fn drop(&mut self) {
         unsafe {

@@ -1,7 +1,6 @@
 use std::{
     cell::RefCell,
-    ops::{Deref, DerefMut},
-    rc::Rc,
+    ops::{Deref, DerefMut}
 };
 
 use crate::{
@@ -16,31 +15,33 @@ use crate::{
 pub struct VNVMutRef<
     'a,
     'b,
+    'c,
     T: Sized,
     A: AllocatorModule + 'static,
     R: PageReplacementModule,
     P: PageStorageModule,
     M: MemoryProviderModule,
 > {
-    vnv_heap: Rc<RefCell<VNVHeapInner<A, R, P, M>>>,
+    vnv_heap: &'a RefCell<VNVHeapInner<A, R, P, M>>,
     allocation_identifier: &'b AllocationIdentifier<T, A>,
-    data_ref: &'a mut T,
+    data_ref: &'c mut T,
 }
 
 impl<
         'a,
         'b,
+        'c,
         T: Sized,
         A: AllocatorModule,
         R: PageReplacementModule,
         P: PageStorageModule,
         M: MemoryProviderModule,
-    > VNVMutRef<'a, 'b, T, A, R, P, M>
+    > VNVMutRef<'a, 'b, 'c, T, A, R, P, M>
 {
     pub(crate) unsafe fn new(
-        vnv_heap: Rc<RefCell<VNVHeapInner<A, R, P, M>>>,
+        vnv_heap: &'a RefCell<VNVHeapInner<A, R, P, M>>,
         allocation_identifier: &'b AllocationIdentifier<T, A>,
-        data_ref: &'a mut T,
+        data_ref: &'c mut T,
     ) -> Self {
         VNVMutRef {
             vnv_heap,
@@ -56,7 +57,7 @@ impl<
         R: PageReplacementModule,
         P: PageStorageModule,
         M: MemoryProviderModule,
-    > Deref for VNVMutRef<'_, '_, T, A, R, P, M>
+    > Deref for VNVMutRef<'_, '_, '_, T, A, R, P, M>
 {
     type Target = T;
 
@@ -71,7 +72,7 @@ impl<
         R: PageReplacementModule,
         P: PageStorageModule,
         M: MemoryProviderModule,
-    > DerefMut for VNVMutRef<'_, '_, T, A, R, P, M>
+    > DerefMut for VNVMutRef<'_, '_, '_, T, A, R, P, M>
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.data_ref
@@ -84,7 +85,7 @@ impl<
         R: PageReplacementModule,
         P: PageStorageModule,
         M: MemoryProviderModule,
-    > Drop for VNVMutRef<'_, '_, T, A, R, P, M>
+    > Drop for VNVMutRef<'_, '_, '_, T, A, R, P, M>
 {
     fn drop(&mut self) {
         unsafe {

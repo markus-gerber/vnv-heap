@@ -1,4 +1,4 @@
-use std::{alloc::Layout, cell::RefCell, marker::PhantomData, rc::Rc};
+use std::{alloc::Layout, cell::RefCell, marker::PhantomData};
 
 use crate::{
     modules::{
@@ -12,27 +12,29 @@ use crate::{
 };
 
 pub struct VNVObject<
+    'a,
     T,
     A: AllocatorModule + 'static,
     R: PageReplacementModule,
     S: PageStorageModule,
     M: MemoryProviderModule,
 > {
-    vnv_heap: Rc<RefCell<VNVHeapInner<A, R, S, M>>>,
+    vnv_heap: &'a RefCell<VNVHeapInner<A, R, S, M>>,
     allocation_identifier: AllocationIdentifier<T, A>,
     phantom_data: PhantomData<T>,
 }
 
 impl<
+        'a,
         T: Sized,
         A: AllocatorModule,
         R: PageReplacementModule,
         S: PageStorageModule,
         M: MemoryProviderModule,
-    > VNVObject<T, A, R, S, M>
+    > VNVObject<'a, T, A, R, S, M>
 {
     pub(crate) fn new(
-        vnv_heap: Rc<RefCell<VNVHeapInner<A, R, S, M>>>,
+        vnv_heap: &'a RefCell<VNVHeapInner<A, R, S, M>>,
         identifier: AllocationIdentifier<T, A>,
     ) -> Self {
         VNVObject {
@@ -42,26 +44,26 @@ impl<
         }
     }
 
-    pub fn get(&self) -> VNVRef<'_, '_, T, A, R, S, M> {
+    pub fn get(&self) -> VNVRef<'_, '_, '_, T, A, R, S, M> {
         let mut heap = self.vnv_heap.borrow_mut();
         unsafe {
             let ptr: *const T = heap.get_ref(&self.allocation_identifier);
             let data_ref = ptr.as_ref().unwrap();
             VNVRef::new(
-                Rc::clone(&self.vnv_heap),
+                self.vnv_heap,
                 &self.allocation_identifier,
                 data_ref,
             )
         }
     }
 
-    pub fn get_mut(&mut self) -> VNVMutRef<'_, '_, T, A, R, S, M> {
+    pub fn get_mut(&mut self) -> VNVMutRef<'_, '_, '_, T, A, R, S, M> {
         let mut heap = self.vnv_heap.borrow_mut();
         unsafe {
             let ptr: *mut T = heap.get_mut(&self.allocation_identifier);
             let data_ref = ptr.as_mut().unwrap();
             VNVMutRef::new(
-                Rc::clone(&self.vnv_heap),
+                self.vnv_heap,
                 &self.allocation_identifier,
                 data_ref,
             )
@@ -75,7 +77,7 @@ impl<
         R: PageReplacementModule,
         S: PageStorageModule,
         M: MemoryProviderModule,
-    > Drop for VNVObject<T, A, R, S, M>
+    > Drop for VNVObject<'_, T, A, R, S, M>
 {
     fn drop(&mut self) {
         let layout = Layout::new::<T>();
@@ -98,16 +100,10 @@ pub(crate) mod test {
 
     use super::VNVObject;
 
-    /// just for testing purposes
-    pub(crate) fn obj_to_allocation_identifier<
-        T: Sized,
-        A: AllocatorModule,
-        R: PageReplacementModule,
-        S: PageStorageModule,
-        M: MemoryProviderModule,
-    >(
-        obj: &VNVObject<T, A, R, S, M>,
-    ) -> &AllocationIdentifier<T, A> {
-        &obj.allocation_identifier
+    // just for testing purposes
+    impl<T, A: AllocatorModule, R: PageReplacementModule, S: PageStorageModule, M: MemoryProviderModule> VNVObject<'_, T, A, R, S, M> {
+        pub(crate) fn get_allocation_identifier(&self) -> &AllocationIdentifier<T, A> {
+            &self.allocation_identifier
+        }
     }
 }

@@ -13,7 +13,7 @@ pub(crate) fn calc_max_resident_heap_count(resident_size: usize) -> usize {
     ceil_div(resident_size, get_page_size())
 }
 
-pub(crate) struct VNVResidentHeapManagerConfig {
+pub struct VNVResidentHeapManagerConfig {
     pub max_resident_size: usize,
     pub max_dirty_size: usize,
 }
