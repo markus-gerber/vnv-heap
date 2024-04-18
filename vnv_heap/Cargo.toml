@@ -10,4 +10,4 @@ log = { version = "0.4.21", features = [ "max_level_trace", "release_max_level_w
 libc = { verison = "0.2.153", optional = true }
 
 [features]
-libc = ["dep:libc"]
+use_libc = ["libc"]

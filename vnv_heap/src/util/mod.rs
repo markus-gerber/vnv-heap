@@ -4,7 +4,7 @@ pub(crate) mod bit_array;
 
 
 // TODO remove this
-#[cfg(feature = "libc")]
+#[cfg(feature = "use_libc")]
 pub(crate) fn get_page_size() -> usize {
     use libc::{sysconf, _SC_PAGE_SIZE};
 
@@ -12,7 +12,7 @@ pub(crate) fn get_page_size() -> usize {
 }
 
 // TODO remove this
-#[cfg(not(feature = "libc"))]
+#[cfg(not(feature = "use_libc"))]
 pub(crate) fn get_page_size() -> usize {
     todo!()
 }

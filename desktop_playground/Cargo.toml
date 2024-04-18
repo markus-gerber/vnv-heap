@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 env_logger = "0.10.2"
 log = { version = "0.4.21", features = [ "max_level_trace", "release_max_level_warn" ] }
-vnv_heap = { path = "../vnv_heap", features = ["libc"] }
+vnv_heap = { path = "../vnv_heap", features = ["use_libc"] }
