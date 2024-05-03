@@ -1,12 +1,12 @@
 use core::{cell::RefCell, ops::Deref};
 
 use crate::{
+    allocation_identifier::AllocationIdentifier,
     modules::{
-        allocator::AllocatorModule, memory_provider::MemoryProviderModule,
-        page_replacement::PageReplacementModule, page_storage::PageStorageModule,
+        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
+        persistent_storage::PersistentStorageModule,
     },
     vnv_heap::VNVHeapInner,
-    vnv_meta_store::AllocationIdentifier,
 };
 
 pub struct VNVRef<
@@ -14,13 +14,12 @@ pub struct VNVRef<
     'b,
     'c,
     T: Sized,
-    A: AllocatorModule + 'static,
-    R: PageReplacementModule,
-    P: PageStorageModule,
-    M: MemoryProviderModule,
+    A: AllocatorModule,
+    N: NonResidentAllocatorModule,
+    S: PersistentStorageModule,
 > {
-    vnv_heap: &'a RefCell<VNVHeapInner<A, R, P, M>>,
-    allocation_identifier: &'b AllocationIdentifier<T, A>,
+    vnv_heap: &'a RefCell<VNVHeapInner<A, N, S>>,
+    allocation_identifier: &'b AllocationIdentifier<T>,
     data_ref: &'c T,
 }
 
@@ -30,14 +29,13 @@ impl<
         'c,
         T: Sized,
         A: AllocatorModule,
-        R: PageReplacementModule,
-        P: PageStorageModule,
-        M: MemoryProviderModule,
-    > VNVRef<'a, 'b, 'c, T, A, R, P, M>
+        N: NonResidentAllocatorModule,
+        S: PersistentStorageModule,
+    > VNVRef<'a, 'b, 'c, T, A, N, S>
 {
     pub(crate) unsafe fn new(
-        vnv_heap: &'a RefCell<VNVHeapInner<A, R, P, M>>,
-        allocation_identifier: &'b AllocationIdentifier<T, A>,
+        vnv_heap: &'a RefCell<VNVHeapInner<A, N, S>>,
+        allocation_identifier: &'b AllocationIdentifier<T>,
         data_ref: &'c T,
     ) -> Self {
         VNVRef {
@@ -48,13 +46,8 @@ impl<
     }
 }
 
-impl<
-        T: Sized,
-        A: AllocatorModule,
-        R: PageReplacementModule,
-        P: PageStorageModule,
-        M: MemoryProviderModule,
-    > Deref for VNVRef<'_, '_, '_, T, A, R, P, M>
+impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule> Deref
+    for VNVRef<'_, '_, '_, T, A, N, S>
 {
     type Target = T;
 
@@ -63,13 +56,8 @@ impl<
     }
 }
 
-impl<
-        T: Sized,
-        A: AllocatorModule,
-        R: PageReplacementModule,
-        P: PageStorageModule,
-        M: MemoryProviderModule,
-    > Drop for VNVRef<'_, '_, '_, T, A, R, P, M>
+impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule> Drop
+    for VNVRef<'_, '_, '_, T, A, N, S>
 {
     fn drop(&mut self) {
         unsafe {
