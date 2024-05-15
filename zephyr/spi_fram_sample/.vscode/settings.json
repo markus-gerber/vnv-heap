@@ -1,5 +1,5 @@
 {
     "C_Cpp.default.includePath": [
-        "~/zephyrproject/zephyr/include"
+        "$(ZEPHYR_BASE)/include"
     ]
 }

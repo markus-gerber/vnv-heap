@@ -1,6 +1,5 @@
 mod allocation_options;
 mod allocation_identifier;
-mod resident_object;
 mod resident_object_manager;
 mod vnv_config;
 mod vnv_heap;
@@ -9,6 +8,10 @@ mod vnv_object;
 mod vnv_ref;
 mod util;
 
+#[cfg(test)]
+mod test;
+
 pub use crate::vnv_heap::VNVHeap;
+pub use crate::vnv_object::VNVObject;
 pub use vnv_config::VNVConfig;
 pub mod modules;

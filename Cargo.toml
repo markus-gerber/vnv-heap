@@ -1,5 +1,9 @@
 [workspace]
 members = [
-    "vnv_heap",
-    "desktop_playground"
+    "desktop_playground",
+    "vnv_heap"
+]
+exclude = [
+    "zephyr/spi_fram_sample",
+    "zephyr/vnv_heap_sample"
 ]

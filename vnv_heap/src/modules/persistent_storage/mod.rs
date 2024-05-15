@@ -5,6 +5,7 @@ use core::{
     mem::{size_of, MaybeUninit},
     ptr::slice_from_raw_parts_mut,
 };
+use core::ptr::slice_from_raw_parts;
 
 #[cfg(not(no_std))]
 pub use file_storage::FilePersistentStorageModule;
@@ -21,7 +22,7 @@ pub trait PersistentStorageModule {
     fn get_max_size(&self) -> usize;
 
     /// Writes the region `src` back to the underlying storage `[offset, offset + size.len()]`
-    fn write(&mut self, offset: usize, src: &mut [u8]) -> Result<(), ()>;
+    fn write(&mut self, offset: usize, src: &[u8]) -> Result<(), ()>;
 
     /// A function that can be used to tell underlying caching layers that the region `[offset, size)`
     /// will probably not be accessed in the near future.
@@ -29,9 +30,9 @@ pub trait PersistentStorageModule {
     /// (So you probably only want to overwrite this function if you are defining a cache)
     fn forget_region(&mut self, _offset: usize, _size: usize) {}
 
-    fn write_data<T: Sized>(&mut self, offset: usize, src: &mut T) -> Result<(), ()> {
-        let buffer = slice_from_raw_parts_mut((src as *mut T) as *mut u8, size_of::<T>());
-        self.write(offset, unsafe { buffer.as_mut().unwrap() })?;
+    fn write_data<T: Sized>(&mut self, offset: usize, src: &T) -> Result<(), ()> {
+        let buffer = slice_from_raw_parts((src as *const T) as *mut u8, size_of::<T>());
+        self.write(offset, unsafe { buffer.as_ref().unwrap() })?;
 
         Ok(())
     }
@@ -92,7 +93,7 @@ pub(crate) mod test {
                 test_slice[x] = source_slice[offset + x];
             }
 
-            module.write(offset, &mut test_slice).unwrap();
+            module.write(offset, &test_slice).unwrap();
         }
 
         for i in 0..PERSISTENT_STORAGE_NORMAL_TEST_SIZE / SUB_TEST_SIZE {
@@ -108,7 +109,7 @@ pub(crate) mod test {
     pub(super) const PERSISTENT_STORAGE_CUSTOM_TYPE_TEST_SIZE: usize = 100;
 
     pub(super) fn test_persistent_storage_custom_type<T: PersistentStorageModule>(mut module: T) {
-        module.write(0, &mut [255u8; 100]).unwrap();
+        module.write(0, &[255u8; 100]).unwrap();
 
         #[derive(PartialEq, Debug)]
         struct TestData {
@@ -123,7 +124,7 @@ pub(crate) mod test {
             c: None,
         };
 
-        module.write_data(10, &mut original).unwrap();
+        module.write_data(10, &original).unwrap();
 
         // make sure that data was only written to that area
         let mut test_buffer = [0u8; 100];

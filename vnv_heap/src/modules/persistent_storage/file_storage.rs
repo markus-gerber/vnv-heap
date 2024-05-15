@@ -50,7 +50,7 @@ impl PersistentStorageModule for FilePersistentStorageModule {
         Ok(())
     }
 
-    fn write(&mut self, offset: usize, src: &mut [u8]) -> Result<(), ()> {
+    fn write(&mut self, offset: usize, src: &[u8]) -> Result<(), ()> {
         debug_assert!(offset + src.len() <= self.file_size);
 
         self.file

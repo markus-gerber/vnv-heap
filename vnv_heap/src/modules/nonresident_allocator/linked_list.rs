@@ -1,4 +1,5 @@
 use core::{marker::PhantomData, mem::size_of};
+use core::alloc::Layout;
 
 use crate::modules::persistent_storage::PersistentStorageModule;
 
@@ -31,7 +32,11 @@ impl<T: Sized> NonResidentLinkedList<T> {
 impl<T: Sized> NonResidentLinkedList<T> {
     /// The total size of an item stored in this list in persistent storage
     pub const fn total_item_size() -> usize {
-        size_of::<T>() + size_of::<usize>()
+        size_of::<NonResidentLinkedListItem<T>>()
+    }
+
+    pub const fn item_layout() -> Layout {
+        Layout::new::<NonResidentLinkedListItem<T>>()
     }
 
     /// Return `true` if the list is empty
@@ -62,11 +67,11 @@ impl<T: Sized> NonResidentLinkedList<T> {
 
         debug_assert_ne!(item_offset, NEXT_NULL, "cannot push reserved offset value");
 
-        let mut item = NonResidentLinkedListItem {
+        let item = NonResidentLinkedListItem {
             next: self.head,
             data: data,
         };
-        storage.write_data(item_offset, &mut item)?;
+        storage.write_data(item_offset, &item)?;
         self.head = item_offset;
 
         Ok(())
@@ -114,7 +119,7 @@ impl<T: Sized> NonResidentLinkedList<T> {
         let mut counter = 0;
 
         while curr != NEXT_NULL {
-            let mut curr_element =
+            let curr_element =
                 unsafe { storage.read_data::<NonResidentLinkedListItem<T>>(curr)? };
 
             if function((curr, &curr_element.data)) {
@@ -128,7 +133,7 @@ impl<T: Sized> NonResidentLinkedList<T> {
                 } else {
                     // this is not the first item in the list
                     // so we need to update the previous item, to remove it
-                    storage.write_data(prev, &mut curr_element.next)?;
+                    storage.write_data(prev, &curr_element.next)?;
                 }
 
                 // tell potential cache layers that this item is not needed anymore for now
@@ -206,6 +211,10 @@ impl SimpleNonResidentLinkedList {
     /// The total size of an item stored in this list in persistent storage
     pub const fn total_item_size() -> usize {
         NonResidentLinkedList::<()>::total_item_size()
+    }
+
+    pub const fn item_layout() -> Layout {
+        NonResidentLinkedList::<()>::item_layout()
     }
 
     /// Return `true` if the list is empty
@@ -287,6 +296,10 @@ impl<T: Sized> CountedNonResidentLinkedList<T> {
     /// The total size of an item stored in this list in persistent storage
     pub const fn total_item_size() -> usize {
         NonResidentLinkedList::<T>::total_item_size()
+    }
+
+    pub const fn item_layout() -> Layout {
+        NonResidentLinkedList::<T>::item_layout()
     }
 
     /// Return `true` if the list is empty
@@ -380,8 +393,8 @@ mod test {
 
         let mut storage = get_test_storage("test_non_resident_linked_list_push_pop", TEST_SIZE);
 
-        let mut init_buffer = [INIT_VAL; TEST_SIZE];
-        storage.write(0, &mut init_buffer).unwrap();
+        let init_buffer = [INIT_VAL; TEST_SIZE];
+        storage.write(0, &init_buffer).unwrap();
 
         let mut list: NonResidentLinkedList<ListData> = NonResidentLinkedList::new();
         let mut check_list: VecDeque<(usize, ListData)> = VecDeque::new();
@@ -431,8 +444,8 @@ mod test {
 
         let mut storage = get_test_storage("test_non_resident_linked_list_remove_where", TEST_SIZE);
 
-        let mut init_buffer = [INIT_VAL; TEST_SIZE];
-        storage.write(0, &mut init_buffer).unwrap();
+        let init_buffer = [INIT_VAL; TEST_SIZE];
+        storage.write(0, &init_buffer).unwrap();
 
         let mut list: NonResidentLinkedList<ListData> = NonResidentLinkedList::new();
         let mut check_list: VecDeque<(usize, ListData)> = VecDeque::new();
@@ -489,8 +502,6 @@ mod test {
     #[cfg(not(no_std))]
     #[test]
     fn test_non_resident_linked_list_filled() {
-        use std::mem::size_of;
-
         const ITEM_SIZE: usize = NonResidentLinkedList::<ListData>::total_item_size();
         const ITEM_COUNT: usize = 100;
         const TEST_SIZE: usize = ITEM_SIZE * ITEM_COUNT;
@@ -498,8 +509,8 @@ mod test {
 
         let mut storage = get_test_storage("test_non_resident_linked_list_filled", TEST_SIZE);
 
-        let mut init_buffer = [INIT_VAL; TEST_SIZE];
-        storage.write(0, &mut init_buffer).unwrap();
+        let init_buffer = [INIT_VAL; TEST_SIZE];
+        storage.write(0, &init_buffer).unwrap();
 
         let mut list: NonResidentLinkedList<ListData> = NonResidentLinkedList::new();
         let mut check_list: VecDeque<(usize, ListData)> = VecDeque::new();
@@ -540,8 +551,8 @@ mod test {
 
         let mut storage = get_test_storage("test_counted_non_resident_linked_list", TEST_SIZE);
 
-        let mut init_buffer = [INIT_VAL; TEST_SIZE];
-        storage.write(0, &mut init_buffer).unwrap();
+        let init_buffer = [INIT_VAL; TEST_SIZE];
+        storage.write(0, &init_buffer).unwrap();
 
         let mut list: CountedNonResidentLinkedList<ListData> = CountedNonResidentLinkedList::new();
         let mut check_list: VecDeque<(usize, ListData)> = VecDeque::new();

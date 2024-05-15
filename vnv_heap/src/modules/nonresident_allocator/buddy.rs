@@ -4,7 +4,7 @@ use super::{NonResidentAllocatorModule, SimpleNonResidentLinkedList};
 use crate::modules::persistent_storage::PersistentStorageModule;
 use core::alloc::Layout;
 use core::array;
-use std::{
+use core::{
     cmp::{max, min},
     mem::size_of,
 };
@@ -159,7 +159,7 @@ fn prev_power_of_two(num: usize) -> usize {
 
 #[cfg(test)]
 mod test {
-    use std::{alloc::Layout, mem::size_of};
+    use core::{alloc::Layout, mem::size_of};
 
     use crate::modules::{
         nonresident_allocator::NonResidentBuddyAllocatorModule,

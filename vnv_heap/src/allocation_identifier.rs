@@ -1,8 +1,15 @@
-use std::marker::PhantomData;
-
-
+use core::marker::PhantomData;
 
 pub(crate) struct AllocationIdentifier<T: Sized> {
-    offset: usize,
+    pub(crate) offset: usize,
     _phantom_data: PhantomData<T>
+}
+
+impl<T: Sized> AllocationIdentifier<T> {
+    pub(crate) fn from_offset(offset: usize) -> Self {
+        Self {
+            offset,
+            _phantom_data: PhantomData
+        }
+    }
 }

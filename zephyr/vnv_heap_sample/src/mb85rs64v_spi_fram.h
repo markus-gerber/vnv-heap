@@ -39,7 +39,7 @@ struct spi_dt_spec mb85rs64v_init(int* error) {
 	return spec;
 }
 
-static int mb85rs64v_access(const struct spi_dt_spec* device,
+static inline int mb85rs64v_access(const struct spi_dt_spec* device,
 			    uint8_t cmd, uint16_t addr, void *data, size_t len)
 {
 	uint8_t access[3];
@@ -133,7 +133,7 @@ int mb85rs64v_validate_id(const struct spi_dt_spec* device)
 }
 
 int mb85rs64v_write_bytes(const struct spi_dt_spec* device,
-		       uint16_t addr, uint8_t *data, uint32_t num_bytes)
+		       uint16_t addr, const uint8_t *data, uint32_t num_bytes)
 {
 	int err;
 
@@ -146,7 +146,7 @@ int mb85rs64v_write_bytes(const struct spi_dt_spec* device,
 
 	/* write cmd */
 	err = mb85rs64v_access(device,
-			       MB85RS64V_WRITE_CMD, addr, data, num_bytes);
+			       MB85RS64V_WRITE_CMD, addr, (uint8_t*) data, num_bytes);
 	if (err) {
 		return -EIO;
 	}
