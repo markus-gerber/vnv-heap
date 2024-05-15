@@ -50,8 +50,17 @@ impl PersistentStorageModule for SpiFramStorageModule {
 
     fn write(&mut self, address: usize, buffer: &[u8]) -> Result<(), ()> {
         debug_assert!(address <= (u16::MAX as usize));
+        
+        #[cfg(debug_assertions)]
+        let before_hash: u32 = crate::xxhash::xxh32(buffer, 1780281484);
 
         let res = unsafe { mb85rs64v_write_bytes(&self.spi_spec, address as u16, buffer.as_ptr(), buffer.len() as u32) };
+
+        #[cfg(debug_assertions)]
+        {
+            let after_hash: u32 = crate::xxhash::xxh32(buffer, 1780281484);
+            debug_assert_eq!(before_hash, after_hash, "buffer should not change when writing bytes!");
+        }
 
         if res != 0 {
             return Err(());

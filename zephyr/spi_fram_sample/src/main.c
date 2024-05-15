@@ -5,9 +5,8 @@
 #include <zephyr/kernel.h>
 #endif
 
-#include "atomics.h"
+#include "../../common/atomics/atomics.h"
 #include "mb85rs64v_spi_fram.h"
-
 
 extern void rust_main(void);
 

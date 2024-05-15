@@ -10,8 +10,6 @@ extern crate zephyr;
 extern crate zephyr_logger;
 extern crate zephyr_core;
 
-mod spi_fram_storage;
-
 use spi_fram_storage::SpiFramStorageModule;
 use vnv_heap::{VNVConfig, VNVHeap, modules::{nonresident_allocator::NonResidentBuddyAllocatorModule, allocator::LinkedListAllocatorModule}};
 

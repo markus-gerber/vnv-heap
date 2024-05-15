@@ -271,15 +271,24 @@ impl<A: AllocatorModule> ResidentObjectManager<A> {
                     while let Some(mut curr_dirty) = dirty_iter_mut.next() {
                         if unsafe { curr_dirty.get_element().offset } == alloc_id.offset {
                             curr_dirty.delete();
-                            found = true;
+
+                            #[cfg(debug_assertions)]
+                            {
+                                found = true;
+                            }
+
                             break;
                         }
                     }
 
-                    debug_assert!(
-                        found,
-                        "Item should be in the dirty list (as its dirty flag was set to true)"
-                    );
+                    #[cfg(debug_assertions)]
+                    {
+                        debug_assert!(
+                            found,
+                            "Item should be in the dirty list (as its dirty flag was set to true)"
+                        );
+                    }
+
                     self.remaining_dirty_size += size_of::<T>();
                 }
 
