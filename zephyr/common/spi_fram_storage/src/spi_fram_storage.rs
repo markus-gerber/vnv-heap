@@ -1,6 +1,7 @@
 extern crate zephyr_sys;
 
 use core::ffi::c_int;
+use std::sync::atomic::AtomicBool;
 
 use vnv_heap::modules::persistent_storage::PersistentStorageModule;
 
@@ -13,6 +14,8 @@ extern "C" {
     fn mb85rs64v_read_bytes(device: *const SPISpec, addr: u16, data: *mut u8, num_bytes: u32) -> c_int;
 }
 
+static ALREADY_INITIALIZED: AtomicBool = AtomicBool::new(false);
+
 pub struct SpiFramStorageModule {
     spi_spec: SPISpec
 }
@@ -20,6 +23,16 @@ pub struct SpiFramStorageModule {
 impl SpiFramStorageModule {
     /// You can only create one object of this struct safely
     pub unsafe fn new() -> Result<Self, ()> {
+        if ALREADY_INITIALIZED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            // module was already initialized
+            // this is not allowed with just one spi spec
+            
+            // one idea to overcome this for some applications:
+            // write new wrapper PersistentStorageModule that manages multiple accesses to
+            // this module
+            panic!("Creating multiple instances of \"SpiFramStorageModule\" is invalid!");
+        }
+
         let mut result: c_int = 0;
         let spec = mb85rs64v_init(&mut result);
         if result != 0 {

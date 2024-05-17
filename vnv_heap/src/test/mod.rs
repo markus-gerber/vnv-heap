@@ -3,7 +3,7 @@ use crate::{modules::{persistent_storage::{test::get_test_storage, FilePersisten
 mod persistency;
 
 #[cfg(not(no_std))]
-fn get_test_heap(test_name: &str, size: usize, resident_buffer: &mut [u8], dirty_size: usize) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, FilePersistentStorageModule> {
+fn get_test_heap<'a>(test_name: &str, size: usize, resident_buffer: &'a mut [u8], dirty_size: usize) -> VNVHeap<'a, LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, FilePersistentStorageModule> {
     use crate::VNVConfig;
 
     let storage = get_test_storage(test_name, size);

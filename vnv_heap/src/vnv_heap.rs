@@ -7,14 +7,14 @@ use crate::{
 use core::{alloc::Layout, cell::RefCell};
 use core::marker::PhantomData;
 
-pub struct VNVHeap<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule> {
-    inner: RefCell<VNVHeapInner<A, N, S>>,
+pub struct VNVHeap<'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule> {
+    inner: RefCell<VNVHeapInner<'a, A, N, S>>,
 }
 
-impl<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule>
-    VNVHeap<A, N, S>
+impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule>
+    VNVHeap<'a, A, N, S>
 {
-    pub fn new(resident_buffer: &mut [u8], mut storage_module: S, config: VNVConfig) -> Result<Self, ()> {
+    pub fn new(resident_buffer: &'a mut [u8], mut storage_module: S, config: VNVConfig) -> Result<Self, ()> {
         assert!(resident_buffer.len() >= config.max_dirty_bytes, "dirty size has to be smaller or equal to the resident buffer");
 
         let (resident_object_manager, offset) = ResidentObjectManager::<A>::new(resident_buffer, config.max_dirty_bytes, &mut storage_module)?;
@@ -31,7 +31,7 @@ impl<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModu
         })
     }
 
-    pub fn allocate<T: Sized>(&self, initial_value: T) -> Result<VNVObject<T, A, N, S>, ()> {
+    pub fn allocate<T: Sized>(&self, initial_value: T) -> Result<VNVObject<'_, 'a, T, A, N, S>, ()> {
         let mut inner = self.inner.borrow_mut();
         let allocation_options = AllocationOptions::new(initial_value);
         let identifier = unsafe { inner.allocate(allocation_options)? };
@@ -41,18 +41,19 @@ impl<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModu
 }
 
 pub(crate) struct VNVHeapInner<
+    'a,
     A: AllocatorModule,
     N: NonResidentAllocatorModule,
     S: PersistentStorageModule,
 > {
     storage_module: S,
-    resident_object_manager: ResidentObjectManager<A>,
+    resident_object_manager: ResidentObjectManager<'a, A>,
     non_resident_allocator: N,
     _phantom_data: PhantomData<A>
 }
 
 impl<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule>
-    VNVHeapInner<A, N, S>
+    VNVHeapInner<'_, A, N, S>
 {
     pub(crate) unsafe fn allocate<T: Sized>(
         &mut self,

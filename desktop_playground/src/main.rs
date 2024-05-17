@@ -1,5 +1,12 @@
 use env_logger::{Builder, Env};
-use vnv_heap::{modules::{allocator::LinkedListAllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, persistent_storage::FilePersistentStorageModule}, VNVConfig, VNVHeap};
+use vnv_heap::{
+    modules::{
+        allocator::LinkedListAllocatorModule,
+        nonresident_allocator::NonResidentBuddyAllocatorModule,
+        persistent_storage::FilePersistentStorageModule,
+    },
+    VNVConfig, VNVHeap,
+};
 
 fn main() {
     Builder::from_env(Env::default())
@@ -9,14 +16,14 @@ fn main() {
 
     let storage = FilePersistentStorageModule::new("test.data".to_string(), 4096).unwrap();
     let config = VNVConfig {
-        max_dirty_bytes: 100
+        max_dirty_bytes: 100,
     };
     let mut buffer = [0u8; 512];
 
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
-        FilePersistentStorageModule
+        FilePersistentStorageModule,
     > = VNVHeap::new(&mut buffer, storage, config).unwrap();
 
     let mut obj = heap.allocate::<u32>(10).unwrap();
@@ -62,5 +69,4 @@ fn main() {
 
         println!("data: {}", *obj_ref);
     }
-
 }

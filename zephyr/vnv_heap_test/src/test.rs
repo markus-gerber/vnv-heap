@@ -17,14 +17,15 @@ pub fn test_heap_persistency() {
     };
     let mut buffer = [0u8; 1000];
     
-    let mut heap: VNVHeap<
+    let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
         SpiFramStorageModule
     > = VNVHeap::new(&mut buffer, storage, config).unwrap();
 
     const SEED: u64 = 5446535461589659585;
-    const OBJECT_COUNT: usize = 100;
+    const OBJECT_COUNT: usize = 200;
+    const ITERATION_MULTIPLIER: usize = 10000;
 
     let mut rand = SmallRng::seed_from_u64(SEED);
 
@@ -64,17 +65,19 @@ pub fn test_heap_persistency() {
         };
     }
 
+    log::warn!("Starting Tests...");
+
     // start allocating some first objects
     for _ in 0..OBJECT_COUNT/3 {
         allocate!();
     }
 
     // start testing
-    for _ in 0..200 {
+    for _ in 0..ITERATION_MULTIPLIER * 2 {
         single_test!();
     }
 
-    log::debug!("-> Finished Test 1!");
+    log::warn!("-> Finished Test 1!");
 
     let mut open_ref_obj = vec![];
     let mut open_refs = vec![];
@@ -93,32 +96,32 @@ pub fn test_heap_persistency() {
     }
 
     // test again
-    for _ in 0..200 {
+    for _ in 0..ITERATION_MULTIPLIER * 2 {
         single_test!();
     }
 
-    log::debug!("-> Finished Test 2!");
+    log::warn!("-> Finished Test 2!");
 
     // drop open refs
     drop(open_refs);
 
 
     // test again
-    for _ in 0..200 {
+    for _ in 0..ITERATION_MULTIPLIER * 5 {
         single_test!();
     }
 
-    log::debug!("-> Finished Test 3!");
+    log::warn!("-> Finished Test 3!");
 
     drop(open_muts);
     drop(open_ref_obj);
 
     // test again
-    for _ in 0..1_000 {
+    for _ in 0..ITERATION_MULTIPLIER * 10 {
         single_test!();
     }
 
-    log::debug!("-> Finished Test 4!");
+    log::warn!("-> Finished Test 4!");
 
     // start allocating last objects
     for _ in 0..(OBJECT_COUNT - objects.len()) {
@@ -126,10 +129,10 @@ pub fn test_heap_persistency() {
     }
 
     // test again
-    for _ in 0..1_000 {
+    for _ in 0..ITERATION_MULTIPLIER * 10 {
         single_test!();
     }
 
-    log::debug!("-> Finished Test 4!");
+    log::warn!("-> Finished Test 5!");
 
 }

@@ -9,26 +9,28 @@ use crate::{
 
 pub struct VNVObject<
     'a,
+    'b: 'a,
     T: Sized,
     A: AllocatorModule,
     N: NonResidentAllocatorModule,
     S: PersistentStorageModule,
 > {
-    vnv_heap: &'a RefCell<VNVHeapInner<A, N, S>>,
+    vnv_heap: &'a RefCell<VNVHeapInner<'b, A, N, S>>,
     allocation_identifier: AllocationIdentifier<T>,
     phantom_data: PhantomData<T>,
 }
 
 impl<
         'a,
+        'b: 'a,
         T: Sized,
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         S: PersistentStorageModule,
-    > VNVObject<'a, T, A, N, S>
+    > VNVObject<'a, 'b, T, A, N, S>
 {
     pub(crate) fn new(
-        vnv_heap: &'a RefCell<VNVHeapInner<A, N, S>>,
+        vnv_heap: &'a RefCell<VNVHeapInner<'b, A, N, S>>,
         identifier: AllocationIdentifier<T>,
     ) -> Self {
         VNVObject {
@@ -38,7 +40,7 @@ impl<
         }
     }
 
-    pub fn get(&self) -> Result<VNVRef<'_, '_, '_, T, A, N, S>, ()> {
+    pub fn get(&self) -> Result<VNVRef<'a, '_, '_, 'b, T, A, N, S>, ()> {
         let mut heap = self.vnv_heap.borrow_mut();
         unsafe {
             let ptr: *const T = heap.get_ref(&self.allocation_identifier)?;
@@ -47,7 +49,7 @@ impl<
         }
     }
 
-    pub fn get_mut(&mut self) -> Result<VNVMutRef<'_, '_, '_, T, A, N, S>, ()> {
+    pub fn get_mut(&mut self) -> Result<VNVMutRef<'a, '_, '_, 'b, T, A, N, S>, ()> {
         let mut heap = self.vnv_heap.borrow_mut();
         unsafe {
             let ptr: *mut T = heap.get_mut(&self.allocation_identifier)?;
@@ -58,7 +60,7 @@ impl<
 }
 
 impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule> Drop
-    for VNVObject<'_, T, A, N, S>
+    for VNVObject<'_, '_, T, A, N, S>
 {
     fn drop(&mut self) {
         let layout = Layout::new::<T>();

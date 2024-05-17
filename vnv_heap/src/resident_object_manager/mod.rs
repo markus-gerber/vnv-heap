@@ -1,5 +1,6 @@
 use core::alloc::Layout;
 use core::{mem::size_of, ptr::NonNull};
+use std::marker::PhantomData;
 
 use log::{debug, error, trace, warn};
 
@@ -19,45 +20,14 @@ use self::resident_object::{
 
 mod resident_object;
 
+mod resident_object_backup;
+
+use resident_object_backup::*;
+
 #[cfg(test)]
 mod test;
 
-/// Metadata of resident objects that will be saved
-/// to non volatile storage, so that program can recover
-/// after a power failure
-struct ResidentObjectMetadataBackup {
-    /// size of the object
-    size: usize,
-
-    /// where is this objects stored inside of
-    /// persistent storage
-    offset: usize,
-
-    /// how many references are there
-    ref_cnt: usize,
-
-    /// at which address does this data live
-    /// (pointers could exist here so we need to restore
-    /// the object at exactly the previous address)
-    resident_ptr: usize,
-}
-
-impl ResidentObjectMetadataBackup {
-    fn new_unused() -> Self {
-        ResidentObjectMetadataBackup {
-            size: 0,
-            offset: 0,
-            ref_cnt: 0,
-            resident_ptr: 0,
-        }
-    }
-
-    fn is_unused(&self) -> bool {
-        self.resident_ptr == 0
-    }
-}
-
-pub(crate) struct ResidentObjectManager<A: AllocatorModule> {
+pub(crate) struct ResidentObjectManager<'a, A: AllocatorModule> {
     /// In memory heap for resident objects and their metadata
     heap: A,
 
@@ -86,9 +56,11 @@ pub(crate) struct ResidentObjectManager<A: AllocatorModule> {
     /// How many bytes can still be made dirty without
     /// violating users requirements
     remaining_dirty_size: usize,
+
+    _resident_buffer: PhantomData<&'a mut ()>
 }
 
-impl<A: AllocatorModule> ResidentObjectManager<A> {
+impl<'a, A: AllocatorModule> ResidentObjectManager<'a, A> {
     /// Create a new resident object manager
     ///
     /// **Note**: Will overwrite any data, at index 0 of the given persistent storage.
@@ -96,7 +68,7 @@ impl<A: AllocatorModule> ResidentObjectManager<A> {
     /// Returns the newly created instance and the offset from which on data can
     /// be stored to persistent storage safely again.
     pub(crate) fn new<S: PersistentStorageModule>(
-        resident_buffer: &mut [u8],
+        resident_buffer: &'a mut [u8],
         max_dirty_size: usize,
         storage: &mut S,
     ) -> Result<(Self, usize), ()> {
@@ -129,6 +101,7 @@ impl<A: AllocatorModule> ResidentObjectManager<A> {
             },
             resident_object_count: 0,
             remaining_dirty_size: max_dirty_size,
+            _resident_buffer: PhantomData
         };
 
         Ok((instance, offset))
@@ -141,7 +114,7 @@ impl<A: AllocatorModule> ResidentObjectManager<A> {
 /// part that will saved to persistent storage (some fields of `ResidentObjectMetadata` can be reconstructed)
 const METADATA_DIRTY_SIZE: usize = size_of::<ResidentObjectMetadataBackup>();
 
-impl<A: AllocatorModule> ResidentObjectManager<A> {
+impl<A: AllocatorModule> ResidentObjectManager<'_, A> {
     /// Makes the given object resident if not already and returns a pointer to the resident data
     unsafe fn require_resident<
         T: Sized,
@@ -470,7 +443,9 @@ impl<A: AllocatorModule> ResidentObjectManager<A> {
         let mut iter = self.dirty_list.iter_mut();
         while let Some(mut curr_item) = iter.next() {
             let meta_ref = curr_item.get_element();
-            if meta_ref.is_dirty && meta_ref.ref_cnt == 0 {
+            debug_assert!(meta_ref.is_dirty, "Item should be marked as dirty, as it is in the dirty list");
+
+            if meta_ref.ref_cnt == 0 {
                 let _ = sync_object_dynamic(curr_item, &mut self.remaining_dirty_size, storage);
                 if self.remaining_dirty_size >= required_bytes {
                     return Ok(());
@@ -594,55 +569,13 @@ unsafe fn sync_object_dynamic<S: PersistentStorageModule>(
     if res.is_ok() {
         // give back space and remove from dirty list
         *remaining_dirty_size += meta_ref.layout.size();
+        meta_ref.is_dirty = false;
         curr_item.delete();
+    } else {
+        error!("Could not write object with offset {} to storage!", meta_ref.offset);
     }
-    res
-}
 
-/// Synchronizes any changes back to persistent storage.
-///
-/// - Returns `Ok(true)` if the item was found, synced and removed from the dirty list.
-/// - Returns `Ok(false)` if the item was not found
-/// - Returns `Err(())` if there was an error while syncing the data
-///
-/// ### Safety
-///
-/// As this list modifies the `dirty_list`, make sure there are no open (mutable) references
-#[inline]
-unsafe fn sync_object<T: Sized, S: PersistentStorageModule>(
-    dirty_list: &mut MultiLinkedList<
-        ResidentObjectMetadata,
-        ResidentObjectMetadataInner,
-        fn(*mut ResidentObjectMetadata) -> *mut *mut ResidentObjectMetadata,
-        fn(*mut ResidentObjectMetadata) -> *mut ResidentObjectMetadataInner,
-    >,
-    storage: &mut S,
-    offset: usize,
-    remaining_dirty_size: &mut usize,
-) -> Result<(), ()> {
-    let mut iterator = dirty_list.iter_mut();
-    while let Some(mut curr_item) = iterator.next() {
-        let metadata = curr_item.get_element();
-        if metadata.offset == offset {
-            if metadata.ref_cnt != 0 {
-                error!("Cannot sync object at offset {}, because there are open references left (ref_cnt = {})", metadata.offset, metadata.ref_cnt);
-                debug_assert!(false, "Cannot sync object at offset {}, because there are open references left (ref_cnt = {})", metadata.offset, metadata.ref_cnt);
-                return Err(());
-            }
-            let data_ptr: *const T = ResidentObject::to_data_ptr(metadata.to_resident_obj_ptr());
-            let res = storage.write_data(metadata.offset, data_ptr.as_ref().unwrap());
-            return match res {
-                Ok(_) => {
-                    // give back space and remove from dirty list
-                    *remaining_dirty_size += metadata.layout.size();
-                    curr_item.delete();
-                    Ok(())
-                }
-                Err(_) => Err(()),
-            };
-        }
-    }
-    Ok(())
+    res
 }
 
 /// This function is used to make an object nonresident even
@@ -679,14 +612,31 @@ unsafe fn make_object_nonresident_dynamic<A: AllocatorModule, S: PersistentStora
     if is_dirty {
         // item is dirty, so iterate over dirty list
         // sync item, and remove it from list
+
+        // for debugging: check if item was found
+        #[cfg(debug_assertions)]
+        let mut found = false;
+
         let mut dirty_iter = dirty_list.iter_mut();
         while let Some(mut curr) = dirty_iter.next() {
             if curr.get_element().offset == offset {
                 sync_object_dynamic(curr, remaining_dirty_size, storage)?;
+
+                #[cfg(debug_assertions)]
+                {
+                    found = true;
+                }
                 break;
             }
         }
 
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(
+                found,
+                "Item should be in the dirty list (as its dirty flag was set to true)"
+            );
+        }
         // item was successfully synced now
         // continue with removing object from RAM
     }

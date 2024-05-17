@@ -11,7 +11,8 @@ fn test_heap_persistency() {
         array::from_fn(|_| rand.next_u32() as u8)
     }
 
-    let heap = get_test_heap("test_heap_persistency", 2* 4096, &mut [0u8; 1000], 600);
+    let mut buffer = [0u8; 1000];
+    let heap = get_test_heap("test_heap_persistency", 2* 4096, &mut buffer, 600);
     const SEED: u64 = 5446535461589659585;
     const OBJECT_COUNT: usize = 100;
 

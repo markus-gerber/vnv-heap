@@ -57,6 +57,11 @@ pub(super) struct ResidentObjectMetadataInner {
 
     pub(super) layout: Layout,
 
+    /// Used to test that `dynamic_metadata_to_data_range` is correct
+    /// 
+    /// Use `usize::MAX` to disable. This is used when the state will
+    /// be restored after a PFI, because VNVHeap has no idea what type
+    /// belongs to which metadata.
     #[cfg(debug_assertions)]
     pub(super) data_offset: usize,
 }
@@ -84,6 +89,12 @@ impl ResidentObjectMetadataInner {
         ResidentObjectMetadata::metadata_to_resident_obj_ptr(ResidentObjectMetadata::ptr_from_meta_inner_mut(ptr))
     }
 
+    /// The same as `ptr_to_resident_obj_ptr` but without type `T`
+    #[inline]
+    pub(super) unsafe fn ptr_to_resident_obj_ptr_base(ptr: *mut ResidentObjectMetadataInner) -> *mut u8 {
+        ResidentObjectMetadata::metadata_to_resident_obj_ptr_base(ResidentObjectMetadata::ptr_from_meta_inner_mut(ptr))
+    }
+
     /// ### Safety
     /// 
     /// This call is only safe to call if this ResidentObjectMetadataInner lives inside a ResidentObjectMetadata and a ResidentObject instance.
@@ -100,11 +111,16 @@ impl ResidentObjectMetadataInner {
 
         // test if the right offset was applied
         #[cfg(debug_assertions)]
-        debug_assert_eq!(
-            (ResidentObjectMetadata::ptr_from_meta_inner(self) as *const u8).add(self.data_offset),
-            base_ptr,
-            "Results in an error if the formula for manually getting the address of the data is wrong"
-        );
+        {
+            // check that data offset was not disabled
+            if self.data_offset != usize::MAX {
+                debug_assert_eq!(
+                    (ResidentObjectMetadata::ptr_from_meta_inner(self) as *const u8).add(self.data_offset),
+                    base_ptr,
+                    "Results in an error if the formula for manually getting the address of the data is wrong"
+                );
+            }
+        }
 
         slice_from_raw_parts(base_ptr, self.layout.size())
             .as_ref()
@@ -132,6 +148,12 @@ impl ResidentObjectMetadata {
     #[inline]
     pub(super) unsafe fn metadata_to_resident_obj_ptr<T>(ptr: *mut ResidentObjectMetadata) -> *mut ResidentObject<T> {
         ptr as *mut ResidentObject<T>
+    }
+    
+    /// The same as `metadata_to_resident_obj_ptr` but without the type `T`
+    #[inline]
+    pub(super) unsafe fn metadata_to_resident_obj_ptr_base(ptr: *mut ResidentObjectMetadata) -> *mut u8 {
+        ptr as *mut u8
     }
 
     #[inline]

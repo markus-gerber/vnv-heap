@@ -1,9 +1,4 @@
 
-#[macro_use]
-extern crate cstr;
-#[macro_use]
-extern crate log;
-
 extern crate zephyr_macros;
 extern crate zephyr;
 extern crate zephyr_logger;
@@ -15,10 +10,10 @@ use test::test_heap_persistency;
 
 #[no_mangle]
 pub extern "C" fn rust_main() {
-    zephyr_logger::init(log::LevelFilter::Debug);
+    zephyr_logger::init(log::LevelFilter::Warn);
 
     test_heap_persistency();
-    log::debug!("#############################");
-    log::debug!("### TESTS WERE SUCCESSFUL ###");
-    log::debug!("#############################");
+    log::warn!("#############################");
+    log::warn!("### TESTS WERE SUCCESSFUL ###");
+    log::warn!("#############################");
 }

@@ -1,8 +1,6 @@
 #![cfg_attr(not(feature = "have_std"), no_std)]
 
 #[macro_use]
-extern crate cstr;
-#[macro_use]
 extern crate log;
 
 extern crate zephyr_macros;

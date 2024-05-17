@@ -11,12 +11,13 @@ pub struct VNVMutRef<
     'a,
     'b,
     'c,
+    'd: 'a,
     T: Sized,
     A: AllocatorModule,
     N: NonResidentAllocatorModule,
     S: PersistentStorageModule,
 > {
-    vnv_heap: &'a RefCell<VNVHeapInner<A, N, S>>,
+    vnv_heap: &'a RefCell<VNVHeapInner<'d, A, N, S>>,
     allocation_identifier: &'b AllocationIdentifier<T>,
     data_ref: &'c mut T,
 }
@@ -25,14 +26,15 @@ impl<
         'a,
         'b,
         'c,
+        'd: 'a,
         T: Sized,
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         S: PersistentStorageModule,
-    > VNVMutRef<'a, 'b, 'c, T, A, N, S>
+    > VNVMutRef<'a, 'b, 'c, 'd, T, A, N, S>
 {
     pub(crate) unsafe fn new(
-        vnv_heap: &'a RefCell<VNVHeapInner<A, N, S>>,
+        vnv_heap: &'a RefCell<VNVHeapInner<'d, A, N, S>>,
         allocation_identifier: &'b AllocationIdentifier<T>,
         data_ref: &'c mut T,
     ) -> Self {
@@ -49,7 +51,7 @@ impl<
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         S: PersistentStorageModule,
-    > Deref for VNVMutRef<'_, '_, '_, T, A, N, S>
+    > Deref for VNVMutRef<'_, '_, '_, '_, T, A, N, S>
 {
     type Target = T;
 
@@ -63,7 +65,7 @@ impl<
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         S: PersistentStorageModule,
-    > DerefMut for VNVMutRef<'_, '_, '_, T, A, N, S>
+    > DerefMut for VNVMutRef<'_, '_, '_, '_, T, A, N, S>
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.data_ref
@@ -75,7 +77,7 @@ impl<
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         S: PersistentStorageModule,
-    > Drop for VNVMutRef<'_, '_, '_, T, A, N, S>
+    > Drop for VNVMutRef<'_, '_, '_, '_, T, A, N, S>
 {
     fn drop(&mut self) {
         unsafe {
