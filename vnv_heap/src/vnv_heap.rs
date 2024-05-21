@@ -1,3 +1,5 @@
+use log::trace;
+
 use crate::{
     allocation_identifier::AllocationIdentifier, allocation_options::AllocationOptions, modules::{
         allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
@@ -6,6 +8,7 @@ use crate::{
 };
 use core::{alloc::Layout, cell::RefCell};
 use core::marker::PhantomData;
+use std::mem::size_of;
 
 pub struct VNVHeap<'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule> {
     inner: RefCell<VNVHeapInner<'a, A, N, S>>,
@@ -31,12 +34,17 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorage
         })
     }
 
-    pub fn allocate<T: Sized>(&self, initial_value: T) -> Result<VNVObject<'_, 'a, T, A, N, S>, ()> {
+    pub fn allocate<'b, T: Sized + 'b>(&'b self, initial_value: T) -> Result<VNVObject<'b, 'a, T, A, N, S>, ()> where 'a: 'b {
         let mut inner = self.inner.borrow_mut();
         let allocation_options = AllocationOptions::new(initial_value);
         let identifier = unsafe { inner.allocate(allocation_options)? };
 
         Ok(VNVObject::new(&self.inner, identifier))
+    }
+
+    #[cfg(feature = "benchmarks")]
+    pub(crate) fn get_inner(&self) -> &RefCell<VNVHeapInner<'a, A, N, S>> {
+        &self.inner
     }
 }
 
@@ -59,6 +67,8 @@ impl<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModu
         &mut self,
         options: AllocationOptions<T>,
     ) -> Result<AllocationIdentifier<T>, ()> {
+        trace!("Allocate new object with {} bytes", size_of::<T>());
+
         let AllocationOptions { layout, initial_value } = options;
         let offset = self.non_resident_allocator.allocate(layout, &mut self.storage_module)?;
 
@@ -72,6 +82,8 @@ impl<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModu
         layout: Layout,
         identifier: &AllocationIdentifier<T>,
     ) -> Result<(), ()> {
+        trace!("Deallocate object with {} bytes (offset {})", size_of::<T>(), identifier.offset);
+
         self.resident_object_manager.drop(identifier, &mut self.non_resident_allocator, &mut self.storage_module)?;
         self.non_resident_allocator.deallocate(identifier.offset, layout, &mut self.storage_module)
     }
@@ -104,5 +116,20 @@ impl<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModu
         data: &T,
     ) {
         self.resident_object_manager.release_ref(identifier, data)
+    }
+
+    #[cfg(feature = "benchmarks")]
+    pub(crate) fn get_storage_module(&self) -> &S {
+        &self.storage_module
+    }
+
+    #[cfg(feature = "benchmarks")]
+    pub(crate) fn get_resident_object_manager(&self) -> &ResidentObjectManager<A> {
+        &self.resident_object_manager
+    }
+
+    #[cfg(feature = "benchmarks")]
+    pub(crate) fn get_non_resident_allocator(&self) -> &N {
+        &self.non_resident_allocator
     }
 }

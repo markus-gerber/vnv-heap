@@ -49,6 +49,12 @@ impl SpiFramStorageModule {
     }
 }
 
+impl Drop for SpiFramStorageModule {
+    fn drop(&mut self) {
+        ALREADY_INITIALIZED.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 impl PersistentStorageModule for SpiFramStorageModule {
     fn read(&mut self, address: usize, buffer: &mut [u8]) -> Result<(), ()> {
         debug_assert!(address <= (u16::MAX as usize));

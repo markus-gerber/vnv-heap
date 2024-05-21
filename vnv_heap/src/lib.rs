@@ -11,6 +11,9 @@ mod util;
 #[cfg(test)]
 mod test;
 
+#[cfg(feature = "benchmarks")]
+pub mod benchmarks;
+
 pub use crate::vnv_heap::VNVHeap;
 pub use crate::vnv_object::VNVObject;
 pub use vnv_config::VNVConfig;

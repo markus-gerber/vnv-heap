@@ -1,5 +1,7 @@
 // code modified from: https://github.com/rcore-os/buddy_system_allocator
 
+use log::trace;
+
 use super::{NonResidentAllocatorModule, SimpleNonResidentLinkedList};
 use crate::modules::persistent_storage::PersistentStorageModule;
 use core::alloc::Layout;
@@ -73,6 +75,7 @@ impl<const ORDER: usize> NonResidentAllocatorModule for NonResidentBuddyAllocato
             // Find the first non-empty size class
             if !self.free_list[i].is_empty() {
                 // Split buffers
+                trace!("Allocate: Have to split {} bucket(s)", (class + 1..i + 1).len());
                 for j in (class + 1..i + 1).rev() {
                     if let Some(block) = self.free_list[j].pop(storage_module)? {
                         unsafe {
@@ -132,6 +135,13 @@ impl<const ORDER: usize> NonResidentAllocatorModule for NonResidentBuddyAllocato
         }
 
         Ok(())
+    }
+}
+
+impl<const ORDER: usize> NonResidentBuddyAllocatorModule<ORDER> {
+    #[cfg(feature = "benchmarks")]
+    pub(crate) fn get_free_list(&self) -> &[SimpleNonResidentLinkedList; ORDER] {
+        &self.free_list
     }
 }
 

@@ -80,9 +80,12 @@ impl<'a, A: AllocatorModule> ResidentObjectManager<'a, A> {
 
         // backup item has to be the first in the persistent storage, so restoring is easier
         let mut meta_backup_list = CountedNonResidentLinkedList::new();
-        unsafe { meta_backup_list.push(0, ResidentObjectMetadataBackup::new_unused(), storage) }?;
-        let offset =
-            CountedNonResidentLinkedList::<ResidentObjectMetadataBackup>::total_item_size();
+
+        // TODO decide what to do with this
+        //unsafe { meta_backup_list.push(0, ResidentObjectMetadataBackup::new_unused(), storage) }?;
+        //let offset =
+        //    CountedNonResidentLinkedList::<ResidentObjectMetadataBackup>::total_item_size();
+        let offset = 0usize;
 
         let instance = ResidentObjectManager {
             heap,
