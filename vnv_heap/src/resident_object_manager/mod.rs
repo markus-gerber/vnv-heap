@@ -27,6 +27,11 @@ use resident_object_backup::*;
 #[cfg(test)]
 mod test;
 
+/// Calculate the size that is cut off the resident buffer
+pub(crate) const fn calc_resident_manager_total_cutoff() -> usize {
+    CountedNonResidentLinkedList::<ResidentObjectMetadataBackup>::total_item_size()
+}
+
 pub(crate) struct ResidentObjectManager<'a, A: AllocatorModule> {
     /// In memory heap for resident objects and their metadata
     heap: A,
@@ -57,7 +62,7 @@ pub(crate) struct ResidentObjectManager<'a, A: AllocatorModule> {
     /// violating users requirements
     remaining_dirty_size: usize,
 
-    _resident_buffer: PhantomData<&'a mut ()>
+    _resident_buffer: PhantomData<&'a mut [u8]>
 }
 
 impl<'a, A: AllocatorModule> ResidentObjectManager<'a, A> {
@@ -81,11 +86,8 @@ impl<'a, A: AllocatorModule> ResidentObjectManager<'a, A> {
         // backup item has to be the first in the persistent storage, so restoring is easier
         let mut meta_backup_list = CountedNonResidentLinkedList::new();
 
-        // TODO decide what to do with this
-        //unsafe { meta_backup_list.push(0, ResidentObjectMetadataBackup::new_unused(), storage) }?;
-        //let offset =
-        //    CountedNonResidentLinkedList::<ResidentObjectMetadataBackup>::total_item_size();
-        let offset = 0usize;
+        unsafe { meta_backup_list.push(0, ResidentObjectMetadataBackup::new_unused(), storage) }?;
+        let offset = calc_resident_manager_total_cutoff();
 
         let instance = ResidentObjectManager {
             heap,
@@ -670,4 +672,15 @@ unsafe fn make_object_nonresident_dynamic<A: AllocatorModule, S: PersistentStora
     trace!("Made object nonresident with offset {}", offset);
 
     Ok(())
+}
+
+impl<A: AllocatorModule> ResidentObjectManager<'_, A> {
+    #[cfg(feature = "benchmarks")]
+    pub(crate) fn get_remaining_dirty_size(&self) -> usize {
+        self.remaining_dirty_size
+    }
+}
+
+pub(crate) const fn get_total_resident_size<T: Sized>() -> usize {
+    size_of::<ResidentObject<T>>()
 }

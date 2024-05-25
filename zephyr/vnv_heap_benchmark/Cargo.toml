@@ -5,7 +5,7 @@ edition = "2018"
 
 [dependencies]
 cstr = "0.2.10"
-log = { version = "0.4", features = ["release_max_level_off"] }
+log = { version = "0.4", features = ["max_level_off" ,"release_max_level_off"] }
 zephyr = { path = "../zephyr-rust/rust/zephyr" }
 zephyr-macros = { path = "../zephyr-rust/rust/zephyr-macros" }
 zephyr-logger = { path = "../zephyr-rust/rust/zephyr-logger" }

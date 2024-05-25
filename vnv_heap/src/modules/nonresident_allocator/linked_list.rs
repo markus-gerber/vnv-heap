@@ -1,5 +1,6 @@
 use core::{marker::PhantomData, mem::size_of};
 use core::alloc::Layout;
+use std::fmt::Debug;
 
 use crate::modules::persistent_storage::PersistentStorageModule;
 
@@ -166,6 +167,12 @@ impl<T: Sized> NonResidentLinkedList<T> {
     }
 }
 
+impl<T> Debug for NonResidentLinkedList<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", self.head))
+    }
+}
+
 /// An iterator over the linked list
 pub struct Iter<'a, 'b, S: PersistentStorageModule, T: Sized> {
     curr: usize,
@@ -265,6 +272,12 @@ impl SimpleNonResidentLinkedList {
     ) -> Result<usize, ()> {
         self.inner
             .remove_where(storage, single_item, |(offset, _)| function(offset))
+    }
+}
+
+impl Debug for SimpleNonResidentLinkedList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{:?}", self.inner))
     }
 }
 

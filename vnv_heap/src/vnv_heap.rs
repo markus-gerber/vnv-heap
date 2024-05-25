@@ -119,8 +119,8 @@ impl<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModu
     }
 
     #[cfg(feature = "benchmarks")]
-    pub(crate) fn get_storage_module(&self) -> &S {
-        &self.storage_module
+    pub(crate) fn get_storage_module(&mut self) -> &mut S {
+        &mut self.storage_module
     }
 
     #[cfg(feature = "benchmarks")]

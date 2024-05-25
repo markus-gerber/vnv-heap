@@ -2,10 +2,11 @@ extern crate zephyr;
 extern crate zephyr_core;
 extern crate zephyr_logger;
 extern crate zephyr_macros;
+extern crate zephyr_sys;
 
 use spi_fram_storage::SpiFramStorageModule;
 use vnv_heap::benchmarks::{
-    AllocateMaxBenchmark, AllocateMinBenchmark, Benchmark, BenchmarkRunOptions, Timer,
+    BenchmarkRunOptions, Timer, run_all_benchmarks, RunAllBenchmarkOptions
 };
 use vnv_heap::{
     modules::{
@@ -18,43 +19,49 @@ use vnv_heap::{
 extern "C" {
     pub fn helper_k_cycle_get_32() -> u32;
     pub fn helper_sys_clock_hw_cycles_per_sec() -> u32;
+    pub fn helper_k_uptime_get() -> i64;
 }
 
 #[no_mangle]
 pub extern "C" fn rust_main() {
     zephyr_logger::init(log::LevelFilter::Trace);
+    let mut time: i64 = unsafe { helper_k_uptime_get() };
+    
+    run_all_benchmarks::<
+        ZephyrTimer,
+        LinkedListAllocatorModule,
+        SpiFramStorageModule,
+        fn(
+            &mut [u8],
+            usize,
+        ) -> VNVHeap<
+            LinkedListAllocatorModule,
+            NonResidentBuddyAllocatorModule<16>,
+            SpiFramStorageModule,
+        >,
+    >(
+        get_bench_heap,
+        BenchmarkRunOptions {
+            cold_start: 0,
+            machine_name: "esp32c3",
+            repetitions: 500,
+            result_buffer: &mut [0; 500],
+        },
+        /*RunAllBenchmarkOptions {
+            run_deallocate_benchmarks: true,
+            run_persistent_storage_benchmarks: true,
+            ..Default::default()
+        },*/
+        RunAllBenchmarkOptions::all()
+    );
 
-    seq_macro::seq!(I in 1..20 {
-        {
-            const SIZE: usize = I * 8;
-            let mut buf = [0u8; 256];
-            let res_size = buf.len();
-            let heap = get_bench_heap(&mut buf, res_size);
-            let bench: AllocateMinBenchmark<LinkedListAllocatorModule, SpiFramStorageModule, SIZE> = AllocateMinBenchmark::new(&heap);
-            bench.run_benchmark::<ZephyrTimer>(BenchmarkRunOptions {
-                cold_start: 0,
-                machine_name: "esp32c3",
-                repetitions: 250,
-                result_buffer: &mut [0; 250]
-            });
-        }
-    });
+    time = unsafe { helper_k_uptime_get() } - time; 
 
-    seq_macro::seq!(I in 1..20 {
-        {
-            const SIZE: usize = I * 8;
-            let mut buf = [0u8; 256];
-            let bench: AllocateMaxBenchmark<LinkedListAllocatorModule, SpiFramStorageModule, fn(&mut [u8], usize) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, SpiFramStorageModule>, SIZE> = AllocateMaxBenchmark::new(get_bench_heap, &mut buf);
-            bench.run_benchmark::<ZephyrTimer>(BenchmarkRunOptions {
-                cold_start: 0,
-                machine_name: "esp32c3",
-                repetitions: 250,
-                result_buffer: &mut [0; 250]
-            });
-        }
-    });
+    let secs: i64 = (time / 1000) % 60;
+    let mins: i64 = (time / (1000 * 60)) % 60;
+    let hours: i64 = time / (1000 * 60 * 60);
 
-    println!("[BENCH-STATUS] Finished")
+    println!("[BENCH-STATUS] Finished in {}h {}m {}s", hours, mins, secs);
 }
 
 struct ZephyrTimer {

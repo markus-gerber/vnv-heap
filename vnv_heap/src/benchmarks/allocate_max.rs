@@ -8,37 +8,36 @@ use crate::{
 use core::hint::black_box;
 use serde::Serialize;
 
-use super::{Benchmark, Timer};
+use super::{Benchmark, ModuleOptions, Timer};
 
 #[derive(Serialize)]
 pub struct AllocateMaxBenchmarkOptions {
     object_size: usize,
+    modules: ModuleOptions
 }
 
 /// This benchmark only works with the NonResidentBuddyAllocatorModule
 pub struct AllocateMaxBenchmark<
     'a,
+    'b: 'a,
     A: AllocatorModule,
     S: PersistentStorageModule,
-    F: Fn(&mut [u8], usize) -> VNVHeap<A, NonResidentBuddyAllocatorModule<16>, S>,
     const OBJ_SIZE: usize,
 > {
-    heap_generator: F,
-    resident_buffer: &'a mut [u8],
+    heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, S>,
 }
 
 impl<
         'a,
+        'b: 'a,
         A: AllocatorModule,
         S: PersistentStorageModule,
-        F: Fn(&mut [u8], usize) -> VNVHeap<A, NonResidentBuddyAllocatorModule<16>, S>,
         const OBJ_SIZE: usize,
-    > AllocateMaxBenchmark<'a, A, S, F, OBJ_SIZE>
+    > AllocateMaxBenchmark<'a, 'b, A, S, OBJ_SIZE>
 {
-    pub fn new(heap_generator: F, resident_buffer: &'a mut [u8]) -> Self {
+    pub fn new(heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, S>) -> Self {
         Self {
-            heap_generator,
-            resident_buffer,
+            heap,
         }
     }
 }
@@ -47,9 +46,8 @@ impl<
         'a,
         A: AllocatorModule,
         S: PersistentStorageModule,
-        F: Fn(&mut [u8], usize) -> VNVHeap<A, NonResidentBuddyAllocatorModule<16>, S>,
         const OBJ_SIZE: usize,
-    > Benchmark<AllocateMaxBenchmarkOptions> for AllocateMaxBenchmark<'a, A, S, F, OBJ_SIZE>
+    > Benchmark<AllocateMaxBenchmarkOptions> for AllocateMaxBenchmark<'a, '_, A, S, OBJ_SIZE>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
@@ -57,27 +55,22 @@ impl<
     }
 
     #[inline]
-    fn prepare_next_iteration(&mut self) {}
-
-    #[inline]
     fn execute<T: Timer>(&mut self) -> u32 {
-        let heap = (self.heap_generator)(self.resident_buffer, self.resident_buffer.len());
-
         let timer = T::start();
 
-        let item = black_box(heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE])).unwrap();
+        let item = black_box(self.heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE])).unwrap();
         let res = timer.stop();
 
         drop(item);
-        drop(heap);
 
         res
     }
 
     #[inline]
-    fn get_bench_options(&self) -> &AllocateMaxBenchmarkOptions {
-        &AllocateMaxBenchmarkOptions {
+    fn get_bench_options(&self) -> AllocateMaxBenchmarkOptions {
+        AllocateMaxBenchmarkOptions {
             object_size: OBJ_SIZE,
+            modules: ModuleOptions::new::<A, NonResidentBuddyAllocatorModule<16>, S>()
         }
     }
 }

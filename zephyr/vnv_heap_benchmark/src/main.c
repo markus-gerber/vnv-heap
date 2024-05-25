@@ -20,6 +20,10 @@ uint32_t helper_sys_clock_hw_cycles_per_sec() {
 	return sys_clock_hw_cycles_per_sec();
 }
 
+int64_t helper_k_uptime_get() {
+	return k_uptime_get();
+}
+
 void main(void) {
 	rust_main();
 }

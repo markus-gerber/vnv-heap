@@ -25,7 +25,12 @@ try:
         first_obj = True
         while True:
             # Read a line from the serial port
-            line = ser.readline().decode().strip()
+            try:
+                line_data = ser.readline()
+                line = line_data.decode().strip()
+            except UnicodeDecodeError:
+                print("ERROR: could not parse line data " + str(line_data))
+                continue
 
             print(line)
 
@@ -40,7 +45,7 @@ try:
 
             elif line.startswith("[BENCH-STATUS]"):
                 arg = line[15:]
-                if arg == "Finished":
+                if arg.startswith("Finished"):
                     break
             
 

@@ -306,9 +306,9 @@ mod test {
         }
 
         pub fn check_integrity(&self) {
-            assert_eq!(unsafe { self.list.iter() }.count(), self.check_list.len());
+            assert_eq!(self.list.iter().count(), self.check_list.len());
 
-            for (a, b) in unsafe { self.list.iter() }.zip(self.check_list.iter()) {
+            for (a, b) in self.list.iter().zip(self.check_list.iter()) {
                 println!("{:?} =?= {:?}", a, b);
                 if a != b {
                     assert!(a == b);
@@ -318,7 +318,7 @@ mod test {
 
         pub fn print(&self) {
             print!("list: [");
-            for x in unsafe { self.list.iter() } {
+            for x in self.list.iter() {
                 print!("{:?}, ", x);
             }
             println!("]");
