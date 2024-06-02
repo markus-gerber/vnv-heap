@@ -70,10 +70,12 @@ impl<'a, 'b: 'a, A: AllocatorModule, S: PersistentStorageModule, const OBJ_SIZE:
 
     #[inline]
     fn execute<T: Timer>(&mut self) -> u32 {
+        // TODO: allocate free buckets except the biggest one
+
         let obj = self.heap.allocate(DeallocateDropRequiredObject {
             inner: [0u8; OBJ_SIZE]
         });
-        
+
         {
             // load blocker object into memory and make it dirty
             let blocker_ref = match self.blocker.get_mut() {

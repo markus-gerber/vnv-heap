@@ -1,131 +1,56 @@
-use core::{marker::PhantomData, ptr::null_mut, sync::atomic::{AtomicPtr, Ordering}, cell::Cell};
+use core::{marker::PhantomData, ptr::null_mut};
 
-pub(crate) type DefaultMultiLinkedList<T, E, F, G> = GeneralMultiLinkedList<T, MultiLinkedListDefaultPointer<T>, E, F, G>;
-pub(crate) type AtomicMultiLinkedList<T, E, F, G> = GeneralMultiLinkedList<T, MultiLinkedListAtomicPointer<T>, E, F, G>;
-
-pub(crate) struct MultiLinkedListAtomicPointer<T> {
-    inner: AtomicPtr<T>
-}
-
-impl<T> MultiLinkedListPointer<T> for MultiLinkedListAtomicPointer<T> {
-    #[inline]
-    fn null() -> Self {
-        Self {
-            inner: AtomicPtr::new(null_mut())
-        }
-    }
-
-    #[inline]
-    fn get(&self) -> *mut T {
-        self.inner.load(Ordering::SeqCst)
-    }
-
-    #[inline]
-    fn set(&self, ptr: *mut T) {
-        self.inner.store(ptr, Ordering::SeqCst)
-    }
-
-    #[inline]
-    fn is_null(&self) -> bool {
-        self.get().is_null()
-    }
-}
-
-pub(crate) struct MultiLinkedListDefaultPointer<T> {
-    inner: Cell<*mut T>
-}
-
-impl<T> MultiLinkedListPointer<T> for MultiLinkedListDefaultPointer<T> {
-    #[inline]
-    fn null() -> Self {
-        Self {
-            inner: Cell::new(null_mut())
-        }
-    }
-
-    #[inline]
-    fn get(&self) -> *mut T {
-        self.inner.get()
-    }
-
-    #[inline]
-    fn set(&self, ptr: *mut T) {
-        self.inner.set(ptr);
-    }
-
-    #[inline]
-    fn is_null(&self) -> bool {
-        self.inner.get().is_null()
-    }
-}
-
-pub(crate) trait MultiLinkedListPointer<T> {
-    fn null() -> Self;
-
-    fn get(&self) -> *mut T;
-
-    fn set(&self, ptr: *mut T);
-
-    fn is_null(&self) -> bool;
-}
-
-pub(crate) struct GeneralMultiLinkedList<T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) -> *mut E> {
-    head: P,
+pub(crate) struct MultiLinkedList<T, E, F: Fn(*mut T) -> *mut *mut T, G: Fn(*mut T) -> *mut E> {
+    head: *mut T,
 
     /// function to get the next element field of that item
     get_next_element_field: F,
     get_element_field: G,
-    _phantom_data: PhantomData<T>
 }
 
-impl<T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) -> *mut E> GeneralMultiLinkedList<T, P, E, F, G> {
+impl<T, E, F: Fn(*mut T) -> *mut *mut T, G: Fn(*mut T) -> *mut E> MultiLinkedList<T, E, F, G> {
     /// ### Safety
     ///
     /// It is unsafe to create multiple `MultiLinkedList`s over the same next field
     /// (the same `get_next_element_field` function)
     pub(crate) unsafe fn new(get_next_element_field: F, get_element_field: G) -> Self {
         Self {
-            head: P::null(),
+            head: null_mut(),
             get_next_element_field,
             get_element_field,
-            _phantom_data: PhantomData
         }
     }
 
     /// Return `true` if the list is empty
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.head.is_null()
     }
 
     /// Push `item` to the front of the list
-    pub(crate) fn push(&mut self, item: &mut T) {
-        let next = unsafe { (self.get_next_element_field)(item).as_mut().unwrap() };
-        next.set(self.head.get());
+    pub fn push(&mut self, item: &mut T) {
+        let next = (self.get_next_element_field)(item);
+        unsafe { *next = self.head };
 
-        self.head.set(item);
+        self.head = item;
     }
 
     /// Try to remove the first item in the list
-    pub(crate) fn pop(&mut self) -> Option<*mut T> {
+    pub fn pop(&mut self) -> Option<*mut T> {
         match self.is_empty() {
             true => None,
             false => {
                 // Advance head pointer
-                let item = self.head.get();
-                let new_head = unsafe {
-                    (self.get_next_element_field)(item).as_ref().unwrap() 
-                }.get();
-
-                self.head.set(new_head);
+                let item = self.head;
+                self.head = unsafe { *(self.get_next_element_field)(item) };
                 Some(item)
             }
         }
     }
 
-    /// Returns an immutable iterator over the items in the list
-    pub(crate) fn iter(&self) -> Iter<'_, '_, '_, T, P, E, F, G> {
+    /// Returns an iterator over the items in the list
+    pub fn iter(&self) -> Iter<'_, '_, '_, T, E, F, G> {
         let head = if !self.head.is_null() {
-            Some(unsafe { self.head.get().as_ref().unwrap() })
+            Some(unsafe { self.head.as_ref().unwrap() })
         } else {
             None
         };
@@ -139,14 +64,14 @@ impl<T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) 
     }
 
     /// Returns a mutable iterator over the items in the list
-    pub(crate) fn iter_mut(&mut self) -> IterMut<'_, '_, T, P, E, F, G> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, '_, T, E, F, G> {
         IterMut {
             curr: CurrItem {
-                curr: self.head.get(),
+                curr: self.head,
 
                 // don't advance prev for first item
                 advance_prev: false,
-                prev: &self.head,
+                prev: &mut self.head,
                 get_next: &self.get_next_element_field,
                 get_element: &self.get_element_field,
                 _phantom_data: PhantomData,
@@ -156,15 +81,15 @@ impl<T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) 
 }
 
 /// An iterator over the linked list
-pub(crate) struct Iter<'a, 'b, 'c, T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) -> *mut E> {
+pub struct Iter<'a, 'b, 'c, T, E, F: Fn(*mut T) -> *mut *mut T, G: Fn(*mut T) -> *mut E> {
     curr: Option<&'b T>,
-    list: PhantomData<&'a GeneralMultiLinkedList<T, P, E, F, G>>,
+    list: PhantomData<&'a MultiLinkedList<T, E, F, G>>,
     get_next_element: &'c F,
     get_element: &'c G,
 }
 
-impl<'a, 'b, 'c, T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) -> *mut E> Iterator
-    for Iter<'a, 'b, 'c, T, P, E, F, G>
+impl<'a, 'b, 'c, T, E, F: Fn(*mut T) -> *mut *mut T, G: Fn(*mut T) -> *mut E> Iterator
+    for Iter<'a, 'b, 'c, T, E, F, G>
 {
     type Item = &'b T;
 
@@ -173,9 +98,9 @@ impl<'a, 'b, 'c, T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G:
 
         if let Some(data) = ret {
             // some ugly pointer magic (because func only takes *mut pointers)
-            // this is safe, because we cast the resulting *mut pointer back to a *const
-            let ptr = (self.get_next_element)((data as *const T) as *mut T) as *const P;
-            let next_ptr = unsafe { ptr.as_ref().unwrap().get() } as *const T;
+            // this is safe, because we don't access the pointers here
+            let ptr = (self.get_next_element)((data as *const T) as *mut T) as *const *const T;
+            let next_ptr = unsafe { *ptr };
             if !next_ptr.is_null() {
                 self.curr = Some(unsafe { next_ptr.as_ref().unwrap() })
             }
@@ -185,22 +110,18 @@ impl<'a, 'b, 'c, T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G:
     }
 }
 
-pub(crate) struct DeleteHandle<'a, 'b, 'c, T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) -> *mut E> {
-    inner: &'c mut CurrItem<'a, 'b, T, P, E, F, G>,
+pub struct DeleteHandle<'a, 'b, 'c, T, E, F: Fn(*mut T) -> *mut *mut T, G: Fn(*mut T) -> *mut E> {
+    inner: &'c mut CurrItem<'a, 'b, T, E, F, G>,
 }
 
-impl<T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) -> *mut E>
-    DeleteHandle<'_, '_, '_, T, P, E, F, G>
+impl<T, E, F: Fn(*mut T) -> *mut *mut T, G: Fn(*mut T) -> *mut E>
+    DeleteHandle<'_, '_, '_, T, E, F, G>
 {
     /// Delete an item
     #[inline]
     pub fn delete(self) {
         let new_ptr = (self.inner.get_next)(self.inner.curr);
-        unsafe { 
-            let prev = self.inner.prev.as_ref().unwrap();
-            let new = new_ptr.as_ref().unwrap();
-            prev.set(new.get());
-        };
+        unsafe { *self.inner.prev = *new_ptr };
         self.inner.advance_prev = false;
     }
 
@@ -218,24 +139,24 @@ impl<T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) 
     }
 }
 
-struct CurrItem<'a, 'b, T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) -> *mut E> {
-    prev: *const P,
+struct CurrItem<'a, 'b, T, E, F: Fn(*mut T) -> *mut *mut T, G: Fn(*mut T) -> *mut E> {
+    prev: *mut *mut T,
     curr: *mut T,
     advance_prev: bool,
     get_next: &'b F,
     get_element: &'b G,
-    _phantom_data: PhantomData<&'a T>,
+    _phantom_data: PhantomData<&'a ()>,
 }
 
-pub(crate) struct IterMut<'a, 'b, T, P: MultiLinkedListPointer<T>, E, F: Fn(*mut T) -> *mut P, G: Fn(*mut T) -> *mut E> {
-    curr: CurrItem<'a, 'b, T, P, E, F, G>,
+pub struct IterMut<'a, 'b, T, E, F: Fn(*mut T) -> *mut *mut T, G: Fn(*mut T) -> *mut E> {
+    curr: CurrItem<'a, 'b, T, E, F, G>,
 }
 
-impl<'a, 'b, T, P: MultiLinkedListPointer<T>, E, F: 'a + Fn(*mut T) -> *mut P, G: 'a + Fn(*mut T) -> *mut E>
-    IterMut<'a, 'b, T, P, E, F, G>
+impl<'a, 'b, T, E, F: 'a + Fn(*mut T) -> *mut *mut T, G: 'a + Fn(*mut T) -> *mut E>
+    IterMut<'a, 'b, T, E, F, G>
 {
-    pub fn next<'c>(&'c mut self) -> Option<DeleteHandle<'a, 'b, 'c, T, P, E, F, G>> {
-        if self.curr.curr.is_null() {
+    pub fn next<'c>(&'c mut self) -> Option<DeleteHandle<'a, 'b, 'c, T, E, F, G>> {
+        if self.curr.curr == null_mut() {
             None
         } else {
             // if the previous element was deleted we don't want to update
@@ -243,12 +164,13 @@ impl<'a, 'b, T, P: MultiLinkedListPointer<T>, E, F: 'a + Fn(*mut T) -> *mut P, G
             if self.curr.advance_prev {
                 // advance curr item and drag pointer
                 let new_prev = (self.curr.get_next)(self.curr.curr);
+
                 self.curr.prev = unsafe { new_prev.as_mut().unwrap() };
             }
             self.curr.advance_prev = true;
-            self.curr.curr = unsafe { self.curr.prev.as_ref().unwrap() }.get();
+            self.curr.curr = unsafe { *self.curr.prev };
 
-            if self.curr.curr.is_null() {
+            if self.curr.curr == null_mut() {
                 None
             } else {
                 Some(DeleteHandle {
@@ -265,7 +187,7 @@ mod test {
 
     use memoffset::offset_of;
 
-    use super::{GeneralMultiLinkedList, MultiLinkedListDefaultPointer, MultiLinkedListPointer};
+    use super::MultiLinkedList;
 
     #[derive(Clone, Copy)]
     struct TestStructData {
@@ -304,14 +226,14 @@ mod test {
             }
         }
 
-        fn get_next_x(ptr: *mut TestStruct) -> *mut MultiLinkedListDefaultPointer<TestStruct> {
+        fn get_next_x(ptr: *mut TestStruct) -> *mut *mut TestStruct {
             const OFFSET: usize = offset_of!(TestStruct, next_x);
-            (unsafe { (ptr as *mut u8).add(OFFSET) }) as *mut MultiLinkedListDefaultPointer<TestStruct>
+            (unsafe { (ptr as *mut u8).add(OFFSET) }) as *mut *mut TestStruct
         }
 
-        fn get_next_y(ptr: *mut TestStruct) -> *mut MultiLinkedListDefaultPointer<TestStruct> {
+        fn get_next_y(ptr: *mut TestStruct) -> *mut *mut TestStruct {
             const OFFSET: usize = offset_of!(TestStruct, next_y);
-            (unsafe { (ptr as *mut u8).add(OFFSET) }) as *mut MultiLinkedListDefaultPointer<TestStruct>
+            (unsafe { (ptr as *mut u8).add(OFFSET) }) as *mut *mut TestStruct
         }
 
         fn get_data(ptr: *mut TestStruct) -> *mut TestStructData {
@@ -336,27 +258,25 @@ mod test {
 
     struct TestableModularLinkedList<
         T: Clone + Copy + PartialEq + Debug,
-        P: MultiLinkedListPointer<T>,
         E: Clone + Copy + PartialEq + Debug,
-        F: Fn(*mut T) -> *mut P,
+        F: Fn(*mut T) -> *mut *mut T,
         G: Fn(*mut T) -> *mut E,
     > {
         check_list: VecDeque<T>,
-        list: GeneralMultiLinkedList<T, P, E, F, G>,
+        list: MultiLinkedList<T, E, F, G>,
     }
 
     impl<
             T: Clone + Copy + PartialEq + Debug,
-            P: MultiLinkedListPointer<T>,
             E: Clone + Copy + PartialEq + Debug,
-            F: Fn(*mut T) -> *mut P,
+            F: Fn(*mut T) -> *mut *mut T,
             G: Fn(*mut T) -> *mut E,
-        > TestableModularLinkedList<T, P, E, F, G>
+        > TestableModularLinkedList<T, E, F, G>
     {
         pub unsafe fn new(function: F, function2: G) -> Self {
             Self {
                 check_list: VecDeque::new(),
-                list: GeneralMultiLinkedList::new(function, function2),
+                list: MultiLinkedList::new(function, function2),
             }
         }
 

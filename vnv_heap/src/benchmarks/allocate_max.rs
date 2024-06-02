@@ -56,6 +56,8 @@ impl<
 
     #[inline]
     fn execute<T: Timer>(&mut self) -> u32 {
+        // TODO: allocate free buckets except the biggest one
+
         let timer = T::start();
 
         let item = black_box(self.heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE])).unwrap();

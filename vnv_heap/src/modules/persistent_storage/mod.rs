@@ -1,14 +1,12 @@
+mod access_distribution;
+pub(crate) use access_distribution::*;
+
 #[cfg(not(no_std))]
 mod file_storage;
 
-use core::{
-    mem::{size_of, MaybeUninit},
-    ptr::slice_from_raw_parts_mut,
-};
-use core::ptr::slice_from_raw_parts;
-
 #[cfg(not(no_std))]
 pub use file_storage::FilePersistentStorageModule;
+
 
 pub trait PersistentStorageModule {
     /// Reads a region `[offset, offset + dest.len())` to a storage location `dest` that is at least `dest.len()` bytes big.
@@ -29,24 +27,33 @@ pub trait PersistentStorageModule {
     ///
     /// (So you probably only want to overwrite this function if you are defining a cache)
     fn forget_region(&mut self, _offset: usize, _size: usize) {}
+}
 
-    fn write_data<T: Sized>(&mut self, offset: usize, src: &T) -> Result<(), ()> {
+pub(crate) mod persistent_storage_util {
+    use core::{mem::{size_of, MaybeUninit}, ptr::{slice_from_raw_parts, slice_from_raw_parts_mut}};
+
+    use super::PersistentStorageModule;
+
+    #[inline]
+    pub(crate) fn write_storage_data<T: Sized, P: PersistentStorageModule>(storage: &mut P, offset: usize, src: &T) -> Result<(), ()> {
         let buffer = slice_from_raw_parts((src as *const T) as *mut u8, size_of::<T>());
-        self.write(offset, unsafe { buffer.as_ref().unwrap() })?;
+        storage.write(offset, unsafe { buffer.as_ref().unwrap() })?;
 
         Ok(())
     }
 
-    unsafe fn read_data_into<T: Sized>(&mut self, offset: usize, dest: &mut T) -> Result<(), ()> {
+    #[inline]
+    pub(crate) unsafe fn read_storage_data_into<T: Sized, P: PersistentStorageModule>(storage: &mut P, offset: usize, dest: &mut T) -> Result<(), ()> {
         let buffer = slice_from_raw_parts_mut((dest as *mut T) as *mut u8, size_of::<T>());
-        self.read(offset, buffer.as_mut().unwrap())?;
+        storage.read(offset, buffer.as_mut().unwrap())?;
 
         Ok(())
     }
 
-    unsafe fn read_data<T: Sized>(&mut self, offset: usize) -> Result<T, ()> {
+    #[inline]
+    pub(crate) unsafe fn read_storage_data<T: Sized, P: PersistentStorageModule>(storage: &mut P, offset: usize) -> Result<T, ()> {
         let mut res: MaybeUninit<T> = MaybeUninit::uninit();
-        self.read_data_into(offset, &mut res)?;
+        read_storage_data_into(storage, offset, &mut res)?;
 
         Ok(res.assume_init())
     }
@@ -54,6 +61,8 @@ pub trait PersistentStorageModule {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use crate::modules::persistent_storage::persistent_storage_util::{read_storage_data, read_storage_data_into, write_storage_data};
+
     use super::{FilePersistentStorageModule, PersistentStorageModule};
     use core::mem::size_of;
 
@@ -124,7 +133,7 @@ pub(crate) mod test {
             c: None,
         };
 
-        module.write_data(10, &original).unwrap();
+        write_storage_data(&mut module, 10, &original).unwrap();
 
         // make sure that data was only written to that area
         let mut test_buffer = [0u8; 100];
@@ -143,10 +152,10 @@ pub(crate) mod test {
             c: None,
         };
 
-        unsafe { module.read_data_into(10, &mut buffer).unwrap() };
+        unsafe { read_storage_data_into(&mut module, 10, &mut buffer).unwrap() };
         assert_eq!(original, buffer);
 
-        let res = unsafe { module.read_data::<TestData>(10).unwrap() };
+        let res = unsafe { read_storage_data::<TestData, T>(&mut module, 10).unwrap() };
         assert_eq!(original, res);
 
         // unsafe read, make sure read does not read over boundaries

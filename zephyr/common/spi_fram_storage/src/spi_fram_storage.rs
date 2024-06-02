@@ -1,7 +1,7 @@
 extern crate zephyr_sys;
 
 use core::ffi::c_int;
-use std::sync::atomic::AtomicBool;
+use core::sync::atomic::AtomicBool;
 
 use vnv_heap::modules::persistent_storage::PersistentStorageModule;
 
@@ -23,7 +23,7 @@ pub struct SpiFramStorageModule {
 impl SpiFramStorageModule {
     /// You can only create one object of this struct safely
     pub unsafe fn new() -> Result<Self, ()> {
-        if ALREADY_INITIALIZED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        if ALREADY_INITIALIZED.swap(true, core::sync::atomic::Ordering::SeqCst) {
             // module was already initialized
             // this is not allowed with just one spi spec
             
@@ -51,7 +51,7 @@ impl SpiFramStorageModule {
 
 impl Drop for SpiFramStorageModule {
     fn drop(&mut self) {
-        ALREADY_INITIALIZED.store(false, std::sync::atomic::Ordering::SeqCst);
+        ALREADY_INITIALIZED.store(false, core::sync::atomic::Ordering::SeqCst);
     }
 }
 

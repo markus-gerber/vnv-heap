@@ -52,7 +52,7 @@ impl<
         
         Self {
             object: item,
-            blockers: from_fn(|i| {
+            blockers: from_fn(|_| {
                 heap.allocate::<[u8; BLOCKER_SIZE]>([0u8; BLOCKER_SIZE]).unwrap()
             })
         }

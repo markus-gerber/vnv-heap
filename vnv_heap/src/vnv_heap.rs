@@ -3,12 +3,25 @@ use log::trace;
 use crate::{
     allocation_identifier::AllocationIdentifier, allocation_options::AllocationOptions, modules::{
         allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
-        persistent_storage::PersistentStorageModule,
-    }, resident_object_manager::ResidentObjectManager, vnv_object::VNVObject, VNVConfig
+        persistent_storage::{persistent_storage_util::write_storage_data, PersistentStorageModule},
+    }, persist_access_point::PersistAccessPoint, resident_object_manager::ResidentObjectManager, vnv_object::VNVObject, VNVConfig
 };
-use core::{alloc::Layout, cell::RefCell};
+use core::{alloc::Layout, cell::RefCell, mem::size_of};
 use core::marker::PhantomData;
-use std::mem::size_of;
+
+static PERSIST_ACCESS_POINT: PersistAccessPoint = PersistAccessPoint::empty();
+
+/// Persists all existing heaps.
+/// 
+/// If this function is called because of a *power failure* and the operating system tries to save the systems state
+/// calling this function will persist all data, call the OS and block until it is safe to restart execution
+/// (e.g. power is back online and all previous state was restored) and restore the state of this heap.
+/// In that case this function will only return if all of these steps were executed.
+/// 
+/// **Make sure that no other thread is running except for the one running this function!**
+pub unsafe fn vnv_persist_all() {
+    PERSIST_ACCESS_POINT.persist_if_not_empty();
+}
 
 pub struct VNVHeap<'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule> {
     inner: RefCell<VNVHeapInner<'a, A, N, S>>,
@@ -21,7 +34,7 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorage
         assert!(resident_buffer.len() >= config.max_dirty_bytes, "dirty size has to be smaller or equal to the resident buffer");
 
         let (resident_object_manager, offset) = ResidentObjectManager::<A>::new(resident_buffer, config.max_dirty_bytes, &mut storage_module)?;
-        let mut non_resident_allocator =  N::new();
+        let mut non_resident_allocator = N::new();
         non_resident_allocator.init(offset, storage_module.get_max_size() - offset, &mut storage_module)?;
 
         Ok(VNVHeap {
@@ -72,7 +85,7 @@ impl<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModu
         let AllocationOptions { layout, initial_value } = options;
         let offset = self.non_resident_allocator.allocate(layout, &mut self.storage_module)?;
 
-        self.storage_module.write_data(offset, &initial_value)?;
+        write_storage_data(&mut self.storage_module, offset, &initial_value)?;
 
         Ok(AllocationIdentifier::<T>::from_offset(offset))
     }

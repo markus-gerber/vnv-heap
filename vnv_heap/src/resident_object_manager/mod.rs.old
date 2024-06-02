@@ -1,31 +1,28 @@
-use core::{mem::size_of, ptr::NonNull, marker::PhantomData, alloc::Layout};
+use core::alloc::Layout;
+use core::{mem::size_of, ptr::NonNull};
+use std::marker::PhantomData;
 
 use log::{debug, error, trace, warn};
-use metadata_backup_list::MetadataBackupList;
 
 use crate::modules::persistent_storage::persistent_storage_util::read_storage_data;
-use crate::util::multi_linked_list::{AtomicMultiLinkedList, DefaultMultiLinkedList, MultiLinkedListAtomicPointer, MultiLinkedListDefaultPointer};
 use crate::{
     allocation_identifier::AllocationIdentifier,
     modules::{
         allocator::AllocatorModule,
-        nonresident_allocator::NonResidentAllocatorModule,
+        nonresident_allocator::{CountedNonResidentLinkedList, NonResidentAllocatorModule},
         persistent_storage::PersistentStorageModule,
     },
-    util::multi_linked_list::{DeleteHandle, GeneralMultiLinkedList},
+    util::multi_linked_list::{DeleteHandle, MultiLinkedList},
 };
 
 use self::resident_object::{
     calc_resident_obj_layout, ResidentObject, ResidentObjectMetadata, ResidentObjectMetadataInner,
 };
 
-mod metadata_backup_list;
-mod persist;
 mod resident_object;
+
 mod resident_object_backup;
 
-pub(crate) use metadata_backup_list::SharedMetadataBackupPtr;
-pub(crate) use persist::*;
 use resident_object_backup::*;
 
 #[cfg(test)]
@@ -33,7 +30,7 @@ mod test;
 
 /// Calculate the size that is cut off the resident buffer
 pub(crate) const fn calc_resident_manager_total_cutoff() -> usize {
-    MetadataBackupList::total_item_size()
+    CountedNonResidentLinkedList::<ResidentObjectMetadataBackup>::total_item_size()
 }
 
 pub(crate) struct ResidentObjectManager<'a, A: AllocatorModule> {
@@ -44,21 +41,21 @@ pub(crate) struct ResidentObjectManager<'a, A: AllocatorModule> {
     /// to backup metadata when PFI occurs
     ///
     /// Following is always true: `resident_object_meta_backup.len() >= resident_object_count`
-    resident_object_meta_backup: MetadataBackupList,
+    resident_object_meta_backup: CountedNonResidentLinkedList<ResidentObjectMetadataBackup>,
 
     /// How many objects are currently resident?
     resident_object_count: usize,
 
-    resident_list: DefaultMultiLinkedList<
+    resident_list: MultiLinkedList<
         ResidentObjectMetadata,
         ResidentObjectMetadataInner,
-        fn(*mut ResidentObjectMetadata) -> *mut MultiLinkedListDefaultPointer<ResidentObjectMetadata>,
+        fn(*mut ResidentObjectMetadata) -> *mut *mut ResidentObjectMetadata,
         fn(*mut ResidentObjectMetadata) -> *mut ResidentObjectMetadataInner,
     >,
-    dirty_list: AtomicMultiLinkedList<
+    dirty_list: MultiLinkedList<
         ResidentObjectMetadata,
         ResidentObjectMetadataInner,
-        fn(*mut ResidentObjectMetadata) -> *mut MultiLinkedListAtomicPointer<ResidentObjectMetadata>,
+        fn(*mut ResidentObjectMetadata) -> *mut *mut ResidentObjectMetadata,
         fn(*mut ResidentObjectMetadata) -> *mut ResidentObjectMetadataInner,
     >,
 
@@ -88,7 +85,7 @@ impl<'a, A: AllocatorModule> ResidentObjectManager<'a, A> {
         }
 
         // backup item has to be the first in the persistent storage, so restoring is easier
-        let mut meta_backup_list = MetadataBackupList::new();
+        let mut meta_backup_list = CountedNonResidentLinkedList::new();
 
         unsafe { meta_backup_list.push(0, ResidentObjectMetadataBackup::new_unused(), storage) }?;
         let offset = calc_resident_manager_total_cutoff();
@@ -97,13 +94,13 @@ impl<'a, A: AllocatorModule> ResidentObjectManager<'a, A> {
             heap,
             resident_object_meta_backup: meta_backup_list,
             resident_list: unsafe {
-                GeneralMultiLinkedList::new(
+                MultiLinkedList::new(
                     ResidentObjectMetadata::get_next_resident_item,
                     ResidentObjectMetadata::get_inner,
                 )
             },
             dirty_list: unsafe {
-                GeneralMultiLinkedList::new(
+                MultiLinkedList::new(
                     ResidentObjectMetadata::get_next_dirty_item,
                     ResidentObjectMetadata::get_inner,
                 )
@@ -162,7 +159,7 @@ impl<A: AllocatorModule> ResidentObjectManager<'_, A> {
         if self.resident_object_count == self.resident_object_meta_backup.len() {
             // acquire new slot for backup
             let ptr = non_resident_allocator.allocate(
-                MetadataBackupList::item_layout(),
+                CountedNonResidentLinkedList::<ResidentObjectMetadataBackup>::item_layout(),
                 storage,
             )?;
 
@@ -214,7 +211,7 @@ impl<A: AllocatorModule> ResidentObjectManager<'_, A> {
         non_resident_allocator: &mut N,
         storage: &mut S,
     ) -> Result<(), ()> {
-        if core::mem::needs_drop::<T>() {
+        if std::mem::needs_drop::<T>() {
             // require resident to drop object in memory
             let _ = unsafe { self.require_resident(alloc_id, non_resident_allocator, storage) }?;
         }
@@ -298,7 +295,7 @@ impl<A: AllocatorModule> ResidentObjectManager<'_, A> {
         // if this point is reached
         // it means that this object was not resident
 
-        if core::mem::needs_drop::<T>() {
+        if std::mem::needs_drop::<T>() {
             // should not happen: object should be made resident and dropped in RAM
             debug_assert!(false, "Should not happen");
             Err(())
@@ -561,9 +558,8 @@ impl<A: AllocatorModule> ResidentObjectManager<'_, A> {
 unsafe fn sync_object_dynamic<S: PersistentStorageModule>(
     mut curr_item: DeleteHandle<
         ResidentObjectMetadata,
-        MultiLinkedListAtomicPointer<ResidentObjectMetadata>,
         ResidentObjectMetadataInner,
-        fn(*mut ResidentObjectMetadata) -> *mut MultiLinkedListAtomicPointer<ResidentObjectMetadata>,
+        fn(*mut ResidentObjectMetadata) -> *mut *mut ResidentObjectMetadata,
         fn(*mut ResidentObjectMetadata) -> *mut ResidentObjectMetadataInner,
     >,
     remaining_dirty_size: &mut usize,
@@ -598,15 +594,14 @@ unsafe fn sync_object_dynamic<S: PersistentStorageModule>(
 unsafe fn make_object_nonresident_dynamic<A: AllocatorModule, S: PersistentStorageModule>(
     mut delete_handle: DeleteHandle<
         ResidentObjectMetadata,
-        MultiLinkedListDefaultPointer<ResidentObjectMetadata>,
         ResidentObjectMetadataInner,
-        fn(*mut ResidentObjectMetadata) -> *mut MultiLinkedListDefaultPointer<ResidentObjectMetadata>,
+        fn(*mut ResidentObjectMetadata) -> *mut *mut ResidentObjectMetadata,
         fn(*mut ResidentObjectMetadata) -> *mut ResidentObjectMetadataInner,
     >,
-    dirty_list: &mut AtomicMultiLinkedList<
+    dirty_list: &mut MultiLinkedList<
         ResidentObjectMetadata,
         ResidentObjectMetadataInner,
-        fn(*mut ResidentObjectMetadata) -> *mut MultiLinkedListAtomicPointer<ResidentObjectMetadata>,
+        fn(*mut ResidentObjectMetadata) -> *mut *mut ResidentObjectMetadata,
         fn(*mut ResidentObjectMetadata) -> *mut ResidentObjectMetadataInner,
     >,
     heap: &mut A,

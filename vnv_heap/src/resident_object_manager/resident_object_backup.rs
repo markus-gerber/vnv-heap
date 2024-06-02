@@ -1,6 +1,6 @@
-use std::alloc::Layout;
+use core::alloc::Layout;
 
-use super::resident_object::ResidentObjectMetadataInner;
+use super::resident_object::{MetadataBackupInfo, ResidentObjectMetadataInner};
 
 
 /// Metadata of resident objects that will be saved
@@ -24,7 +24,7 @@ pub(super) struct ResidentObjectMetadataBackup {
 }
 
 impl ResidentObjectMetadataBackup {
-    pub(super) fn new_unused() -> Self {
+    pub(crate) fn new_unused() -> Self {
         ResidentObjectMetadataBackup {
             layout: Layout::from_size_align(0, 1).unwrap(),
             offset: 0,
@@ -50,7 +50,15 @@ impl ResidentObjectMetadataBackup {
         self.resident_ptr == 0
     }
 
-    pub(super) fn to_metadata(&self) -> ResidentObjectMetadataInner {
+    /// `offset` can be the offset where this metadata is stored
+    pub(super) fn to_metadata(&self, backup_offset: Option<usize>) -> ResidentObjectMetadataInner {
+        let backup_info = if let Some(backup_offset) = backup_offset {
+            // TODO this has to depend on is_dirty!!!
+            MetadataBackupInfo::new(backup_offset)
+        } else {
+            MetadataBackupInfo::empty()
+        };
+        
         ResidentObjectMetadataInner {
             #[cfg(debug_assertions)]
             data_offset: usize::MAX,
@@ -58,7 +66,8 @@ impl ResidentObjectMetadataBackup {
             // TODO figure out what to do here
             layout: self.layout,
             offset: self.offset,
-            ref_cnt: self.ref_cnt
+            ref_cnt: self.ref_cnt,
+            metadata_backup_node: backup_info
         }
     }
 }

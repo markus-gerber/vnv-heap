@@ -1,6 +1,7 @@
 mod allocation_options;
 mod allocation_identifier;
 mod resident_object_manager;
+mod persist_access_point;
 mod vnv_config;
 mod vnv_heap;
 mod vnv_mut_ref;

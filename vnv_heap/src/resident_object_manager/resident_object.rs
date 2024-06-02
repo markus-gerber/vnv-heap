@@ -6,7 +6,7 @@ use core::{
 
 use memoffset::offset_of;
 
-use crate::util::repr_c_layout;
+use crate::util::{multi_linked_list::{MultiLinkedListAtomicPointer, MultiLinkedListDefaultPointer}, repr_c_layout};
 
 /// A object that is currently stored in RAM
 ///
@@ -34,15 +34,55 @@ pub(super) fn calc_resident_obj_layout(data_layout: Layout) -> Layout {
     repr_c_layout(&[Layout::new::<ResidentObjectMetadata>(), data_layout.clone()]).unwrap()
 }
 
+/// A small wrapper for offset of the metadata backup of a resident object
+pub(crate) struct MetadataBackupInfo {
+    offset: usize
+}
+
+impl MetadataBackupInfo {
+    const NONE_ELEMENT: usize = usize::MAX;
+    
+    #[inline]
+    pub(crate) fn new(offset: usize) -> Self {
+        debug_assert_ne!(offset, MetadataBackupInfo::NONE_ELEMENT);
+
+        Self {
+            offset
+        }
+    }
+
+    #[inline]
+    pub(crate) fn empty() -> Self {
+        Self {
+            offset: MetadataBackupInfo::NONE_ELEMENT
+        }
+    }
+
+    #[inline]
+    pub(crate) fn set(&mut self, offset: usize) {
+        debug_assert_ne!(offset, MetadataBackupInfo::NONE_ELEMENT);
+        self.offset = offset;
+    }
+
+    #[inline]
+    pub(crate) fn get(&self) -> Option<usize> {
+        if self.offset == MetadataBackupInfo::NONE_ELEMENT {
+            None
+        } else {
+            Some(self.offset)
+        }
+    }
+}
+
 pub(super) struct ResidentObjectMetadata {
     /// Actual metadata
     pub(super) inner: ResidentObjectMetadataInner,
 
     /// Next item in the resident object list
-    pub(super) next_resident_object: *mut ResidentObjectMetadata,
+    pub(super) next_resident_object: *mut MultiLinkedListDefaultPointer<ResidentObjectMetadata>,
 
     /// Next item in the next dirty object list
-    pub(super) next_dirty_object: *mut ResidentObjectMetadata,
+    pub(super) next_dirty_object: *mut MultiLinkedListAtomicPointer<ResidentObjectMetadata>,
 }
 
 pub(super) struct ResidentObjectMetadataInner {
@@ -56,6 +96,9 @@ pub(super) struct ResidentObjectMetadataInner {
     pub(super) offset: usize,
 
     pub(super) layout: Layout,
+
+    /// Offset of the metadata backup node that is being used.
+    pub(super) metadata_backup_node: MetadataBackupInfo,
 
     /// Used to test that `dynamic_metadata_to_data_range` is correct
     /// 
@@ -73,6 +116,7 @@ impl ResidentObjectMetadataInner {
             ref_cnt: 0,
             layout: Layout::new::<T>(),
             offset,
+            metadata_backup_node: MetadataBackupInfo::empty(),
 
             #[cfg(debug_assertions)]
             data_offset: offset_of!(ResidentObject<T>, data),
@@ -170,17 +214,17 @@ impl ResidentObjectMetadata {
     #[inline]
     pub(super) fn get_next_resident_item(
         ptr: *mut ResidentObjectMetadata,
-    ) -> *mut *mut ResidentObjectMetadata {
+    ) -> *mut MultiLinkedListDefaultPointer<ResidentObjectMetadata> {
         const OFFSET: usize = offset_of!(ResidentObjectMetadata, next_resident_object);
-        (unsafe { (ptr as *mut u8).add(OFFSET) }) as *mut *mut ResidentObjectMetadata
+        (unsafe { (ptr as *mut u8).add(OFFSET) }) as *mut MultiLinkedListDefaultPointer<ResidentObjectMetadata>
     }
 
     #[inline]
     pub(super) fn get_next_dirty_item(
         ptr: *mut ResidentObjectMetadata,
-    ) -> *mut *mut ResidentObjectMetadata {
+    ) -> *mut MultiLinkedListAtomicPointer<ResidentObjectMetadata> {
         const OFFSET: usize = offset_of!(ResidentObjectMetadata, next_dirty_object);
-        (unsafe { (ptr as *mut u8).add(OFFSET) }) as *mut *mut ResidentObjectMetadata
+        (unsafe { (ptr as *mut u8).add(OFFSET) }) as *mut MultiLinkedListAtomicPointer<ResidentObjectMetadata>
     }
 
     #[inline]

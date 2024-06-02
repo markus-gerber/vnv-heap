@@ -82,11 +82,10 @@ impl Drop for FilePersistentStorageModule {
 
 #[cfg(test)]
 mod test {
-    use crate::modules::persistent_storage::test::{
-        PERSISTENT_STORAGE_CUSTOM_TYPE_TEST_SIZE, PERSISTENT_STORAGE_NORMAL_TEST_SIZE,
-    };
+    use crate::modules::persistent_storage::test::{test_persistent_storage_custom_type, PERSISTENT_STORAGE_CUSTOM_TYPE_TEST_SIZE, PERSISTENT_STORAGE_NORMAL_TEST_SIZE};
+    use crate::modules::persistent_storage::{SharedStorageReference, SharedStorageAccessControl};
 
-    use super::super::test::{test_persistent_storage_custom_type, test_persistent_storage_normal};
+    use super::super::test::test_persistent_storage_normal;
     use super::FilePersistentStorageModule;
 
     #[test]
@@ -107,5 +106,30 @@ mod test {
         )
         .unwrap();
         test_persistent_storage_custom_type(storage);
+    }
+
+    #[test]
+    fn test_file_storage_reference_module_normal() {
+        let mut storage = FilePersistentStorageModule::new(
+            "/tmp/test_file_storage_reference_module_normal.tmp".into(),
+            PERSISTENT_STORAGE_NORMAL_TEST_SIZE,
+        )
+        .unwrap();
+        let access_control = SharedStorageAccessControl::new(&mut storage);
+        let reference = SharedStorageReference::new(&access_control);
+        test_persistent_storage_normal(reference);
+    }
+
+
+    #[test]
+    fn test_file_storage_reference_module_custom_types() {
+        let mut storage = FilePersistentStorageModule::new(
+            "/tmp/test_file_storage_reference_module_custom_types.tmp".into(),
+            PERSISTENT_STORAGE_CUSTOM_TYPE_TEST_SIZE,
+        )
+        .unwrap();
+        let access_control = SharedStorageAccessControl::new(&mut storage);
+        let reference = SharedStorageReference::new(&access_control);
+        test_persistent_storage_custom_type(reference);
     }
 }

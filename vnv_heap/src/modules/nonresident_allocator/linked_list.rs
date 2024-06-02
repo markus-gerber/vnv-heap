@@ -1,8 +1,32 @@
-use core::{marker::PhantomData, mem::size_of};
-use core::alloc::Layout;
-use std::fmt::Debug;
-
+use crate::modules::persistent_storage::persistent_storage_util::{
+    read_storage_data, write_storage_data,
+};
 use crate::modules::persistent_storage::PersistentStorageModule;
+use core::{
+    alloc::Layout,
+    fmt::Debug,
+    marker::PhantomData,
+    mem::size_of,
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
+pub struct NonResidentLinkedListItemLocation {
+    offset: usize,
+}
+
+impl NonResidentLinkedListItemLocation {
+    fn from_base_offset(offset: usize) -> Self {
+        Self { offset }
+    }
+
+    pub fn get_base_offset(&self) -> usize {
+        self.offset
+    }
+
+    pub fn get_data_offset(&self) -> usize {
+        self.offset + size_of::<usize>()
+    }
+}
 
 pub struct NonResidentLinkedList<T: Sized> {
     head: usize,
@@ -61,7 +85,8 @@ impl<T: Sized> NonResidentLinkedList<T> {
                 let size = NonResidentLinkedList::<T>::total_item_size();
 
                 // 9 + 24 <= 32 && 32 + 24 <= 9
-                (item_offset + size <= curr_offset) || (curr_offset + size <= item_offset)
+                (item_offset + size <= curr_offset.get_base_offset())
+                    || (curr_offset.get_base_offset() + size <= item_offset)
             }),
             "Invalid offset! Item is going to be overwritten!"
         );
@@ -72,7 +97,7 @@ impl<T: Sized> NonResidentLinkedList<T> {
             next: self.head,
             data: data,
         };
-        storage.write_data(item_offset, &item)?;
+        write_storage_data(storage, item_offset, &item)?;
         self.head = item_offset;
 
         Ok(())
@@ -82,14 +107,15 @@ impl<T: Sized> NonResidentLinkedList<T> {
     pub fn pop<S: PersistentStorageModule>(
         &mut self,
         storage: &mut S,
-    ) -> Result<Option<(usize, T)>, ()> {
+    ) -> Result<Option<(NonResidentLinkedListItemLocation, T)>, ()> {
         match self.is_empty() {
             true => Ok(None),
             false => {
                 // Advance head pointer
                 let current_offset = self.head;
-                let item =
-                    unsafe { storage.read_data::<NonResidentLinkedListItem<T>>(current_offset)? };
+                let item = unsafe {
+                    read_storage_data::<NonResidentLinkedListItem<T>, S>(storage, current_offset)?
+                };
                 self.head = item.next;
 
                 // tell potential cache layers that this item is not needed anymore for now
@@ -98,7 +124,10 @@ impl<T: Sized> NonResidentLinkedList<T> {
                     NonResidentLinkedList::<T>::total_item_size(),
                 );
 
-                Ok(Some((current_offset, item.data)))
+                Ok(Some((
+                    NonResidentLinkedListItemLocation::from_base_offset(current_offset),
+                    item.data,
+                )))
             }
         }
     }
@@ -109,7 +138,10 @@ impl<T: Sized> NonResidentLinkedList<T> {
     /// items to remove is cancelled after one item was found
     ///
     /// Returns the amount of items that were removed
-    pub fn remove_where<S: PersistentStorageModule, F: Fn((usize, &T)) -> bool>(
+    pub fn remove_where<
+        S: PersistentStorageModule,
+        F: Fn((NonResidentLinkedListItemLocation, &T)) -> bool,
+    >(
         &mut self,
         storage: &mut S,
         single_item: bool,
@@ -121,9 +153,12 @@ impl<T: Sized> NonResidentLinkedList<T> {
 
         while curr != NEXT_NULL {
             let curr_element =
-                unsafe { storage.read_data::<NonResidentLinkedListItem<T>>(curr)? };
+                unsafe { read_storage_data::<NonResidentLinkedListItem<T>, S>(storage, curr)? };
 
-            if function((curr, &curr_element.data)) {
+            if function((
+                NonResidentLinkedListItemLocation::from_base_offset(curr),
+                &curr_element.data,
+            )) {
                 counter += 1;
 
                 // remove current item
@@ -134,7 +169,7 @@ impl<T: Sized> NonResidentLinkedList<T> {
                 } else {
                     // this is not the first item in the list
                     // so we need to update the previous item, to remove it
-                    storage.write_data(prev, &curr_element.next)?;
+                    write_storage_data(storage, prev, &curr_element.next)?;
                 }
 
                 // tell potential cache layers that this item is not needed anymore for now
@@ -158,30 +193,36 @@ impl<T: Sized> NonResidentLinkedList<T> {
     }
 
     /// Return an iterator over the items in the list
-    pub fn iter<'b, S: PersistentStorageModule>(&self, storage: &'b mut S) -> Iter<'_, 'b, S, T> {
+    pub fn iter<'a, S: PersistentStorageModule>(&self, storage: &'a mut S) -> Iter<'a, S, T> {
         Iter {
             curr: self.head,
             list: PhantomData,
             storage: storage,
         }
     }
+
+    /// Converts base offset of the `NonResidentLinkedListItem<T>` provided by
+    /// `iter(...)` or `remove_where(...)` to the offset of `NonResidentLinkedListItem<T>.data`
+    pub fn get_data_offset(base_offset: usize) -> usize {
+        base_offset + size_of::<usize>()
+    }
 }
 
 impl<T> Debug for NonResidentLinkedList<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_fmt(format_args!("{}", self.head))
     }
 }
 
 /// An iterator over the linked list
-pub struct Iter<'a, 'b, S: PersistentStorageModule, T: Sized> {
+pub struct Iter<'a, S: PersistentStorageModule, T: Sized> {
     curr: usize,
-    list: PhantomData<&'a NonResidentLinkedList<T>>,
-    storage: &'b mut S,
+    list: PhantomData<NonResidentLinkedList<T>>,
+    storage: &'a mut S,
 }
 
-impl<'a, 'b, S: PersistentStorageModule, T: Sized> Iterator for Iter<'a, 'b, S, T> {
-    type Item = Result<(usize, T), ()>;
+impl<'a, S: PersistentStorageModule, T: Sized> Iterator for Iter<'a, S, T> {
+    type Item = Result<(NonResidentLinkedListItemLocation, T), ()>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.curr == NEXT_NULL {
@@ -189,7 +230,9 @@ impl<'a, 'b, S: PersistentStorageModule, T: Sized> Iterator for Iter<'a, 'b, S, 
         } else {
             let item = self.curr;
 
-            match unsafe { self.storage.read_data::<NonResidentLinkedListItem<T>>(item) } {
+            match unsafe {
+                read_storage_data::<NonResidentLinkedListItem<T>, S>(self.storage, item)
+            } {
                 Err(()) => {
                     self.curr = NEXT_NULL;
                     Some(Err(()))
@@ -197,7 +240,10 @@ impl<'a, 'b, S: PersistentStorageModule, T: Sized> Iterator for Iter<'a, 'b, S, 
                 Ok(dest) => {
                     self.curr = dest.next;
 
-                    Some(Ok((item, dest.data)))
+                    Some(Ok((
+                        NonResidentLinkedListItemLocation::from_base_offset(item),
+                        dest.data,
+                    )))
                 }
             }
         }
@@ -245,14 +291,14 @@ impl SimpleNonResidentLinkedList {
         &mut self,
         storage: &mut S,
     ) -> Result<Option<usize>, ()> {
-        Ok(self.inner.pop(storage)?.map(|(offset, _)| offset))
+        Ok(self
+            .inner
+            .pop(storage)?
+            .map(|(offset, _)| offset.get_base_offset()))
     }
 
     /// Return an iterator over the items in the list
-    pub fn iter<'b, S: PersistentStorageModule>(
-        &self,
-        storage: &'b mut S,
-    ) -> SimpleIter<'_, 'b, S> {
+    pub fn iter<'a, S: PersistentStorageModule>(&self, storage: &'a mut S) -> SimpleIter<'a, S> {
         SimpleIter {
             inner: self.inner.iter(storage),
         }
@@ -271,120 +317,144 @@ impl SimpleNonResidentLinkedList {
         function: F,
     ) -> Result<usize, ()> {
         self.inner
-            .remove_where(storage, single_item, |(offset, _)| function(offset))
+            .remove_where(storage, single_item, |(offset, _)| {
+                function(offset.get_base_offset())
+            })
     }
 }
 
 impl Debug for SimpleNonResidentLinkedList {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_fmt(format_args!("{:?}", self.inner))
     }
 }
 
-pub struct SimpleIter<'a, 'b, S: PersistentStorageModule> {
-    inner: Iter<'a, 'b, S, ()>,
+pub struct SimpleIter<'a, S: PersistentStorageModule> {
+    inner: Iter<'a, S, ()>,
 }
 
-impl<'a, 'b, S: PersistentStorageModule> Iterator for SimpleIter<'a, 'b, S> {
+impl<'a, S: PersistentStorageModule> Iterator for SimpleIter<'a, S> {
     type Item = Result<usize, ()>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|data| data.map(|(offset, _)| offset))
+        self.inner
+            .next()
+            .map(|data| data.map(|(offset, _)| offset.get_base_offset()))
     }
 }
 
-pub struct CountedNonResidentLinkedList<T: Sized> {
-    inner: NonResidentLinkedList<T>,
-    length: usize,
+pub struct AtomicPushOnlyNonResidentLinkedList<T: Sized> {
+    head: AtomicUsize,
+    _phantom_data: PhantomData<T>,
 }
 
-impl<T: Sized> CountedNonResidentLinkedList<T> {
+impl<T: Sized> AtomicPushOnlyNonResidentLinkedList<T> {
     pub fn new() -> Self {
         Self {
-            inner: NonResidentLinkedList::new(),
-            length: 0,
+            head: AtomicUsize::new(NEXT_NULL),
+            _phantom_data: PhantomData,
         }
     }
+}
 
+impl<T: Sized> AtomicPushOnlyNonResidentLinkedList<T> {
     /// The total size of an item stored in this list in persistent storage
     pub const fn total_item_size() -> usize {
-        NonResidentLinkedList::<T>::total_item_size()
+        size_of::<NonResidentLinkedListItem<T>>()
     }
 
     pub const fn item_layout() -> Layout {
-        NonResidentLinkedList::<T>::item_layout()
+        Layout::new::<NonResidentLinkedListItem<T>>()
     }
 
     /// Return `true` if the list is empty
     pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+        self.head.load(Ordering::SeqCst) == NEXT_NULL
     }
 
     /// Push `item_offset` to the front of the list.
     ///
     /// `item_offset` is offset in bytes
     pub unsafe fn push<S: PersistentStorageModule>(
-        &mut self,
+        &self,
         item_offset: usize,
         data: T,
         storage: &mut S,
     ) -> Result<(), ()> {
-        let res = self.inner.push(item_offset, data, storage);
-        if res.is_ok() {
-            self.length += 1;
-        }
+        // check that this new item does not overwrite an existing one
+        debug_assert!(
+            self.iter(storage).all(|item| {
+                let (curr_offset, _) = item.unwrap();
+                let size = NonResidentLinkedList::<T>::total_item_size();
 
-        res
-    }
+                // 9 + 24 <= 32 && 32 + 24 <= 9
+                (item_offset + size <= curr_offset.get_base_offset())
+                    || (curr_offset.get_base_offset() + size <= item_offset)
+            }),
+            "Invalid offset! Item is going to be overwritten!"
+        );
 
-    /// Removes the first item in the list
-    pub fn pop<S: PersistentStorageModule>(
-        &mut self,
-        storage: &mut S,
-    ) -> Result<Option<(usize, T)>, ()> {
-        let res = self.inner.pop(storage);
-        if res.is_ok() {
-            self.length -= 1;
-        }
+        debug_assert_ne!(item_offset, NEXT_NULL, "cannot push reserved offset value");
 
-        res
-    }
+        let item = NonResidentLinkedListItem {
+            next: self.head.load(Ordering::SeqCst),
+            data: data,
+        };
+        write_storage_data(storage, item_offset, &item)?;
+        self.head.store(item_offset, Ordering::SeqCst);
 
-    /// Removes all items where `function` returns `true`
-    ///
-    /// If `single_item = true` is set, the search for more
-    /// items to remove is cancelled after one item was found
-    ///
-    /// Returns the amount of items that were removed
-    pub fn remove_where<S: PersistentStorageModule, F: Fn((usize, &T)) -> bool>(
-        &mut self,
-        storage: &mut S,
-        single_item: bool,
-        function: F,
-    ) -> Result<usize, ()> {
-        let res = self.inner.remove_where(storage, single_item, function);
-        if let Ok(cnt) = &res {
-            self.length -= cnt;
-        }
-
-        res
+        Ok(())
     }
 
     /// Return an iterator over the items in the list
-    pub fn iter<'b, S: PersistentStorageModule>(&self, storage: &'b mut S) -> Iter<'_, 'b, S, T> {
-        self.inner.iter(storage)
+    pub fn iter<'a, S: PersistentStorageModule>(&self, storage: &'a mut S) -> Iter<'a, S, T> {
+        Iter {
+            curr: self.head.load(Ordering::SeqCst),
+            list: PhantomData,
+            storage: storage,
+        }
     }
 
-    pub fn len(&self) -> usize {
-        self.length
+    pub fn get_shared_head_ptr(&self) -> SharedAtomicLinkedListHeadPtr<T> {
+        SharedAtomicLinkedListHeadPtr {
+            phantom_data: PhantomData,
+            ptr: &self.head,
+        }
+    }
+}
+
+pub struct SharedAtomicLinkedListHeadPtr<'a, T> {
+    ptr: &'a AtomicUsize,
+    phantom_data: PhantomData<T>,
+}
+
+impl<'a, T> SharedAtomicLinkedListHeadPtr<'a, T> {
+    pub fn get_atomic_iter<'b, S: PersistentStorageModule>(
+        &self,
+        storage: &'b mut S,
+    ) -> Iter<'b, S, T> {
+        Iter {
+            curr: self.ptr.load(Ordering::SeqCst),
+            list: PhantomData,
+            storage: storage,
+        }
+    }
+}
+
+impl<T> Debug for AtomicPushOnlyNonResidentLinkedList<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_fmt(format_args!("{}", self.head.load(Ordering::SeqCst)))
     }
 }
 
 #[cfg(test)]
 mod test {
     use crate::modules::{
-        nonresident_allocator::{linked_list::CountedNonResidentLinkedList, NonResidentLinkedList},
-        persistent_storage::{test::get_test_storage, PersistentStorageModule},
+        nonresident_allocator::NonResidentLinkedList,
+        persistent_storage::{
+            persistent_storage_util::read_storage_data, test::get_test_storage,
+            PersistentStorageModule,
+        },
     };
     use std::{
         collections::VecDeque,
@@ -437,9 +507,10 @@ mod test {
         check_integrity(&mut storage, &holes, ITEM_SIZE, INIT_VAL, TEST_SIZE);
 
         while check_list.is_empty() && list.is_empty() {
+            let (loc, data) = list.pop(&mut storage).unwrap().unwrap();
             assert_eq!(
                 check_list.pop_front().unwrap(),
-                list.pop(&mut storage).unwrap().unwrap()
+                (loc.get_base_offset(), data)
             );
 
             lists_assert_eq(&mut list, &mut storage, &mut check_list);
@@ -493,8 +564,10 @@ mod test {
         lists_assert_eq(&mut list, &mut storage, &mut check_list);
 
         // should only remove one item
-        list.remove_where(&mut storage, true, |(offset, _)| offset >= 1000)
-            .unwrap();
+        list.remove_where(&mut storage, true, |(offset, _)| {
+            offset.get_base_offset() >= 1000
+        })
+        .unwrap();
         check_list.retain(|(offset, _)| *offset != 3000 + ITEM_SIZE);
         lists_assert_eq(&mut list, &mut storage, &mut check_list);
 
@@ -547,86 +620,15 @@ mod test {
         }
 
         while check_list.is_empty() && list.is_empty() {
+            let (loc, data) = list.pop(&mut storage).unwrap().unwrap();
+
             assert_eq!(
                 check_list.pop_front().unwrap(),
-                list.pop(&mut storage).unwrap().unwrap()
+                (loc.get_base_offset(), data)
             );
 
             lists_assert_eq(&mut list, &mut storage, &mut check_list);
         }
-    }
-
-    #[test]
-    fn test_counted_non_resident_linked_list() {
-        const TEST_SIZE: usize = 4096;
-        const INIT_VAL: u8 = u8::MAX;
-        const ITEM_SIZE: usize = CountedNonResidentLinkedList::<ListData>::total_item_size();
-
-        let mut storage = get_test_storage("test_counted_non_resident_linked_list", TEST_SIZE);
-
-        let init_buffer = [INIT_VAL; TEST_SIZE];
-        storage.write(0, &init_buffer).unwrap();
-
-        let mut list: CountedNonResidentLinkedList<ListData> = CountedNonResidentLinkedList::new();
-        let mut check_list: VecDeque<(usize, ListData)> = VecDeque::new();
-
-        let data = [
-            (32, ListData { a: false, b: 10 }),
-            (4000, ListData { a: true, b: 10000 }),
-            (128, ListData { a: true, b: 17 }),
-            (0, ListData { a: false, b: 16 }),
-            (3000, ListData { a: true, b: 32 }),
-            (3000 + ITEM_SIZE, ListData { a: false, b: 7000 }),
-            (512, ListData { a: true, b: 9001 }),
-            (32 + ITEM_SIZE, ListData { a: false, b: 27 }),
-        ];
-
-        let holes: Vec<usize> = data.iter().map(|(offset, _)| offset.clone()).collect();
-
-        assert_eq!(list.len(), list.iter(&mut storage).count());
-        assert_eq!(list.len(), check_list.len());
-
-        for element in data {
-            check_list.push_front(element.clone());
-            unsafe { list.push(element.0, element.1, &mut storage).unwrap() };
-
-            assert_eq!(list.len(), list.iter(&mut storage).count());
-            assert_eq!(list.len(), check_list.len());
-        }
-
-        check_integrity(&mut storage, &holes, ITEM_SIZE, INIT_VAL, TEST_SIZE);
-
-        // should not change anything
-        list.remove_where(&mut storage, false, |_| false).unwrap();
-        assert_eq!(list.len(), list.iter(&mut storage).count());
-        assert_eq!(list.len(), check_list.len());
-
-        // should only remove one item
-        list.remove_where(&mut storage, true, |(offset, _)| offset >= 1000)
-            .unwrap();
-        check_list.retain(|(offset, _)| *offset != 3000 + ITEM_SIZE);
-        assert_eq!(list.len(), list.iter(&mut storage).count());
-        assert_eq!(list.len(), check_list.len());
-
-        // remove multiple items based one ListData
-        list.remove_where(&mut storage, false, |(_, data)| !data.a)
-            .unwrap();
-        check_list.retain(|(_, data)| data.a);
-        assert_eq!(list.len(), list.iter(&mut storage).count());
-        assert_eq!(list.len(), check_list.len());
-
-        // remove all remaining items
-        while check_list.is_empty() && list.is_empty() {
-            assert_eq!(
-                check_list.pop_front().unwrap(),
-                list.pop(&mut storage).unwrap().unwrap()
-            );
-
-            assert_eq!(list.len(), list.iter(&mut storage).count());
-            assert_eq!(list.len(), check_list.len());
-        }
-
-        check_integrity(&mut storage, &holes, ITEM_SIZE, INIT_VAL, TEST_SIZE);
     }
 
     // semi random list data generator
@@ -655,7 +657,7 @@ mod test {
                 continue;
             }
 
-            let data: u8 = unsafe { storage.read_data(i).unwrap() };
+            let data: u8 = unsafe { read_storage_data(storage, i).unwrap() };
             assert_eq!(data, initial_value);
 
             i += 1;
@@ -675,7 +677,7 @@ mod test {
 
         for (item1, item2) in nonresident_list.iter(storage).zip(check_list.iter()) {
             let item1 = item1.unwrap();
-            assert_eq!(item1.0, item2.0);
+            assert_eq!(item1.0.get_base_offset(), item2.0);
             assert_eq!(item1.1, item2.1);
         }
     }
