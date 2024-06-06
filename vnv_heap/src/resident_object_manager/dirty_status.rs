@@ -1,7 +1,7 @@
 const DATA_DIRTY: u8 = 0;
 const GENERAL_METADATA_DIRTY: u8 = 1;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub(crate) struct DirtyStatus {
     bit_list: u8,
 }
@@ -24,7 +24,7 @@ impl DirtyStatus {
     /// The whole metadata is dirty except from the data
     pub(crate) const fn new_metadata_dirty() -> DirtyStatus {
         DirtyStatus {
-            bit_list: 1 << GENERAL_METADATA_DIRTY
+            bit_list: 1 << GENERAL_METADATA_DIRTY,
         }
     }
 
@@ -50,4 +50,10 @@ impl DirtyStatus {
         is_general_metadata_dirty,
         set_general_metadata_dirty
     );
+}
+
+impl Default for DirtyStatus {
+    fn default() -> Self {
+        Self::new_metadata_dirty()
+    }
 }

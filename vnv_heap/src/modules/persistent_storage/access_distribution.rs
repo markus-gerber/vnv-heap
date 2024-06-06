@@ -82,7 +82,7 @@ macro_rules! storage_reference_critical_section {
 impl PersistentStorageModule for SharedStorageReference<'_, '_> {
     fn read(&mut self, offset: usize, dest: &mut [u8]) -> Result<(), ()> {
         storage_reference_critical_section!(self, mut storage_guard, {
-            storage_guard.read(offset, dest);
+            storage_guard.read(offset, dest)?;
         })
     }
 
@@ -96,7 +96,7 @@ impl PersistentStorageModule for SharedStorageReference<'_, '_> {
 
     fn write(&mut self, offset: usize, src: &[u8]) -> Result<(), ()> {
         storage_reference_critical_section!(self, mut storage_guard, {
-            storage_guard.write(offset, src);
+            storage_guard.write(offset, src)?;
         })
     }
 }

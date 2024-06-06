@@ -9,6 +9,7 @@ use crate::{
     modules::{
         allocator::{BuddyAllocatorModule, LinkedListAllocatorModule},
         nonresident_allocator::{NonResidentAllocatorModule, NonResidentBuddyAllocatorModule},
+        object_management::DefaultObjectManagementModule,
         persistent_storage::{test::get_test_storage, PersistentStorageModule},
     },
 };
@@ -28,11 +29,10 @@ fn test_release_dirty_size() {
     let mut storage = get_test_storage("rom_test_release_dirty_size", STORAGE_SIZE);
     let mut non_resident_alloc = NonResidentBuddyAllocatorModule::<16>::new();
 
-    let (mut manager, start_offset) = ResidentObjectManager::<LinkedListAllocatorModule>::new(
-        &mut buffer,
-        INITIAL_DIRTY_SIZE,
-        &mut storage,
-    )
+    let (mut manager, start_offset) = ResidentObjectManager::<
+        LinkedListAllocatorModule,
+        DefaultObjectManagementModule,
+    >::new(&mut buffer, INITIAL_DIRTY_SIZE, &mut storage)
     .unwrap();
 
     non_resident_alloc
@@ -119,11 +119,10 @@ fn test_remain_resident() {
     let mut storage = get_test_storage("rom_test_remain_resident", STORAGE_SIZE);
     let mut non_resident_alloc = NonResidentBuddyAllocatorModule::<16>::new();
 
-    let (mut manager, start_offset) = ResidentObjectManager::<BuddyAllocatorModule<16>>::new(
-        &mut buffer,
-        INITIAL_DIRTY_SIZE,
-        &mut storage,
-    )
+    let (mut manager, start_offset) = ResidentObjectManager::<
+        BuddyAllocatorModule<16>,
+        DefaultObjectManagementModule,
+    >::new(&mut buffer, INITIAL_DIRTY_SIZE, &mut storage)
     .unwrap();
 
     non_resident_alloc
@@ -270,7 +269,7 @@ fn test_remain_resident() {
                 )
                 .unwrap();
         }
-    
+
         check_resident!();
     }
 
@@ -307,5 +306,4 @@ fn test_remain_resident() {
 
     assert_eq!(manager.resident_object_count, 0);
     assert!(manager.resident_list.is_empty());
-    assert!(manager.dirty_list.is_empty());
 }

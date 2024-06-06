@@ -1,7 +1,7 @@
 use core::{ptr::null_mut, mem::{transmute, MaybeUninit}};
 use try_lock::TryLock;
 
-use crate::{modules::{nonresident_allocator::SharedAtomicLinkedListHeadPtr, persistent_storage::SharedStorageReference}, resident_object_manager::SharedMetadataBackupPtr};
+use crate::{modules::persistent_storage::SharedStorageReference, resident_object_manager::SharedMetadataBackupPtr};
 
 
 /// An object containing all necessary data 

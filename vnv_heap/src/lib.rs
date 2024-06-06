@@ -12,7 +12,7 @@ mod util;
 #[cfg(test)]
 mod test;
 
-#[cfg(feature = "benchmarks")]
+#[cfg(any(feature = "benchmarks", test))]
 pub mod benchmarks;
 
 pub use crate::vnv_heap::VNVHeap;

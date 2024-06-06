@@ -13,15 +13,17 @@ memoffset = "0.9.1"
 serde = { version = "1.0.202", features = ["derive"], optional = true }
 serde_json = { version = "1.0.117", optional = true }
 seq-macro = { version = "0.3.5", optional = true }
-static_assertions = { version = "1.1.0", optional = true }
+static_assertions = { version = "1.1.0" }
 try-lock = "0.2.5"
+polonius-the-crab = "0.4.1"
 
 [features]
 default = ["linked_list_allocator", "buddy_allocator"]
 linked_list_allocator = ["dep:linked_list_allocator"]
 buddy_allocator = ["dep:buddy_system_allocator"]
-benchmarks = ["dep:serde", "dep:serde_json", "dep:seq-macro", "dep:static_assertions"]
+benchmarks = ["dep:serde", "dep:serde_json", "dep:seq-macro"]
 
 [dev-dependencies]
 env_logger = "0.10.2"
 rand = { version = "0.8.5", features = ["small_rng"], default-features = false }
+vnv_heap = { path = ".", features = ["benchmarks"] }

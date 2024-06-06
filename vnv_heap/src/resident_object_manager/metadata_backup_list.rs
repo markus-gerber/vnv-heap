@@ -1,16 +1,21 @@
-use core::alloc::Layout;
-use crate::modules::{nonresident_allocator::{AtomicPushOnlyNonResidentLinkedList, Iter, NonResidentLinkedList, SharedAtomicLinkedListHeadPtr}, persistent_storage::PersistentStorageModule};
 use super::ResidentObjectMetadataBackup;
+use crate::modules::{
+    nonresident_allocator::{
+        AtomicPushOnlyNonResidentLinkedList, Iter, NonResidentLinkedList,
+        SharedAtomicLinkedListHeadPtr,
+    },
+    persistent_storage::PersistentStorageModule,
+};
+use core::alloc::Layout;
 
-
-pub(super) struct MetadataBackupList {
+pub(crate) struct MetadataBackupList {
     inner: AtomicPushOnlyNonResidentLinkedList<ResidentObjectMetadataBackup>,
     length: usize,
 }
 
 impl MetadataBackupList {
     #[inline]
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             inner: AtomicPushOnlyNonResidentLinkedList::new(),
             length: 0,
@@ -19,18 +24,18 @@ impl MetadataBackupList {
 
     /// The total size of an item stored in this list in persistent storage
     #[inline]
-    pub(super) const fn total_item_size() -> usize {
+    pub(crate) const fn total_item_size() -> usize {
         AtomicPushOnlyNonResidentLinkedList::<ResidentObjectMetadataBackup>::total_item_size()
     }
 
     #[inline]
-    pub(super) const fn item_layout() -> Layout {
+    pub(crate) const fn item_layout() -> Layout {
         AtomicPushOnlyNonResidentLinkedList::<ResidentObjectMetadataBackup>::item_layout()
     }
 
     /// Return `true` if the list is empty
     #[inline]
-    pub(super) fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
@@ -38,7 +43,7 @@ impl MetadataBackupList {
     ///
     /// `item_offset` is offset in bytes
     #[inline]
-    pub(super) unsafe fn push<S: PersistentStorageModule>(
+    pub(crate) unsafe fn push<S: PersistentStorageModule>(
         &mut self,
         item_offset: usize,
         data: ResidentObjectMetadataBackup,
@@ -54,17 +59,22 @@ impl MetadataBackupList {
 
     /// Return an iterator over the items in the list
     #[inline]
-    pub(super) fn iter<'a, S: PersistentStorageModule>(&self, storage: &'a mut S) -> Iter<'a, S, ResidentObjectMetadataBackup> {
+    pub(crate) fn iter<'a, S: PersistentStorageModule>(
+        &self,
+        storage: &'a mut S,
+    ) -> Iter<'a, S, ResidentObjectMetadataBackup> {
         self.inner.iter(storage)
     }
 
     #[inline]
-    pub(super) fn get_shared_head_ptr(&self) -> SharedAtomicLinkedListHeadPtr<ResidentObjectMetadataBackup> {
-        self.inner.get_shared_head_ptr()
+    pub(crate) fn get_shared_head_ptr(&self) -> SharedMetadataBackupPtr<'_> {
+        SharedMetadataBackupPtr {
+            inner: self.inner.get_shared_head_ptr(),
+        }
     }
 
     #[inline]
-    pub(super) fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.length
     }
 
@@ -77,10 +87,13 @@ impl MetadataBackupList {
 }
 
 pub(crate) struct SharedMetadataBackupPtr<'a> {
-    inner: SharedAtomicLinkedListHeadPtr<'a, ResidentObjectMetadataBackup>
+    inner: SharedAtomicLinkedListHeadPtr<'a, ResidentObjectMetadataBackup>,
 }
 impl SharedMetadataBackupPtr<'_> {
-    pub(super) fn get_atomic_iter<'a, S: PersistentStorageModule>(&self, storage: &'a mut S) -> Iter<'a, S, ResidentObjectMetadataBackup> {
-        self.get_atomic_iter(storage)
+    pub(crate) fn get_atomic_iter<'a, S: PersistentStorageModule>(
+        &self,
+        storage: &'a mut S,
+    ) -> Iter<'a, S, ResidentObjectMetadataBackup> {
+        self.inner.get_atomic_iter(storage)
     }
 }

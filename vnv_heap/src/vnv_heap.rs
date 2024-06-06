@@ -2,8 +2,7 @@ use log::trace;
 
 use crate::{
     allocation_identifier::AllocationIdentifier, allocation_options::AllocationOptions, modules::{
-        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
-        persistent_storage::{persistent_storage_util::write_storage_data, PersistentStorageModule},
+        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule, object_management::DefaultObjectManagementModule, persistent_storage::{persistent_storage_util::write_storage_data, PersistentStorageModule}
     }, persist_access_point::PersistAccessPoint, resident_object_manager::ResidentObjectManager, vnv_object::VNVObject, VNVConfig
 };
 use core::{alloc::Layout, cell::RefCell, mem::size_of};
@@ -33,7 +32,7 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorage
     pub fn new(resident_buffer: &'a mut [u8], mut storage_module: S, config: VNVConfig) -> Result<Self, ()> {
         assert!(resident_buffer.len() >= config.max_dirty_bytes, "dirty size has to be smaller or equal to the resident buffer");
 
-        let (resident_object_manager, offset) = ResidentObjectManager::<A>::new(resident_buffer, config.max_dirty_bytes, &mut storage_module)?;
+        let (resident_object_manager, offset) = ResidentObjectManager::<A, DefaultObjectManagementModule>::new(resident_buffer, config.max_dirty_bytes, &mut storage_module)?;
         let mut non_resident_allocator = N::new();
         non_resident_allocator.init(offset, storage_module.get_max_size() - offset, &mut storage_module)?;
 
@@ -68,7 +67,7 @@ pub(crate) struct VNVHeapInner<
     S: PersistentStorageModule,
 > {
     storage_module: S,
-    resident_object_manager: ResidentObjectManager<'a, A>,
+    resident_object_manager: ResidentObjectManager<'a, A, DefaultObjectManagementModule>,
     non_resident_allocator: N,
     _phantom_data: PhantomData<A>
 }
@@ -137,7 +136,7 @@ impl<A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModu
     }
 
     #[cfg(feature = "benchmarks")]
-    pub(crate) fn get_resident_object_manager(&self) -> &ResidentObjectManager<A> {
+    pub(crate) fn get_resident_object_manager(&self) -> &ResidentObjectManager<A, DefaultObjectManagementModule> {
         &self.resident_object_manager
     }
 

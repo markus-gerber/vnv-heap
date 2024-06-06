@@ -109,7 +109,7 @@ pub fn run_all_benchmarks<
             for_obj_size_impl!($index, $inner, 31);
 
             #[cfg(target_pointer_width = "64")]
-            for_obj_size_impl!($index, $inner, 29);
+            for_obj_size_impl!($index, $inner, 28);
         };
     }
 
@@ -295,6 +295,13 @@ pub fn run_all_benchmarks<
     }
 }
 
+macro_rules! output {
+    ($($arg:tt)*) => {{
+        println!(format!($($arg)*));
+    }};
+
+}
+
 pub trait Benchmark<O: Serialize> {
     fn get_name(&self) -> &'static str;
 
@@ -310,6 +317,8 @@ pub trait Benchmark<O: Serialize> {
         assert_eq!(options.repetitions as usize, options.result_buffer.len());
 
         print!("Running Benchmark \"{}\" with options ", self.get_name());
+
+        #[cfg(not(test))]
         serde_json::to_writer(stdout(), &self.get_bench_options()).unwrap();
         println!();
 
@@ -322,17 +331,22 @@ pub trait Benchmark<O: Serialize> {
             options.result_buffer[i] = res;
         }
 
-        let run_info = BenchmarkRunInfo {
-            bench_name: self.get_name(),
-            bench_options: &self.get_bench_options(),
-            machine_name: options.machine_name,
-            cold_start: options.cold_start,
-            repetitions: options.repetitions,
-            data: &options.result_buffer,
-        };
-
+        
+        
         print!("[BENCH-INFO] ");
-        serde_json::to_writer(stdout(), &run_info).unwrap();
+
+        #[cfg(not(test))]
+        {
+            let run_info = BenchmarkRunInfo {
+                bench_name: self.get_name(),
+                bench_options: &self.get_bench_options(),
+                machine_name: options.machine_name,
+                cold_start: options.cold_start,
+                repetitions: options.repetitions,
+                data: &options.result_buffer,
+            };
+            serde_json::to_writer(stdout(), &run_info).unwrap();    
+        }
         println!("");
 
         let res = BenchmarkRunResult::from_buffer(&options.result_buffer);

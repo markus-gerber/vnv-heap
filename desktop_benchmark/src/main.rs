@@ -76,7 +76,7 @@ fn get_bench_heap(
     NonResidentBuddyAllocatorModule<16>,
     FilePersistentStorageModule,
 > {
-    let storage = FilePersistentStorageModule::new("test.data".to_string(), 4096).unwrap();
+    let storage = FilePersistentStorageModule::new("test.data".to_string(), 4096 * 4).unwrap();
     let config = VNVConfig {
         max_dirty_bytes: max_dirty,
     };
