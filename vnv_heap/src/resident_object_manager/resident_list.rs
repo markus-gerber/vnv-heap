@@ -27,14 +27,14 @@ impl ResidentList {
     /// ### Safety
     ///
     /// This is only safe if `item` was not previously pushed to any list before (pushing after popping an item is okay tho).
-    pub(crate) unsafe fn push(&mut self, item: &mut ResidentObjectMetadata) {
+    pub(crate) unsafe fn push(&self, item: &mut ResidentObjectMetadata) {
         let old_head = self.head.load(Ordering::SeqCst);
         item.next_resident_object.store(old_head, Ordering::SeqCst);
         self.head.store(item, Ordering::SeqCst);
     }
 
     /// Try to remove the first item in the list
-    pub(crate) fn pop(&mut self) -> Option<*mut ResidentObjectMetadata> {
+    pub(crate) fn pop(&self) -> Option<*mut ResidentObjectMetadata> {
         match self.is_empty() {
             true => None,
             false => {
@@ -62,12 +62,37 @@ impl ResidentList {
     }
 
     /// Returns a mutable iterator over the items in the list
-    pub(crate) fn iter_mut<'a>(&'a mut self) -> IterMut<'a> {
+    pub(crate) fn iter_mut<'a>(&'a self) -> IterMut<'a> {
         IterMut {
             curr: CurrItem {
                 curr: null_mut(),
                 prev: &self.head,
             },
+        }
+    }
+
+    pub(crate) fn get_shared_ref(&self) -> SharedResidentListRef {
+        SharedResidentListRef {
+            head: &self.head,
+            _phantom_data: PhantomData,
+        }
+    }
+}
+
+pub(crate) struct SharedResidentListRef<'a> {
+    head: *const AtomicPtr<ResidentObjectMetadata>,
+    _phantom_data: PhantomData<&'a ()>,
+}
+
+impl SharedResidentListRef<'_> {
+    /// Returns an immutable iterator over the items in the list
+    pub(crate) fn iter(&self) -> Iter<'_, '_> {
+        let ptr = unsafe { self.head.as_ref().unwrap().load(Ordering::SeqCst) };
+        let head = unsafe { ptr.as_ref() };
+
+        Iter {
+            curr: head,
+            list: PhantomData,
         }
     }
 }
@@ -155,13 +180,13 @@ impl<'a> IterMut<'a> {
 
 #[cfg(test)]
 mod test {
+    const ENABLE_PRINTS: bool = false;
+
     use crate::resident_object_manager::{
         dirty_status::DirtyStatus,
-        metadata_backup_info::MetadataBackupInfo,
         resident_object::{ResidentObjectMetadata, ResidentObjectMetadataInner},
     };
     use std::{
-        alloc::Layout,
         collections::VecDeque,
         fmt::Debug,
         sync::atomic::{AtomicPtr, Ordering},
@@ -184,7 +209,6 @@ mod test {
                 .field("ref_cnt", &self.ref_cnt)
                 .field("offset", &self.offset)
                 .field("layout", &self.layout)
-                .field("data_offset", &self.data_offset)
                 .finish()
         }
     }
@@ -201,7 +225,6 @@ mod test {
                 && self.ref_cnt == other.ref_cnt
                 && self.offset == other.offset
                 && self.layout == other.layout
-                && self.data_offset == other.data_offset
         }
     }
 
@@ -210,20 +233,6 @@ mod test {
             Self {
                 inner: Default::default(),
                 next_resident_object: Default::default(),
-            }
-        }
-    }
-    impl Default for ResidentObjectMetadataInner {
-        fn default() -> Self {
-            Self {
-                dirty_status: Default::default(),
-                ref_cnt: Default::default(),
-                offset: Default::default(),
-                layout: Layout::new::<()>(),
-                metadata_backup_node: MetadataBackupInfo::empty(),
-
-                #[cfg(debug_assertions)]
-                data_offset: usize::MAX,
             }
         }
     }
@@ -295,7 +304,9 @@ mod test {
             assert_eq!(self.list.iter().count(), self.check_list.len());
 
             for (a, b) in self.list.iter().zip(self.check_list.iter()) {
-                println!("{:?} =?= {:?}", a, b);
+                if ENABLE_PRINTS {
+                    println!("{:?} =?= {:?}", a, b);
+                }
                 if a != b {
                     assert!(a == b);
                 }
@@ -303,17 +314,19 @@ mod test {
         }
 
         pub fn print(&self) {
-            print!("list: [");
-            for x in self.list.iter() {
-                print!("{:?}, ", x);
-            }
-            println!("]");
+            if ENABLE_PRINTS {
+                print!("list: [");
+                for x in self.list.iter() {
+                    print!("{:?}, ", x);
+                }
+                println!("]");
 
-            print!("check_list: [");
-            for x in self.check_list.iter() {
-                print!("{:?}, ", x);
+                print!("check_list: [");
+                for x in self.check_list.iter() {
+                    print!("{:?}, ", x);
+                }
+                println!("]");
             }
-            println!("]");
         }
     }
 
@@ -367,16 +380,20 @@ mod test {
         check_integrity!();
 
         {
-            println!("### before iter_mut ###");
-            list.print();
-            println!("### iter_mut ###");
+            if ENABLE_PRINTS {
+                println!("### before iter_mut ###");
+                list.print();
+                println!("### iter_mut ###");
+            }
             let mut iter = list.list.iter_mut();
             while let Some(mut handle) = iter.next() {
                 let item = handle.get_element();
                 let stop = item.inner.offset == 0;
 
                 if item.inner.dirty_status.is_data_dirty() {
-                    println!("delete {:?}", item);
+                    if ENABLE_PRINTS {
+                        println!("delete {:?}", item);
+                    }
                     handle.delete();
                 }
 
@@ -412,9 +429,11 @@ mod test {
         check_integrity!();
 
         {
-            println!("### before iter_mut ###");
-            list.print();
-            println!("### iter_mut ###");
+            if ENABLE_PRINTS {
+                println!("### before iter_mut ###");
+                list.print();
+                println!("### iter_mut ###");
+            }
             let mut iter = list.list.iter_mut();
             while let Some(handle) = iter.next() {
                 handle.delete();

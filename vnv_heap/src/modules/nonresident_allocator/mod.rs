@@ -6,7 +6,8 @@ mod linked_list;
 
 pub use buddy::NonResidentBuddyAllocatorModule;
 pub use linked_list::{
-    Iter, SimpleIter, NonResidentLinkedList, SimpleNonResidentLinkedList, AtomicPushOnlyNonResidentLinkedList, SharedAtomicLinkedListHeadPtr
+    AtomicPushOnlyNonResidentLinkedList, Iter, NonResidentLinkedList,
+    SharedAtomicLinkedListHeadPtr, SimpleIter, SimpleNonResidentLinkedList,
 };
 
 /// An allocator module that is not stored inside RAM,

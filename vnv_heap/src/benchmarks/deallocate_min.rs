@@ -1,7 +1,6 @@
 use crate::{
     modules::{
-        allocator::AllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule,
-        persistent_storage::PersistentStorageModule,
+        allocator::AllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, object_management::ObjectManagementModule
     },
     VNVHeap, VNVObject,
 };
@@ -21,22 +20,22 @@ pub struct DeallocateMinBenchmarkOptions {
 pub struct DeallocateMinBenchmark<
     'a,
     'b: 'a,
-    A: AllocatorModule,
-    S: PersistentStorageModule,
+    A: AllocatorModule + 'static,
+    M: ObjectManagementModule,
     const OBJ_SIZE: usize,
 > {
-    heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, S>,
+    heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M>,
 
     #[allow(dead_code)]
-    item_guard: Option<VNVObject<'a, 'b, [u8; OBJ_SIZE], A, NonResidentBuddyAllocatorModule<16>, S>>,
+    item_guard: Option<VNVObject<'a, 'b, [u8; OBJ_SIZE], A, NonResidentBuddyAllocatorModule<16>, M>>,
 
     object_bucket_index: usize,
 }
 
-impl<'a, 'b: 'a, A: AllocatorModule, S: PersistentStorageModule, const OBJ_SIZE: usize>
-    DeallocateMinBenchmark<'a, 'b, A, S, OBJ_SIZE>
+impl<'a, 'b: 'a, A: AllocatorModule, M: ObjectManagementModule, const OBJ_SIZE: usize>
+    DeallocateMinBenchmark<'a, 'b, A, M, OBJ_SIZE>
 {
-    pub fn new(heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, S>) -> Self {
+    pub fn new(heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M>) -> Self {
         let object_bucket_index = (max(OBJ_SIZE, size_of::<usize>())).next_power_of_two().trailing_zeros() as usize;
         
         let mut item_guard = None;
@@ -56,8 +55,8 @@ impl<'a, 'b: 'a, A: AllocatorModule, S: PersistentStorageModule, const OBJ_SIZE:
     }
 }
 
-impl<'a, 'b: 'a, A: AllocatorModule, S: PersistentStorageModule, const OBJ_SIZE: usize>
-    Benchmark<DeallocateMinBenchmarkOptions> for DeallocateMinBenchmark<'a, 'b, A, S, OBJ_SIZE>
+impl<'a, 'b: 'a, A: AllocatorModule + 'static, M: ObjectManagementModule, const OBJ_SIZE: usize>
+    Benchmark<DeallocateMinBenchmarkOptions> for DeallocateMinBenchmark<'a, 'b, A, M, OBJ_SIZE>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
@@ -90,7 +89,7 @@ impl<'a, 'b: 'a, A: AllocatorModule, S: PersistentStorageModule, const OBJ_SIZE:
     fn get_bench_options(&self) -> DeallocateMinBenchmarkOptions {
         DeallocateMinBenchmarkOptions {
             object_size: OBJ_SIZE,
-            modules: ModuleOptions::new::<A, NonResidentBuddyAllocatorModule<16>, S>()
+            modules: ModuleOptions::new::<A, NonResidentBuddyAllocatorModule<16>>()
         }
     }
 }

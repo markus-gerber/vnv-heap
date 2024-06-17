@@ -4,7 +4,7 @@ use crate::{
     allocation_identifier::AllocationIdentifier,
     modules::{
         allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
-        persistent_storage::PersistentStorageModule,
+        object_management::ObjectManagementModule,
     },
     vnv_heap::VNVHeapInner,
 };
@@ -17,9 +17,9 @@ pub struct VNVRef<
     T: Sized,
     A: AllocatorModule,
     N: NonResidentAllocatorModule,
-    S: PersistentStorageModule,
+    M: ObjectManagementModule,
 > {
-    vnv_heap: &'a RefCell<VNVHeapInner<'d, A, N, S>>,
+    vnv_heap: &'a RefCell<VNVHeapInner<'d, A, N, M>>,
     allocation_identifier: &'b AllocationIdentifier<T>,
     data_ref: &'c T,
 }
@@ -32,11 +32,11 @@ impl<
         T: Sized,
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
-        S: PersistentStorageModule,
-    > VNVRef<'a, 'b, 'c, 'd, T, A, N, S>
+        M: ObjectManagementModule,
+    > VNVRef<'a, 'b, 'c, 'd, T, A, N, M>
 {
     pub(crate) unsafe fn new(
-        vnv_heap: &'a RefCell<VNVHeapInner<'d, A, N, S>>,
+        vnv_heap: &'a RefCell<VNVHeapInner<'d, A, N, M>>,
         allocation_identifier: &'b AllocationIdentifier<T>,
         data_ref: &'c T,
     ) -> Self {
@@ -48,8 +48,8 @@ impl<
     }
 }
 
-impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule> Deref
-    for VNVRef<'_, '_, '_, '_, T, A, N, S>
+impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementModule> Deref
+    for VNVRef<'_, '_, '_, '_, T, A, N, M>
 {
     type Target = T;
 
@@ -58,8 +58,8 @@ impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentS
     }
 }
 
-impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule> Drop
-    for VNVRef<'_, '_, '_, '_, T, A, N, S>
+impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementModule> Drop
+    for VNVRef<'_, '_, '_, '_, T, A, N, M>
 {
     fn drop(&mut self) {
         unsafe {

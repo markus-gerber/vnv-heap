@@ -5,9 +5,10 @@ use crate::{
     modules::{
         allocator::LinkedListAllocatorModule,
         nonresident_allocator::NonResidentBuddyAllocatorModule,
+        object_management::DefaultObjectManagementModule,
         persistent_storage::FilePersistentStorageModule,
     },
-    VNVConfig, VNVHeap,
+    VNVHeap,
 };
 
 use super::get_test_heap;
@@ -16,15 +17,15 @@ use super::get_test_heap;
 fn test_benchmarks() {
     run_all_benchmarks::<
         DesktopTimer,
-        LinkedListAllocatorModule,
         FilePersistentStorageModule,
+        DefaultObjectManagementModule,
         fn(
             &mut [u8],
             usize,
         ) -> VNVHeap<
             LinkedListAllocatorModule,
             NonResidentBuddyAllocatorModule<16>,
-            FilePersistentStorageModule,
+            DefaultObjectManagementModule,
         >,
     >(
         get_bench_heap,
@@ -44,9 +45,9 @@ fn get_bench_heap(
 ) -> VNVHeap<
     LinkedListAllocatorModule,
     NonResidentBuddyAllocatorModule<16>,
-    FilePersistentStorageModule,
+    DefaultObjectManagementModule,
 > {
-    get_test_heap("test_benchmarks", 4096 * 4, buf, max_dirty)
+    get_test_heap("test_benchmarks", 4096 * 4, buf, max_dirty, |_, _| {})
 }
 
 struct DesktopTimer {

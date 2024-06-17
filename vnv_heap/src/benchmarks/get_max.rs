@@ -1,7 +1,6 @@
 use crate::{
     modules::{
-        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
-        persistent_storage::PersistentStorageModule,
+        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule, object_management::ObjectManagementModule,
     }, resident_object_manager::get_total_resident_size, VNVHeap, VNVObject
 };
 use core::hint::black_box;
@@ -23,27 +22,27 @@ pub struct GetMax1Benchmark<
     'b: 'a,
     A: AllocatorModule,
     N: NonResidentAllocatorModule,
-    S: PersistentStorageModule,
+    M: ObjectManagementModule,
     const OBJ_SIZE: usize,
     const BLOCKER_SIZE: usize,
     const BLOCKER_COUNT: usize,
 > {
-    object: VNVObject<'a, 'b, [u8; OBJ_SIZE], A, N, S>,
-    blockers: [VNVObject<'a, 'b, [u8; BLOCKER_SIZE], A, N, S>; BLOCKER_COUNT],
+    object: VNVObject<'a, 'b, [u8; OBJ_SIZE], A, N, M>,
+    blockers: [VNVObject<'a, 'b, [u8; BLOCKER_SIZE], A, N, M>; BLOCKER_COUNT],
 }
 
 impl<
         'a,
         'b: 'a,
-        A: AllocatorModule,
+        A: AllocatorModule + 'static,
         N: NonResidentAllocatorModule,
-        S: PersistentStorageModule,
+        M: ObjectManagementModule,
         const OBJ_SIZE: usize,
         const BLOCKER_SIZE: usize,
         const BLOCKER_COUNT: usize,
-    > GetMax1Benchmark<'a, 'b, A, N, S, OBJ_SIZE, BLOCKER_SIZE, BLOCKER_COUNT>
+    > GetMax1Benchmark<'a, 'b, A, N, M, OBJ_SIZE, BLOCKER_SIZE, BLOCKER_COUNT>
 {
-    pub fn new(heap: &'a VNVHeap<'b, A, N, S>, resident_buffer_size: usize) -> Self {
+    pub fn new(heap: &'a VNVHeap<'b, A, N, M>, resident_buffer_size: usize) -> Self {
         assert_eq!(resident_buffer_size, heap.get_inner().borrow_mut().get_resident_object_manager().get_remaining_dirty_size());
 
         assert!(BLOCKER_COUNT * (BLOCKER_SIZE + 16) >= resident_buffer_size, "Blockers should be able to easily fill resident buffer");
@@ -79,14 +78,14 @@ macro_rules! get_max_1_benchmark_calc_blocker_size {
 impl<
         'a,
         'b: 'a,
-        A: AllocatorModule,
+        A: AllocatorModule + 'static,
         N: NonResidentAllocatorModule,
-        S: PersistentStorageModule,
+        M: ObjectManagementModule,
         const OBJ_SIZE: usize,
         const BLOCKER_SIZE: usize,
         const BLOCKER_COUNT: usize,
     > Benchmark<GetMax1BenchmarkOptions>
-    for GetMax1Benchmark<'a, 'b, A, N, S, OBJ_SIZE, BLOCKER_SIZE, BLOCKER_COUNT>
+    for GetMax1Benchmark<'a, 'b, A, N, M, OBJ_SIZE, BLOCKER_SIZE, BLOCKER_COUNT>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
@@ -121,7 +120,7 @@ impl<
             object_size: OBJ_SIZE,
             blocker_count: BLOCKER_COUNT,
             blocker_size: BLOCKER_SIZE,
-            modules: ModuleOptions::new::<A, N, S>()
+            modules: ModuleOptions::new::<A, N>()
         }
     }
 }
@@ -139,27 +138,27 @@ pub struct GetMax2Benchmark<
     'b: 'a,
     A: AllocatorModule,
     N: NonResidentAllocatorModule,
-    S: PersistentStorageModule,
+    M: ObjectManagementModule,
     const OBJ_SIZE: usize,
     const BLOCKER_SIZE: usize,
 > {
-    object: VNVObject<'a, 'b, [u8; OBJ_SIZE], A, N, S>,
-    blocker: VNVObject<'a, 'b, [u8; BLOCKER_SIZE], A, N, S>,
-    debug_obj: VNVObject<'a, 'b, (), A, N, S>
+    object: VNVObject<'a, 'b, [u8; OBJ_SIZE], A, N, M>,
+    blocker: VNVObject<'a, 'b, [u8; BLOCKER_SIZE], A, N, M>,
+    debug_obj: VNVObject<'a, 'b, (), A, N, M>
 }
 
 impl<
         'a,
         'b: 'a,
-        A: AllocatorModule,
+        A: AllocatorModule + 'static,
         N: NonResidentAllocatorModule,
-        S: PersistentStorageModule,
+        M: ObjectManagementModule,
         const OBJ_SIZE: usize,
         const BLOCKER_SIZE: usize,
-    > GetMax2Benchmark<'a, 'b, A, N, S, OBJ_SIZE, BLOCKER_SIZE>
+    > GetMax2Benchmark<'a, 'b, A, N, M, OBJ_SIZE, BLOCKER_SIZE>
 {
 
-    pub fn new(heap: &'a VNVHeap<'b, A, N, S>, resident_buffer_size: usize) -> Self {
+    pub fn new(heap: &'a VNVHeap<'b, A, N, M>, resident_buffer_size: usize) -> Self {
         assert_eq!(heap.get_inner().borrow_mut().get_resident_object_manager().get_remaining_dirty_size(), resident_buffer_size, "whole buffer should be able to be dirty");
         // blocker size should been calculated with this function
         assert_eq!(resident_buffer_size, get_total_resident_size::<[u8; BLOCKER_SIZE]>(), "blocker size is wrong! {} != {}", resident_buffer_size, get_total_resident_size::<[u8; BLOCKER_SIZE]>());
@@ -178,11 +177,11 @@ impl<
         'b: 'a,
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
-        S: PersistentStorageModule,
+        M: ObjectManagementModule,
         const OBJ_SIZE: usize,
         const BLOCKER_SIZE: usize,
     > Benchmark<GetMax2BenchmarkOptions>
-    for GetMax2Benchmark<'a, 'b, A, N, S, OBJ_SIZE, BLOCKER_SIZE>
+    for GetMax2Benchmark<'a, 'b, A, N, M, OBJ_SIZE, BLOCKER_SIZE>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
@@ -227,7 +226,7 @@ impl<
         GetMax2BenchmarkOptions {
             object_size: OBJ_SIZE,
             blocker_size: BLOCKER_SIZE,
-            modules: ModuleOptions::new::<A, N, S>()
+            modules: ModuleOptions::new::<A, N>()
         }
     }
 }

@@ -80,14 +80,13 @@ impl<T: Sized> NonResidentLinkedList<T> {
     ) -> Result<(), ()> {
         // check that this new item does not overwrite an existing one
         debug_assert!(
-            self.iter(storage).all(|item| {
-                let (curr_offset, _) = item.unwrap();
+            self.iter().all(|offset, _| {
                 let size = NonResidentLinkedList::<T>::total_item_size();
 
                 // 9 + 24 <= 32 && 32 + 24 <= 9
-                (item_offset + size <= curr_offset.get_base_offset())
-                    || (curr_offset.get_base_offset() + size <= item_offset)
-            }),
+                (item_offset + size <= offset.get_base_offset())
+                    || (offset.get_base_offset() + size <= item_offset)
+            }, storage)?,
             "Invalid offset! Item is going to be overwritten!"
         );
 
@@ -193,11 +192,10 @@ impl<T: Sized> NonResidentLinkedList<T> {
     }
 
     /// Return an iterator over the items in the list
-    pub fn iter<'a, S: PersistentStorageModule>(&self, storage: &'a mut S) -> Iter<'a, S, T> {
+    pub fn iter<'a>(&'a self) -> Iter<'a, T> {
         Iter {
             curr: self.head,
             list: PhantomData,
-            storage: storage,
         }
     }
 
@@ -215,38 +213,45 @@ impl<T> Debug for NonResidentLinkedList<T> {
 }
 
 /// An iterator over the linked list
-pub struct Iter<'a, S: PersistentStorageModule, T: Sized> {
+pub struct Iter<'a, T: Sized> {
     curr: usize,
-    list: PhantomData<NonResidentLinkedList<T>>,
-    storage: &'a mut S,
+    list: PhantomData<&'a NonResidentLinkedList<T>>,
 }
 
-impl<'a, S: PersistentStorageModule, T: Sized> Iterator for Iter<'a, S, T> {
-    type Item = Result<(NonResidentLinkedListItemLocation, T), ()>;
-
-    fn next(&mut self) -> Option<Self::Item> {
+impl<'a, T: Sized> Iter<'a, T> {
+    pub fn next<S: PersistentStorageModule>(&mut self, storage: &mut S) -> Result<Option<(NonResidentLinkedListItemLocation, T)>, ()> {
         if self.curr == NEXT_NULL {
-            None
+            Ok(None)
         } else {
             let item = self.curr;
 
-            match unsafe {
-                read_storage_data::<NonResidentLinkedListItem<T>, S>(self.storage, item)
-            } {
-                Err(()) => {
-                    self.curr = NEXT_NULL;
-                    Some(Err(()))
-                }
-                Ok(dest) => {
-                    self.curr = dest.next;
+            let dest = unsafe {
+                read_storage_data::<NonResidentLinkedListItem<T>, S>(storage, item)?
+            };
 
-                    Some(Ok((
-                        NonResidentLinkedListItemLocation::from_base_offset(item),
-                        dest.data,
-                    )))
-                }
+            self.curr = dest.next;
+
+            Ok(Some((
+                NonResidentLinkedListItemLocation::from_base_offset(item),
+                dest.data,
+            )))
+        }
+    }
+
+    pub fn find<S: PersistentStorageModule, F: Fn(&NonResidentLinkedListItemLocation, &T) -> bool>(&mut self, f: F, storage: &mut S) -> Result<Option<(NonResidentLinkedListItemLocation, T)>, ()> {
+        while let Some(item) = self.next(storage)? {
+            if f(&item.0, &item.1) {
+                return Ok(Some(item));
             }
         }
+
+        Ok(None)
+    }
+
+    pub fn all<S: PersistentStorageModule, F: Fn(&NonResidentLinkedListItemLocation, &T) -> bool>(&mut self, f: F, storage: &mut S) -> Result<bool, ()> {
+        Ok(self.find(|x, y| {
+            !f(x,y)
+        }, storage)?.is_none())
     }
 }
 
@@ -298,9 +303,9 @@ impl SimpleNonResidentLinkedList {
     }
 
     /// Return an iterator over the items in the list
-    pub fn iter<'a, S: PersistentStorageModule>(&self, storage: &'a mut S) -> SimpleIter<'a, S> {
+    pub fn iter<'a>(&'a self) -> SimpleIter<'a> {
         SimpleIter {
-            inner: self.inner.iter(storage),
+            inner: self.inner.iter(),
         }
     }
 
@@ -329,17 +334,29 @@ impl Debug for SimpleNonResidentLinkedList {
     }
 }
 
-pub struct SimpleIter<'a, S: PersistentStorageModule> {
-    inner: Iter<'a, S, ()>,
+pub struct SimpleIter<'a> {
+    inner: Iter<'a, ()>,
 }
 
-impl<'a, S: PersistentStorageModule> Iterator for SimpleIter<'a, S> {
-    type Item = Result<usize, ()>;
+impl<'a> SimpleIter<'a> {
+    pub fn next<S: PersistentStorageModule>(&mut self, storage: &mut S) -> Result<Option<NonResidentLinkedListItemLocation>, ()> {
+        self.inner.next(storage).map(|x| {
+            x.map(|x| x.0)
+        })
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner
-            .next()
-            .map(|data| data.map(|(offset, _)| offset.get_base_offset()))
+    pub fn find<S: PersistentStorageModule, F: Fn(&NonResidentLinkedListItemLocation) -> bool>(&mut self, f: F, storage: &mut S) -> Result<Option<NonResidentLinkedListItemLocation>, ()> {
+        let res = self.inner.find(|x, _| {
+            f(x)
+        }, storage)?;
+
+        Ok(res.map(|x| x.0))
+    }
+
+    pub fn all<S: PersistentStorageModule, F: Fn(&NonResidentLinkedListItemLocation) -> bool>(&mut self, f: F, storage: &mut S) -> Result<bool, ()> {
+        self.inner.all(|x, _| {
+            f(x)
+        }, storage)
     }
 }
 
@@ -383,14 +400,13 @@ impl<T: Sized> AtomicPushOnlyNonResidentLinkedList<T> {
     ) -> Result<(), ()> {
         // check that this new item does not overwrite an existing one
         debug_assert!(
-            self.iter(storage).all(|item| {
-                let (curr_offset, _) = item.unwrap();
+            self.iter().all(|curr_offset, _| {
                 let size = NonResidentLinkedList::<T>::total_item_size();
 
                 // 9 + 24 <= 32 && 32 + 24 <= 9
                 (item_offset + size <= curr_offset.get_base_offset())
                     || (curr_offset.get_base_offset() + size <= item_offset)
-            }),
+            }, storage)?,
             "Invalid offset! Item is going to be overwritten!"
         );
 
@@ -407,11 +423,10 @@ impl<T: Sized> AtomicPushOnlyNonResidentLinkedList<T> {
     }
 
     /// Return an iterator over the items in the list
-    pub fn iter<'a, S: PersistentStorageModule>(&self, storage: &'a mut S) -> Iter<'a, S, T> {
+    pub fn iter<'a>(&'a self) -> Iter<'a, T> {
         Iter {
             curr: self.head.load(Ordering::SeqCst),
             list: PhantomData,
-            storage: storage,
         }
     }
 
@@ -424,19 +439,17 @@ impl<T: Sized> AtomicPushOnlyNonResidentLinkedList<T> {
 }
 
 pub struct SharedAtomicLinkedListHeadPtr<'a, T> {
-    ptr: &'a AtomicUsize,
-    phantom_data: PhantomData<T>,
+    ptr: *const AtomicUsize,
+    phantom_data: PhantomData<&'a T>,
 }
 
 impl<'a, T> SharedAtomicLinkedListHeadPtr<'a, T> {
-    pub fn get_atomic_iter<'b, S: PersistentStorageModule>(
-        &self,
-        storage: &'b mut S,
-    ) -> Iter<'b, S, T> {
+    pub fn get_atomic_iter<'b> (
+        &'b self,
+    ) -> Iter<'b, T> {
         Iter {
-            curr: self.ptr.load(Ordering::SeqCst),
+            curr: unsafe { self.ptr.as_ref().unwrap().load(Ordering::SeqCst) },
             list: PhantomData,
-            storage: storage,
         }
     }
 }
@@ -669,16 +682,23 @@ mod test {
         storage: &mut S,
         check_list: &mut VecDeque<(usize, ListData)>,
     ) {
-        assert_eq!(
-            nonresident_list.iter(storage).count(),
-            check_list.iter().count()
-        );
         stdout().flush().unwrap();
 
-        for (item1, item2) in nonresident_list.iter(storage).zip(check_list.iter()) {
-            let item1 = item1.unwrap();
-            assert_eq!(item1.0.get_base_offset(), item2.0);
-            assert_eq!(item1.1, item2.1);
+        let mut iter_x = nonresident_list.iter();
+        let mut iter_y = check_list.iter();
+        loop {
+            let x = iter_x.next(storage).unwrap();
+            let y = iter_y.next();
+
+            assert_eq!(x.is_some(), y.is_some());
+            if x.is_some() {
+                let x = x.unwrap();
+                let y = y.unwrap();
+                assert_eq!(x.0.get_base_offset(), y.0);
+                assert_eq!(x.1, y.1);
+            } else {
+                return;
+            }
         }
     }
 }

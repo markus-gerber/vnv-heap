@@ -10,21 +10,24 @@ use super::{ceil_div, get_page_size};
 
 struct MMapGuard<T: MMapGuardInner + 'static> {
     inner: ManuallyDrop<&'static mut T>,
-    size: usize
+    size: usize,
 }
 
 impl<T: MMapGuardInner> MMapGuard<T> {
     /// Maps a new page with the size `get_page_size()` and writes `T` to the start of this page.
     ///
     /// If finished, `T.use_remaining_data(...)` will be called.
-    /// 
-    /// `min_size` is the minimum size in bytes that is required 
-    /// 
+    ///
+    /// `min_size` is the minimum size in bytes that is required
+    ///
     /// ### Safety
-    /// 
-    /// `min_size` has to be greater or equal to the size that is needed to store `T`. 
+    ///
+    /// `min_size` has to be greater or equal to the size that is needed to store `T`.
     pub(crate) unsafe fn new(data: T, min_size: usize) -> Self {
-        debug_assert!(size_of::<T>() <= min_size, "min_size should be big enough for T!");
+        debug_assert!(
+            size_of::<T>() <= min_size,
+            "min_size should be big enough for T!"
+        );
 
         let page_size = get_page_size();
         let mmap_size = ceil_div(min_size, page_size) * page_size;
@@ -58,13 +61,11 @@ impl<T: MMapGuardInner> MMapGuard<T> {
         let unused_ptr = unsafe { base_ptr.offset(size_of::<T>() as isize) };
         data.use_remaining_data(unused_ptr, mmap_size - size_of::<T>());
 
-        let data_ref = unsafe {
-            (base_ptr as *mut T).as_mut().unwrap()
-        };
+        let data_ref = unsafe { (base_ptr as *mut T).as_mut().unwrap() };
 
         Self {
             inner: ManuallyDrop::new(data_ref),
-            size: mmap_size
+            size: mmap_size,
         }
     }
 }

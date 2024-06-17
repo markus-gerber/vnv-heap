@@ -1,7 +1,6 @@
 use crate::{
     modules::{
-        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
-        persistent_storage::PersistentStorageModule,
+        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule, object_management::ObjectManagementModule
     },
     VNVHeap, VNVObject,
 };
@@ -21,17 +20,17 @@ pub struct GetMinBenchmark<
     'b: 'a,
     A: AllocatorModule,
     N: NonResidentAllocatorModule,
-    S: PersistentStorageModule,
+    M: ObjectManagementModule,
     const OBJ_SIZE: usize,
 > {
 
-    object: VNVObject<'a, 'b, [u8; OBJ_SIZE], A, N, S>,
+    object: VNVObject<'a, 'b, [u8; OBJ_SIZE], A, N, M>,
 }
 
-impl<'a, 'b: 'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule, const OBJ_SIZE: usize>
-    GetMinBenchmark<'a, 'b, A, N, S, OBJ_SIZE>
+impl<'a, 'b: 'a, A: AllocatorModule + 'static, N: NonResidentAllocatorModule, M: ObjectManagementModule, const OBJ_SIZE: usize>
+    GetMinBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
 {
-    pub fn new(heap: &'a VNVHeap<'b, A, N, S>) -> Self {
+    pub fn new(heap: &'a VNVHeap<'b, A, N, M>) -> Self {
         let item = heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap();
         drop(item.get().unwrap());
 
@@ -41,8 +40,8 @@ impl<'a, 'b: 'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: Persisten
     }
 }
 
-impl<'a, 'b: 'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule, const OBJ_SIZE: usize>
-    Benchmark<GetMinBenchmarkOptions> for GetMinBenchmark<'a, 'b, A, N, S, OBJ_SIZE>
+impl<'a, 'b: 'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementModule, const OBJ_SIZE: usize>
+    Benchmark<GetMinBenchmarkOptions> for GetMinBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
@@ -65,7 +64,7 @@ impl<'a, 'b: 'a, A: AllocatorModule, N: NonResidentAllocatorModule, S: Persisten
     fn get_bench_options(&self) -> GetMinBenchmarkOptions {
         GetMinBenchmarkOptions {
             object_size: OBJ_SIZE,
-            modules: ModuleOptions::new::<A, N, S>()
+            modules: ModuleOptions::new::<A, N>()
         }
     }
 }

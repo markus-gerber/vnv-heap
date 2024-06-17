@@ -75,7 +75,10 @@ impl<const ORDER: usize> NonResidentAllocatorModule for NonResidentBuddyAllocato
             // Find the first non-empty size class
             if !self.free_list[i].is_empty() {
                 // Split buffers
-                trace!("Allocate: Have to split {} bucket(s)", (class + 1..i + 1).len());
+                trace!(
+                    "Allocate: Have to split {} bucket(s)",
+                    (class + 1..i + 1).len()
+                );
                 for j in (class + 1..i + 1).rev() {
                     if let Some(block) = self.free_list[j].pop(storage_module)? {
                         unsafe {
@@ -145,24 +148,6 @@ impl<const ORDER: usize> NonResidentBuddyAllocatorModule<ORDER> {
     }
 }
 
-#[cfg(test)]
-impl<const ORDER: usize> NonResidentBuddyAllocatorModule<ORDER> {
-    /// prints buddy free lists
-    fn print_info<S: PersistentStorageModule>(&self, storage: &mut S) {
-        let list: Vec<Vec<usize>> = self
-            .free_list
-            .iter()
-            .map(|list| {
-                list.iter(storage)
-                    .filter(|x| x.is_ok())
-                    .map(|x| x.unwrap())
-                    .collect()
-            })
-            .collect();
-        println!("{:?}", list);
-    }
-}
-
 fn prev_power_of_two(num: usize) -> usize {
     1 << (usize::BITS as usize - num.leading_zeros() as usize - 1)
 }
@@ -190,7 +175,6 @@ mod test {
         regions: &mut Vec<AllocatedRegion>,
         storage: &mut S,
     ) {
-        allocator.print_info(storage);
         let offset = allocator
             .allocate(
                 Layout::from_size_align(size, size_of::<usize>()).unwrap(),
@@ -292,10 +276,10 @@ mod test {
     ) {
         let mut items: Vec<AllocatedRegion> = regions.iter().map(|x| x.clone()).collect();
         for i in 0..allocator.free_list.len() {
-            for item in allocator.free_list[i].iter(storage) {
-                let item = item.unwrap();
+            let mut iter = allocator.free_list[i].iter();
+            while let Some(item) = iter.next(storage).unwrap() {
                 items.push(AllocatedRegion {
-                    offset: item,
+                    offset: item.get_base_offset(),
                     size: 2usize.pow(i as u32),
                 });
             }

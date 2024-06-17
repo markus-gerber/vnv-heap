@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "have_std"), no_std)]
+#![no_std]
 
 #[macro_use]
 extern crate log;
@@ -9,7 +9,7 @@ extern crate zephyr_logger;
 extern crate zephyr_core;
 
 use spi_fram_storage::SpiFramStorageModule;
-use vnv_heap::{VNVConfig, VNVHeap, modules::{nonresident_allocator::NonResidentBuddyAllocatorModule, allocator::LinkedListAllocatorModule}};
+use vnv_heap::{VNVConfig, VNVHeap, modules::{nonresident_allocator::NonResidentBuddyAllocatorModule, allocator::LinkedListAllocatorModule, object_management::DefaultObjectManagementModule}};
 
 #[no_mangle]
 pub extern "C" fn rust_main() {
@@ -25,8 +25,8 @@ pub extern "C" fn rust_main() {
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
-        SpiFramStorageModule
-    > = VNVHeap::new(&mut buffer, storage, config).unwrap();
+        DefaultObjectManagementModule
+    > = VNVHeap::new(&mut buffer, storage, LinkedListAllocatorModule::new(), config, |_, _| {}).unwrap();
 
     let mut obj = heap.allocate::<u32>(10).unwrap();
 

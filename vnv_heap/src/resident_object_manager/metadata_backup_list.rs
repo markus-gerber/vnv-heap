@@ -59,11 +59,10 @@ impl MetadataBackupList {
 
     /// Return an iterator over the items in the list
     #[inline]
-    pub(crate) fn iter<'a, S: PersistentStorageModule>(
-        &self,
-        storage: &'a mut S,
-    ) -> Iter<'a, S, ResidentObjectMetadataBackup> {
-        self.inner.iter(storage)
+    pub(crate) fn iter<'a>(
+        &'a self,
+    ) -> Iter<'a, ResidentObjectMetadataBackup> {
+        self.inner.iter()
     }
 
     #[inline]
@@ -90,10 +89,9 @@ pub(crate) struct SharedMetadataBackupPtr<'a> {
     inner: SharedAtomicLinkedListHeadPtr<'a, ResidentObjectMetadataBackup>,
 }
 impl SharedMetadataBackupPtr<'_> {
-    pub(crate) fn get_atomic_iter<'a, S: PersistentStorageModule>(
-        &self,
-        storage: &'a mut S,
-    ) -> Iter<'a, S, ResidentObjectMetadataBackup> {
-        self.inner.get_atomic_iter(storage)
+    pub(crate) fn get_atomic_iter<'a>(
+        &'a self,
+    ) -> Iter<'a, ResidentObjectMetadataBackup> {
+        self.inner.get_atomic_iter()
     }
 }

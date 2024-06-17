@@ -1,5 +1,5 @@
-use std::{array, vec};
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
+use std::{array, vec};
 
 use super::get_test_heap;
 
@@ -11,8 +11,8 @@ fn test_heap_persistency() {
         array::from_fn(|_| rand.next_u32() as u8)
     }
 
-    let mut buffer = [0u8; 1000];
-    let heap = get_test_heap("test_heap_persistency", 2* 4096, &mut buffer, 600);
+    let mut buffer = [0u8; 2000];
+    let heap = get_test_heap("test_heap_persistency", 2 * 4096, &mut buffer, 1000, |_, _| {});
     const SEED: u64 = 5446535461589659585;
     const OBJECT_COUNT: usize = 100;
 
@@ -20,7 +20,7 @@ fn test_heap_persistency() {
 
     let mut objects = vec![];
     let mut check_states = vec![];
-    
+
     macro_rules! allocate {
         () => {
             let data = rand_data(&mut rand);
@@ -38,7 +38,7 @@ fn test_heap_persistency() {
                 // get mut and change data
                 let mut mut_ref = objects[i].get_mut().unwrap();
                 assert_eq!(*mut_ref, check_states[i]);
-                
+
                 let data = rand_data(&mut rand);
                 *mut_ref = data;
                 check_states[i] = data;
@@ -55,7 +55,7 @@ fn test_heap_persistency() {
     }
 
     // start allocating some first objects
-    for _ in 0..OBJECT_COUNT/3 {
+    for _ in 0..OBJECT_COUNT / 3 {
         allocate!();
     }
 
@@ -88,12 +88,11 @@ fn test_heap_persistency() {
     // drop open refs
     drop(open_refs);
 
-
     // test again
     for _ in 0..10_000 {
         single_test!();
     }
-    
+
     drop(open_muts);
     drop(open_ref_obj);
 

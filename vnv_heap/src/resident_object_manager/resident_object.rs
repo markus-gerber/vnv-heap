@@ -4,7 +4,7 @@ use core::{
     ptr::{null_mut, slice_from_raw_parts},
     sync::atomic::AtomicPtr,
 };
-use std::ptr::NonNull;
+use std::ptr::{slice_from_raw_parts_mut, NonNull};
 
 use memoffset::offset_of;
 
@@ -15,6 +15,7 @@ use crate::{
             persistent_storage_util::write_storage_data, PersistentStorageModule,
         },
     },
+    shared_persist_lock::SharedPersistLock,
     util::repr_c_layout,
 };
 
@@ -29,19 +30,9 @@ const SYNCED_METADATA_DIRTY_SIZE: usize = {
         size_of::<T>()
     }
 
-    let obj = ResidentObjectMetadataNonAtomic {
-        inner: ResidentObjectMetadataInner {
-            #[cfg(debug_assertions)]
-            data_offset: usize::MAX,
-            dirty_status: DirtyStatus::new_metadata_dirty(),
-            layout: Layout::new::<()>(),
-            metadata_backup_node: MetadataBackupInfo::empty(),
-            offset: 0,
-            ref_cnt: 0,
-        },
-        next_resident_object: null_mut(),
-    };
+    let obj = ResidentObjectMetadataBackup::new_unused();
 
+    // ref cnt and next_resident_object are not saved
     size(&obj.inner.ref_cnt) + size(&obj.next_resident_object)
 };
 
@@ -58,13 +49,6 @@ pub(crate) struct ResidentObject<T: Sized> {
 }
 
 impl<T: Sized> ResidentObject<T> {
-    #[inline]
-    pub(super) fn to_data_ptr(ptr: *mut ResidentObject<T>) -> *mut T {
-        let offset = offset_of!(ResidentObject<T>, data);
-        let t_ptr = unsafe { (ptr as *mut u8).offset(offset as isize) };
-        t_ptr as *mut T
-    }
-
     /// Unloads this resident object dynamically by indirectly calculating the layout of that object.
     ///
     /// ### Safety
@@ -76,7 +60,7 @@ impl<T: Sized> ResidentObject<T> {
     pub(crate) unsafe fn unload_resident_object<S: PersistentStorageModule, A: AllocatorModule>(
         mut delete_handle: DeleteHandle,
         storage: &mut S,
-        allocator_module: &mut A,
+        allocator_module: &mut SharedPersistLock<*mut A>,
         dirty_size: &mut usize,
     ) -> Result<(), ()> {
         debug_assert_eq!(
@@ -100,18 +84,33 @@ impl<T: Sized> ResidentObject<T> {
         };
 
         {
-            // IMPORTANT: drop metadata reference at the end of this block
-            // remove from resident object list
-            let item_ref = delete_handle.delete();
+            // IMPORTANT: lock the shared persist lock for this modify block
+            // because there are race conditions between this and vnv_persist_all (deallocate is not atomar)
 
-            // remove metadata from backup list
-            item_ref.remove_metadata_backup(storage)?;
+            // unwrap is okay here because there are no other threads concurrently accessing it
+            // except from vnv_persist_all, but as it is guaranteed that no other threads run
+            // during its execution, it is fine
+            let guard = allocator_module.try_lock().unwrap();
+
+            {
+                // IMPORTANT: drop metadata reference at the end of this block
+                // remove from resident object list
+                let item_ref = delete_handle.delete();
+
+                // remove metadata from backup list
+                item_ref.remove_metadata_backup(storage)?;
+            }
+
+            // now, as this item is not used anymore, deallocate it
+            resident_ptr.drop_in_place();
+            let obj_layout = Layout::new::<ResidentObject<T>>();
+            guard
+                .as_mut()
+                .unwrap()
+                .deallocate(NonNull::new(resident_ptr as *mut u8).unwrap(), obj_layout);
+
+            drop(guard);
         }
-
-        // now, as this item is not used anymore, deallocate it
-        resident_ptr.drop_in_place();
-        let obj_layout = Layout::new::<ResidentObject<T>>();
-        allocator_module.deallocate(NonNull::new(resident_ptr as *mut u8).unwrap(), obj_layout);
 
         *dirty_size += prev_dirty_size;
 
@@ -138,6 +137,19 @@ impl<T: Sized> ResidentObject<T> {
         // everything is persisted, not dirty anymore
         self.metadata.inner.dirty_status.set_data_dirty(false);
 
+        if !self.metadata.inner.dirty_status.is_general_metadata_dirty() {
+            // you have to flush dirty status as well
+
+            // because metadata is not dirty, there has to be a backup slot
+            let backup_slot = self.metadata.inner.metadata_backup_node.get().unwrap();
+
+            ResidentObjectMetadataBackup::flush_dirty_status(backup_slot, &self.metadata.inner.dirty_status, storage).unwrap();
+        }
+
+        // set this again because of race conditions:
+        // if vnv_persist_all is called after first set_data_dirty and before flushing dirty status
+        self.metadata.inner.dirty_status.set_data_dirty(false);
+
         Ok(self.metadata.inner.layout.size())
     }
 }
@@ -155,18 +167,6 @@ pub(crate) struct ResidentObjectMetadata {
     /// Next item in the resident object list
     pub(crate) next_resident_object: AtomicPtr<ResidentObjectMetadata>,
 }
-
-pub(crate) struct ResidentObjectMetadataNonAtomic {
-    /// Actual metadata
-    pub(crate) inner: ResidentObjectMetadataInner,
-
-    /// Next item in the resident object list
-    pub(crate) next_resident_object: *mut ResidentObjectMetadataNonAtomic,
-}
-
-// make sure ResidentObjectMetadata has the same layout as ResidentObjectMetadataNonAtomic
-static_assertions::assert_eq_size!(ResidentObjectMetadata, ResidentObjectMetadataNonAtomic);
-static_assertions::assert_eq_align!(ResidentObjectMetadata, ResidentObjectMetadataNonAtomic);
 
 #[derive(Clone, Copy)]
 pub(crate) struct ResidentObjectMetadataInner {
@@ -208,6 +208,20 @@ impl ResidentObjectMetadataInner {
     }
 }
 
+impl Default for ResidentObjectMetadataInner {
+    fn default() -> Self {
+        Self {
+            dirty_status: Default::default(),
+            ref_cnt: Default::default(),
+            offset: Default::default(),
+            layout: Layout::new::<()>(),
+            metadata_backup_node: MetadataBackupInfo::empty(),
+            #[cfg(debug_assertions)]
+            data_offset: usize::MAX,
+        }
+    }
+}
+
 impl ResidentObjectMetadata {
     pub(super) fn new<T: Sized>(offset: usize) -> Self {
         ResidentObjectMetadata {
@@ -218,6 +232,11 @@ impl ResidentObjectMetadata {
 
     pub(crate) const fn fresh_object_dirty_size() -> usize {
         UNSYNCED_METADATA_DIRTY_SIZE
+    }
+
+    /// Change in dirty size for `metadata_dirty=false` -> `metadata_dirty=true`
+    pub(crate) const fn metadata_dirty_transition_size() -> usize {
+        UNSYNCED_METADATA_DIRTY_SIZE - SYNCED_METADATA_DIRTY_SIZE
     }
 
     #[inline]
@@ -253,11 +272,7 @@ impl ResidentObjectMetadata {
         cnt
     }
 
-    /// ### Safety
-    ///
-    /// This call is only safe to call if this ResidentObjectMetadataInner lives inside a ResidentObjectMetadata and a ResidentObject instance.
-    #[inline]
-    unsafe fn dynamic_metadata_to_data_range(&self) -> &[u8] {
+    unsafe fn dynamic_metadata_to_data_range_internal(&self) -> *const u8 {
         let meta_ptr = ((self as *const ResidentObjectMetadata) as *const u8)
             .add(size_of::<ResidentObjectMetadata>());
 
@@ -281,9 +296,40 @@ impl ResidentObjectMetadata {
             }
         }
 
+        base_ptr
+    }
+
+    /// ### Safety
+    ///
+    /// This call is only safe to call if this ResidentObjectMetadataInner lives inside a ResidentObjectMetadata and a ResidentObject instance.
+    #[inline]
+    unsafe fn dynamic_metadata_to_data_range(&self) -> &[u8] {
+        let base_ptr = self.dynamic_metadata_to_data_range_internal();
+
         slice_from_raw_parts(base_ptr, self.inner.layout.size())
             .as_ref()
             .unwrap()
+    }
+
+    /// ### Safety
+    ///
+    /// This call is only safe to call if this ResidentObjectMetadataInner lives inside a ResidentObjectMetadata and a ResidentObject instance.
+    #[inline]
+    unsafe fn dynamic_metadata_to_data_range_mut(&mut self) -> &mut [u8] {
+        let base_ptr = self.dynamic_metadata_to_data_range_internal() as *mut u8;
+
+        slice_from_raw_parts_mut(base_ptr, self.inner.layout.size())
+            .as_mut()
+            .unwrap()
+    }
+
+    pub(crate) unsafe fn load_user_data<S: PersistentStorageModule>(
+        &mut self,
+        storage: &mut S,
+    ) -> Result<(), ()> {
+        let offset = self.inner.offset;
+        let range = self.dynamic_metadata_to_data_range_mut();
+        storage.read(offset, range)
     }
 
     /// Unloads this resident object dynamically by indirectly calculating the layout of that object.
@@ -301,7 +347,7 @@ impl ResidentObjectMetadata {
     >(
         mut delete_handle: DeleteHandle,
         storage: &mut S,
-        allocator_module: &mut A,
+        allocator_module: &SharedPersistLock<*mut A>,
         dirty_size: &mut usize,
     ) -> Result<(), ()> {
         debug_assert_eq!(
@@ -313,24 +359,39 @@ impl ResidentObjectMetadata {
         let prev_dirty_size = delete_handle.get_element().dirty_size();
 
         // sync unsynced changes
-        delete_handle
+        let _ = delete_handle
             .get_element()
             .persist_user_data_dynamic(storage)?;
 
-        // remove from resident object list
-        let item_ref = delete_handle.delete();
+        {
+            // IMPORTANT: lock the shared persist lock for this modify block
+            // because there are race conditions between this and vnv_persist_all (deallocate is not atomar)
 
-        // remove metadata from backup list
-        item_ref.remove_metadata_backup(storage)?;
+            // unwrap is okay here because there are no other threads concurrently accessing it
+            // except from vnv_persist_all, but as it is guaranteed that no other threads run
+            // during its execution, it is fine
+            let guard = allocator_module.try_lock().unwrap();
 
-        // now, as this item is not used anymore, deallocate it
-        let resident_obj_ptr = unsafe { item_ref.to_resident_obj_ptr::<()>() } as *mut u8;
-        let resident_obj_ptr = NonNull::new(resident_obj_ptr).unwrap();
+            // remove from resident object list
+            let item_ref = delete_handle.delete();
 
-        let resident_obj_layout = calc_resident_obj_layout(item_ref.inner.layout);
+            // remove metadata from backup list
+            item_ref.remove_metadata_backup(storage)?;
 
-        resident_obj_ptr.as_ptr().drop_in_place();
-        allocator_module.deallocate(resident_obj_ptr, resident_obj_layout);
+            // now, as this item is not used anymore, deallocate it
+            let resident_obj_ptr = unsafe { item_ref.to_resident_obj_ptr::<()>() } as *mut u8;
+            let resident_obj_ptr = NonNull::new(resident_obj_ptr).unwrap();
+
+            let resident_obj_layout = calc_resident_obj_layout(item_ref.inner.layout);
+
+            resident_obj_ptr.as_ptr().drop_in_place();
+            guard
+                .as_mut()
+                .unwrap()
+                .deallocate(resident_obj_ptr, resident_obj_layout);
+
+            drop(guard);
+        }
 
         *dirty_size += prev_dirty_size;
 
@@ -353,14 +414,41 @@ impl ResidentObjectMetadata {
             return Ok(0);
         }
 
-        // persist data from dynamic data range (stored layout of T is used for that)
-        let data_range = self.dynamic_metadata_to_data_range();
-        storage.write(self.inner.offset, data_range)?;
+        self.write_user_data_dynamic(storage)?;
 
         // everything is persisted, not dirty anymore
         self.inner.dirty_status.set_data_dirty(false);
 
+        if !self.inner.dirty_status.is_general_metadata_dirty() {
+            // you have to flush dirty status as well
+
+            // because metadata is not dirty, there has to be a backup slot
+            let backup_slot = self.inner.metadata_backup_node.get().unwrap();
+
+            ResidentObjectMetadataBackup::flush_dirty_status(backup_slot, &self.inner.dirty_status, storage).unwrap();
+        }
+
+        // set this again because of race conditions:
+        // if vnv_persist_all is called after first set_data_dirty and before flushing dirty status
+        self.inner.dirty_status.set_data_dirty(false);
+
         Ok(self.inner.layout.size())
+    }
+
+    /// Writes the user data of this resident object if you don't know the type `T` of the inner data.
+    /// This function differs from `persist_user_data_dynamic` that is does not update the dirty state of this object.
+    ///
+    /// ### Safety
+    ///
+    /// This call is only safe to call if this ResidentObjectMetadataInner lives inside a ResidentObjectMetadata and a ResidentObject instance.
+    pub(crate) unsafe fn write_user_data_dynamic<S: PersistentStorageModule>(
+        &self,
+        storage: &mut S,
+    ) -> Result<(), ()> {
+        // persist data from dynamic data range (stored layout of T is used for that)
+        let data_range = self.dynamic_metadata_to_data_range();
+        storage.write(self.inner.offset, data_range)?;
+        Ok(())
     }
 
     /// Persists this metadata and saves it to the `MetadataBackupList`.
@@ -377,17 +465,40 @@ impl ResidentObjectMetadata {
 
         if let Some(backup_slot) = self.inner.metadata_backup_node.get() {
             // save stuff to this backup slot
-            let backup_data = ResidentObjectMetadataBackup::from_metadata(self);
-            write_storage_data(storage, backup_slot, &backup_data)?;
+            match self.write_metadata(storage, backup_slot, false) {
+                Ok(()) => {}
+                Err(()) => {
+                    // metadata could not be saved, reset this slot
+                    let backup_data = ResidentObjectMetadataBackup::new_unused();
+
+                    // this should not fail
+                    write_storage_data(storage, backup_slot, &backup_data).unwrap();
+
+                    self.inner.metadata_backup_node.unset();
+                    return Err(());
+                }
+            };
         } else {
             // search for new unused backup slot to use
-            let iter = backup_list.iter(storage);
-            let (slot_location, _) = iter.filter_map(|res| res.ok()).find(|(_, slot)| {
-                slot.is_unused()
-            }).expect("There should be a slot left, as ResidentObjectManager always makes sure that MetadataBackupList.len() >= ResidentObjects.len()");
+            let mut iter = backup_list.iter();
+            let item = iter.find(|_, data| data.is_unused(), storage)?;
+            let (slot_location, _) = item.expect("There should be a slot left, as ResidentObjectManager always makes sure that MetadataBackupList.len() >= ResidentObjects.len()");
 
-            let backup_data = ResidentObjectMetadataBackup::from_metadata(self);
-            write_storage_data(storage, slot_location.get_data_offset(), &backup_data)?;
+            self.inner
+                .metadata_backup_node
+                .set(slot_location.get_data_offset());
+
+            match self.write_metadata(storage, slot_location.get_data_offset(), false) {
+                Ok(()) => {}
+                Err(()) => {
+                    // metadata could not be saved, reset this slot
+                    let backup_data = ResidentObjectMetadataBackup::new_unused();
+                    write_storage_data(storage, slot_location.get_data_offset(), &backup_data)?;
+
+                    self.inner.metadata_backup_node.unset();
+                    return Err(());
+                }
+            };
 
             // save the fact that we saved our metadata to that offset
             self.inner
@@ -398,6 +509,22 @@ impl ResidentObjectMetadata {
         self.inner.dirty_status.set_general_metadata_dirty(false);
 
         Ok(UNSYNCED_METADATA_DIRTY_SIZE - SYNCED_METADATA_DIRTY_SIZE)
+    }
+
+    pub(crate) fn write_metadata<S: PersistentStorageModule>(
+        &self,
+        storage: &mut S,
+        backup_slot: usize,
+        metadata_dirty: bool,
+    ) -> Result<(), ()> {
+        let mut backup_data = ResidentObjectMetadataBackup::from_metadata(self);
+        backup_data
+            .inner
+            .dirty_status
+            .set_general_metadata_dirty(metadata_dirty);
+        write_storage_data(storage, backup_slot, &backup_data)?;
+
+        Ok(())
     }
 
     pub(crate) fn remove_metadata_backup<S: PersistentStorageModule>(

@@ -3,6 +3,9 @@ use core::{
     array,
     ptr::{null, null_mut},
 };
+use std::sync::atomic::AtomicBool;
+
+use try_lock::TryLock;
 
 use crate::{
     allocation_identifier::AllocationIdentifier,
@@ -12,6 +15,7 @@ use crate::{
         object_management::DefaultObjectManagementModule,
         persistent_storage::{test::get_test_storage, PersistentStorageModule},
     },
+    resident_object_manager::{resident_list::ResidentList, MetadataBackupList}, shared_persist_lock::SharedPersistLock,
 };
 
 use super::ResidentObjectManager;
@@ -29,14 +33,28 @@ fn test_release_dirty_size() {
     let mut storage = get_test_storage("rom_test_release_dirty_size", STORAGE_SIZE);
     let mut non_resident_alloc = NonResidentBuddyAllocatorModule::<16>::new();
 
-    let (mut manager, start_offset) = ResidentObjectManager::<
-        LinkedListAllocatorModule,
-        DefaultObjectManagementModule,
-    >::new(&mut buffer, INITIAL_DIRTY_SIZE, &mut storage)
-    .unwrap();
+    let mut meta_backup = MetadataBackupList::new();
+    let mut resident_list = ResidentList::new();
+
+    let mut heap = LinkedListAllocatorModule::new();
+
+    let lock = TryLock::new(());
+    let persist_queued = AtomicBool::new(false);
+    let shared_heap_lock: SharedPersistLock<*mut LinkedListAllocatorModule> =
+        SharedPersistLock::new(&mut heap, &persist_queued, &lock);
+
+    let mut manager =
+        ResidentObjectManager::<LinkedListAllocatorModule, DefaultObjectManagementModule>::new(
+            &mut buffer,
+            INITIAL_DIRTY_SIZE,
+            &mut resident_list,
+            &mut meta_backup,
+            shared_heap_lock
+        )
+        .unwrap();
 
     non_resident_alloc
-        .init(start_offset, STORAGE_SIZE - start_offset, &mut storage)
+        .init(0, STORAGE_SIZE, &mut storage)
         .unwrap();
 
     let initial_data: TestObj = [0u8; 20];
@@ -115,18 +133,33 @@ fn test_remain_resident() {
     const OBJ_COUNT: usize = 200;
     type TestObj = [u8; 20];
 
-    let mut buffer = [0u8; 700];
+    let mut buffer = [0u8; 800];
     let mut storage = get_test_storage("rom_test_remain_resident", STORAGE_SIZE);
     let mut non_resident_alloc = NonResidentBuddyAllocatorModule::<16>::new();
 
-    let (mut manager, start_offset) = ResidentObjectManager::<
-        BuddyAllocatorModule<16>,
-        DefaultObjectManagementModule,
-    >::new(&mut buffer, INITIAL_DIRTY_SIZE, &mut storage)
-    .unwrap();
+    let mut meta_backup = MetadataBackupList::new();
+    let mut resident_list = ResidentList::new();
+
+    let mut heap = BuddyAllocatorModule::<16>::new();
+
+    let lock = TryLock::new(());
+    let persist_queued = AtomicBool::new(false);
+    let shared_heap_lock: SharedPersistLock<*mut BuddyAllocatorModule<16>> =
+        SharedPersistLock::new(&mut heap, &persist_queued, &lock);
+
+    let mut manager =
+        ResidentObjectManager::<BuddyAllocatorModule<16>, DefaultObjectManagementModule>::new(
+            &mut buffer,
+            INITIAL_DIRTY_SIZE,
+            &mut resident_list,
+            &mut meta_backup,
+            shared_heap_lock,
+
+        )
+        .unwrap();
 
     non_resident_alloc
-        .init(start_offset, STORAGE_SIZE - start_offset, &mut storage)
+        .init(0, STORAGE_SIZE, &mut storage)
         .unwrap();
 
     let initial_data: TestObj = [0u8; 20];

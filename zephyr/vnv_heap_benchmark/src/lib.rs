@@ -12,6 +12,7 @@ use vnv_heap::{
     modules::{
         allocator::LinkedListAllocatorModule,
         nonresident_allocator::NonResidentBuddyAllocatorModule,
+        object_management::DefaultObjectManagementModule
     },
     VNVConfig, VNVHeap,
 };
@@ -29,15 +30,15 @@ pub extern "C" fn rust_main() {
     
     run_all_benchmarks::<
         ZephyrTimer,
-        LinkedListAllocatorModule,
         SpiFramStorageModule,
+        DefaultObjectManagementModule,
         fn(
             &mut [u8],
             usize,
         ) -> VNVHeap<
             LinkedListAllocatorModule,
             NonResidentBuddyAllocatorModule<16>,
-            SpiFramStorageModule,
+            DefaultObjectManagementModule
         >,
     >(
         get_bench_heap,
@@ -99,11 +100,11 @@ impl Timer for ZephyrTimer {
 fn get_bench_heap(
     buf: &mut [u8],
     max_dirty: usize,
-) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, SpiFramStorageModule> {
+) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, DefaultObjectManagementModule> {
     let storage = unsafe { SpiFramStorageModule::new() }.unwrap();
     let config = VNVConfig {
         max_dirty_bytes: max_dirty,
     };
 
-    VNVHeap::new(buf, storage, config).unwrap()
+    VNVHeap::new(buf, storage, LinkedListAllocatorModule::new(), config, |_, _| {}).unwrap()
 }

@@ -40,7 +40,13 @@ impl FilePersistentStorageModule {
 
 impl PersistentStorageModule for FilePersistentStorageModule {
     fn read(&mut self, offset: usize, dest: &mut [u8]) -> Result<(), ()> {
-        debug_assert!(offset + dest.len() <= self.file_size);
+        debug_assert!(
+            offset + dest.len() <= self.file_size,
+            "illegal access, offset: {}, len: {}, file_size: {}",
+            offset,
+            dest.len(),
+            self.file_size
+        );
 
         self.file
             .seek(std::io::SeekFrom::Start(offset as u64))
@@ -82,8 +88,16 @@ impl Drop for FilePersistentStorageModule {
 
 #[cfg(test)]
 mod test {
-    use crate::modules::persistent_storage::test::{test_persistent_storage_custom_type, PERSISTENT_STORAGE_CUSTOM_TYPE_TEST_SIZE, PERSISTENT_STORAGE_NORMAL_TEST_SIZE};
-    use crate::modules::persistent_storage::{SharedStorageReference, SharedStorageAccessControl};
+    use std::sync::atomic::AtomicBool;
+
+    use try_lock::TryLock;
+
+    use crate::modules::persistent_storage::test::{
+        test_persistent_storage_custom_type, PERSISTENT_STORAGE_CUSTOM_TYPE_TEST_SIZE,
+        PERSISTENT_STORAGE_NORMAL_TEST_SIZE,
+    };
+    use crate::modules::persistent_storage::{PersistentStorageModule, SharedStorageReference};
+    use crate::shared_persist_lock::SharedPersistLock;
 
     use super::super::test::test_persistent_storage_normal;
     use super::FilePersistentStorageModule;
@@ -115,11 +129,15 @@ mod test {
             PERSISTENT_STORAGE_NORMAL_TEST_SIZE,
         )
         .unwrap();
-        let access_control = SharedStorageAccessControl::new(&mut storage);
-        let reference = SharedStorageReference::new(&access_control);
+
+        let lock = TryLock::new(());
+        let persist_queued = AtomicBool::new(false);
+        let shared_lock: SharedPersistLock<*mut dyn PersistentStorageModule> =
+            SharedPersistLock::new(&mut storage, &persist_queued, &lock);
+
+        let reference = SharedStorageReference::new(shared_lock);
         test_persistent_storage_normal(reference);
     }
-
 
     #[test]
     fn test_file_storage_reference_module_custom_types() {
@@ -128,8 +146,13 @@ mod test {
             PERSISTENT_STORAGE_CUSTOM_TYPE_TEST_SIZE,
         )
         .unwrap();
-        let access_control = SharedStorageAccessControl::new(&mut storage);
-        let reference = SharedStorageReference::new(&access_control);
+
+        let lock = TryLock::new(());
+        let persist_queued = AtomicBool::new(false);
+        let shared_lock: SharedPersistLock<*mut dyn PersistentStorageModule> =
+            SharedPersistLock::new(&mut storage, &persist_queued, &lock);
+
+        let reference = SharedStorageReference::new(shared_lock);
         test_persistent_storage_custom_type(reference);
     }
 }

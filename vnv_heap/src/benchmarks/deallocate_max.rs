@@ -1,11 +1,10 @@
 use crate::{
     modules::{
-        allocator::AllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule,
-        persistent_storage::PersistentStorageModule,
-    }, resident_object_manager::get_total_resident_size, VNVHeap, VNVObject
+        allocator::AllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, object_management::ObjectManagementModule
+    }, resident_object_manager::{get_total_resident_size, resident_object::ResidentObject}, VNVHeap, VNVObject
 };
 use core::hint::black_box;
-use std::mem::needs_drop;
+use std::mem::{needs_drop, size_of};
 use serde::Serialize;
 
 use super::{Benchmark, ModuleOptions, Timer};
@@ -18,7 +17,7 @@ struct DeallocateDropRequiredObject<const SIZE: usize> {
 
 impl<const SIZE: usize> Drop for DeallocateDropRequiredObject<SIZE> {
     fn drop(&mut self) {
-
+        black_box(1);
     }
 }
 
@@ -34,20 +33,21 @@ pub struct DeallocateMaxBenchmark<
     'a,
     'b: 'a,
     A: AllocatorModule,
-    S: PersistentStorageModule,
+    M: ObjectManagementModule,
     const OBJ_SIZE: usize,
     const BLOCKER_SIZE: usize,
 > {
-    heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, S>,
-    blocker: VNVObject<'a, 'b, [u8; BLOCKER_SIZE], A, NonResidentBuddyAllocatorModule<16>, S>,
-    debug_obj: VNVObject<'a, 'b, (), A, NonResidentBuddyAllocatorModule<16>, S>
+    heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M>,
+    blocker: VNVObject<'a, 'b, [u8; BLOCKER_SIZE], A, NonResidentBuddyAllocatorModule<16>, M>,
+    debug_obj: VNVObject<'a, 'b, (), A, NonResidentBuddyAllocatorModule<16>, M>
 }
 
-impl<'a, 'b: 'a, A: AllocatorModule, S: PersistentStorageModule, const OBJ_SIZE: usize, const BLOCKER_SIZE: usize>
-    DeallocateMaxBenchmark<'a, 'b, A, S, OBJ_SIZE, BLOCKER_SIZE>
+impl<'a, 'b: 'a, A: AllocatorModule + 'static, M: ObjectManagementModule, const OBJ_SIZE: usize, const BLOCKER_SIZE: usize>
+    DeallocateMaxBenchmark<'a, 'b, A, M, OBJ_SIZE, BLOCKER_SIZE>
 {
-    pub fn new(heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, S>, resident_buffer_size: usize) -> Self {
+    pub fn new(heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M>, resident_buffer_size: usize) -> Self {
         assert!(needs_drop::<DeallocateDropRequiredObject<OBJ_SIZE>>(), "Object should need drop for worst case scenario");
+        assert!(size_of::<ResidentObject<[u8; OBJ_SIZE]>>() <= resident_buffer_size, "{} > {}", size_of::<ResidentObject<[u8; OBJ_SIZE]>>(), resident_buffer_size);
         assert_eq!(heap.get_inner().borrow_mut().get_resident_object_manager().get_remaining_dirty_size(), resident_buffer_size, "whole buffer should be able to be dirty");
         // blocker size should been calculated with this function
         assert_eq!(resident_buffer_size, get_total_resident_size::<[u8; BLOCKER_SIZE]>(), "blocker size is wrong! {} != {}", resident_buffer_size, get_total_resident_size::<[u8; BLOCKER_SIZE]>());
@@ -60,8 +60,8 @@ impl<'a, 'b: 'a, A: AllocatorModule, S: PersistentStorageModule, const OBJ_SIZE:
     }
 }
 
-impl<'a, 'b: 'a, A: AllocatorModule, S: PersistentStorageModule, const OBJ_SIZE: usize, const BLOCKER_SIZE: usize>
-    Benchmark<DeallocateMaxBenchmarkOptions> for DeallocateMaxBenchmark<'a, 'b, A, S, OBJ_SIZE, BLOCKER_SIZE>
+impl<'a, 'b: 'a, A: AllocatorModule + 'static, M: ObjectManagementModule, const OBJ_SIZE: usize, const BLOCKER_SIZE: usize>
+    Benchmark<DeallocateMaxBenchmarkOptions> for DeallocateMaxBenchmark<'a, 'b, A, M, OBJ_SIZE, BLOCKER_SIZE>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
@@ -104,7 +104,7 @@ impl<'a, 'b: 'a, A: AllocatorModule, S: PersistentStorageModule, const OBJ_SIZE:
     fn get_bench_options(&self) -> DeallocateMaxBenchmarkOptions {
         DeallocateMaxBenchmarkOptions {
             object_size: OBJ_SIZE,
-            modules: ModuleOptions::new::<A, NonResidentBuddyAllocatorModule<16>, S>()
+            modules: ModuleOptions::new::<A, NonResidentBuddyAllocatorModule<16>>()
         }
     }
 }

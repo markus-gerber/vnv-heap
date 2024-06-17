@@ -12,10 +12,10 @@ impl ObjectManagementModule for DefaultObjectManagementModule {
         Self
     }
 
-    fn sync_dirty_data<S: PersistentStorageModule>(
+    fn sync_dirty_data<A: AllocatorModule, S: PersistentStorageModule>(
         &mut self,
         required_bytes: usize,
-        mut dirty_item_list: super::DirtyItemList<'_, '_, '_, S>,
+        mut dirty_item_list: super::DirtyItemList<'_, '_, '_, '_, A, S>,
     ) -> Result<(), ()> {
         let mut curr: usize = 0;
 
@@ -39,6 +39,16 @@ impl ObjectManagementModule for DefaultObjectManagementModule {
             }
         }
 
+        let mut iter = dirty_item_list.iter();
+        while let Some(mut item) = iter.next() {
+            if item.is_unused() {
+                curr += item.unload().unwrap_or_default();
+                if curr >= required_bytes {
+                    return Ok(());
+                }
+            }
+        }
+
         // could not sync enough objects
         Err(())
     }
@@ -48,7 +58,7 @@ impl ObjectManagementModule for DefaultObjectManagementModule {
         layout: &Layout,
         mut resident_item_list: super::ResidentItemList<S, A>,
     ) -> Result<(), ()> {
-        let mut iter: ResidentIter<'_, '_, '_, S, A> = resident_item_list.iter();
+        let mut iter: ResidentIter<'_, '_, '_, '_, S, A> = resident_item_list.iter();
 
         while let Some(item) = iter.next() {
             if let Ok(enough_space) = item.unload_and_check_for_space(layout) {

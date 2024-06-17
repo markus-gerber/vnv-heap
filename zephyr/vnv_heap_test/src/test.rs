@@ -1,6 +1,6 @@
 use std::{array, vec};
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
-use vnv_heap::{VNVConfig, VNVHeap, modules::{nonresident_allocator::NonResidentBuddyAllocatorModule, allocator::LinkedListAllocatorModule}};
+use vnv_heap::{VNVConfig, VNVHeap, modules::{nonresident_allocator::NonResidentBuddyAllocatorModule, allocator::LinkedListAllocatorModule, object_management::DefaultObjectManagementModule}};
 use spi_fram_storage::SpiFramStorageModule;
 
 pub fn test_heap_persistency() {
@@ -20,8 +20,8 @@ pub fn test_heap_persistency() {
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
-        SpiFramStorageModule
-    > = VNVHeap::new(&mut buffer, storage, config).unwrap();
+        DefaultObjectManagementModule
+    > = VNVHeap::new(&mut buffer, storage, LinkedListAllocatorModule::new(), config, |_, _| {}).unwrap();
 
     const SEED: u64 = 5446535461589659585;
     const OBJECT_COUNT: usize = 200;

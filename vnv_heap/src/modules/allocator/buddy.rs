@@ -9,10 +9,6 @@ pub struct BuddyAllocatorModule<const ORDER: usize> {
 }
 
 impl<const ORDER: usize> AllocatorModule for BuddyAllocatorModule<ORDER> {
-    fn new() -> Self {
-        Self { inner: Heap::new() }
-    }
-
     unsafe fn init(&mut self, start: *mut u8, size: usize) {
         self.inner.init(start as usize, size)
     }
@@ -23,5 +19,21 @@ impl<const ORDER: usize> AllocatorModule for BuddyAllocatorModule<ORDER> {
 
     unsafe fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) {
         self.inner.dealloc(ptr, layout)
+    }
+    
+    unsafe fn reset(&mut self) {
+        self.inner = Heap::new();
+    }
+    
+    unsafe fn allocate_at(&mut self, layout: Layout, ptr: *mut u8) -> Result<(), ()> {
+        todo!()
+    }
+}
+
+impl<const ORDER: usize> BuddyAllocatorModule<ORDER> {
+    pub fn new() -> Self {
+        Self {
+            inner: Heap::new()
+        }
     }
 }

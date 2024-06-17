@@ -39,12 +39,8 @@ mod test {
     fn test_ceil_div() {
         // just test a bunch of different values
         for y in 1..100 {
-            for x in 0..y*3 {
-                let expected_value = if x % y == 0 {
-                    x / y
-                } else {
-                    (x / y) + 1
-                };
+            for x in 0..y * 3 {
+                let expected_value = if x % y == 0 { x / y } else { (x / y) + 1 };
 
                 assert_eq!(ceil_div(x, y), expected_value);
             }

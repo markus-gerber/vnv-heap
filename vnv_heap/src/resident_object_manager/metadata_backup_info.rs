@@ -28,6 +28,11 @@ impl MetadataBackupInfo {
     }
 
     #[inline]
+    pub(crate) fn unset(&mut self) {
+        self.offset = Self::NONE_ELEMENT;
+    }
+
+    #[inline]
     pub(crate) fn get(&self) -> Option<usize> {
         if self.offset == MetadataBackupInfo::NONE_ELEMENT {
             None

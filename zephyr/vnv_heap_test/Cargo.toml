@@ -13,8 +13,3 @@ libc = "0.2"
 vnv_heap = { path = "../../vnv_heap" }
 spi_fram_storage = { path = "../common/spi_fram_storage" }
 rand = { version = "0.8.5", features = ["small_rng"], default-features = false }
-
-[features]
-default = []
-# Enable this to add the std examples back into the sample
-have_std = []

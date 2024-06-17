@@ -1,10 +1,14 @@
 use core::{alloc::Layout, cell::RefCell, marker::PhantomData};
 
 use crate::{
-    allocation_identifier::AllocationIdentifier, modules::{
+    allocation_identifier::AllocationIdentifier,
+    modules::{
         allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
-        persistent_storage::PersistentStorageModule,
-    }, vnv_heap::VNVHeapInner, vnv_mut_ref::VNVMutRef, vnv_ref::VNVRef
+        object_management::ObjectManagementModule,
+    },
+    vnv_heap::VNVHeapInner,
+    vnv_mut_ref::VNVMutRef,
+    vnv_ref::VNVRef,
 };
 
 pub struct VNVObject<
@@ -13,9 +17,9 @@ pub struct VNVObject<
     T: Sized,
     A: AllocatorModule,
     N: NonResidentAllocatorModule,
-    S: PersistentStorageModule,
+    M: ObjectManagementModule,
 > {
-    vnv_heap: &'a RefCell<VNVHeapInner<'b, A, N, S>>,
+    vnv_heap: &'a RefCell<VNVHeapInner<'b, A, N, M>>,
     allocation_identifier: AllocationIdentifier<T>,
     phantom_data: PhantomData<T>,
 }
@@ -26,48 +30,66 @@ impl<
         T: Sized,
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
-        S: PersistentStorageModule,
-    > VNVObject<'a, 'b, T, A, N, S>
+        M: ObjectManagementModule,
+    > VNVObject<'a, 'b, T, A, N, M>
 {
     pub(crate) fn new(
-        vnv_heap: &'a RefCell<VNVHeapInner<'b, A, N, S>>,
+        vnv_heap: &'a RefCell<VNVHeapInner<'b, A, N, M>>,
         identifier: AllocationIdentifier<T>,
     ) -> Self {
         VNVObject {
             vnv_heap,
             allocation_identifier: identifier,
-            phantom_data: PhantomData
+            phantom_data: PhantomData,
         }
     }
 
-    pub fn get(&self) -> Result<VNVRef<'a, '_, '_, 'b, T, A, N, S>, ()> {
+    pub fn get(&self) -> Result<VNVRef<'a, '_, '_, 'b, T, A, N, M>, ()> {
         let mut heap = self.vnv_heap.borrow_mut();
         unsafe {
             let ptr: *const T = heap.get_ref(&self.allocation_identifier)?;
             let data_ref = ptr.as_ref().unwrap();
-            Ok(VNVRef::new(self.vnv_heap, &self.allocation_identifier, data_ref))
+            Ok(VNVRef::new(
+                self.vnv_heap,
+                &self.allocation_identifier,
+                data_ref,
+            ))
         }
     }
 
-    pub fn get_mut(&mut self) -> Result<VNVMutRef<'a, '_, '_, 'b, T, A, N, S>, ()> {
+    pub fn get_mut(&mut self) -> Result<VNVMutRef<'a, '_, '_, 'b, T, A, N, M>, ()> {
         let mut heap = self.vnv_heap.borrow_mut();
         unsafe {
             let ptr: *mut T = heap.get_mut(&self.allocation_identifier)?;
             let data_ref = ptr.as_mut().unwrap();
-            Ok(VNVMutRef::new(self.vnv_heap, &self.allocation_identifier, data_ref))
+            Ok(VNVMutRef::new(
+                self.vnv_heap,
+                &self.allocation_identifier,
+                data_ref,
+            ))
         }
+    }
+
+    pub fn is_resident(&self) -> bool {
+        let mut heap = self.vnv_heap.borrow_mut();
+        heap.is_resident(&self.allocation_identifier)
     }
 }
 
-impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, S: PersistentStorageModule> Drop
-    for VNVObject<'_, '_, T, A, N, S>
+impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementModule> Drop
+    for VNVObject<'_, '_, T, A, N, M>
 {
     fn drop(&mut self) {
         let layout = Layout::new::<T>();
         let mut obj = self.vnv_heap.borrow_mut();
         unsafe {
             // TODO handle this error somehow?
-            obj.deallocate(layout, &self.allocation_identifier).unwrap();
+            match obj.deallocate(layout, &self.allocation_identifier) {
+                Ok(()) => {},
+                Err(()) => {
+                    println!("could not deallocate");
+                }
+            }
         }
     }
 }

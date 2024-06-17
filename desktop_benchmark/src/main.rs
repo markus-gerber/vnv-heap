@@ -8,9 +8,7 @@ use vnv_heap::{
         RunAllBenchmarkOptions, Timer,
     },
     modules::{
-        allocator::LinkedListAllocatorModule,
-        nonresident_allocator::NonResidentBuddyAllocatorModule,
-        persistent_storage::FilePersistentStorageModule,
+        allocator::LinkedListAllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, object_management::DefaultObjectManagementModule, persistent_storage::FilePersistentStorageModule
     },
     VNVConfig, VNVHeap,
 };
@@ -41,15 +39,15 @@ fn main() {
 */
     run_all_benchmarks::<
         DesktopTimer,
-        LinkedListAllocatorModule,
         FilePersistentStorageModule,
+        DefaultObjectManagementModule,
         fn(
             &mut [u8],
             usize,
         ) -> VNVHeap<
             LinkedListAllocatorModule,
             NonResidentBuddyAllocatorModule<16>,
-            FilePersistentStorageModule,
+            DefaultObjectManagementModule
         >,
     >(
         get_bench_heap,
@@ -74,7 +72,7 @@ fn get_bench_heap(
 ) -> VNVHeap<
     LinkedListAllocatorModule,
     NonResidentBuddyAllocatorModule<16>,
-    FilePersistentStorageModule,
+    DefaultObjectManagementModule
 > {
     let storage = FilePersistentStorageModule::new("test.data".to_string(), 4096 * 4).unwrap();
     let config = VNVConfig {
@@ -84,8 +82,8 @@ fn get_bench_heap(
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
-        FilePersistentStorageModule,
-    > = VNVHeap::new(buf, storage, config).unwrap();
+        DefaultObjectManagementModule
+    > = VNVHeap::new(buf, storage, LinkedListAllocatorModule::new(), config, |_, _| {}).unwrap();
 
     heap
 }

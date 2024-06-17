@@ -1,9 +1,7 @@
 use env_logger::{Builder, Env};
 use vnv_heap::{
     modules::{
-        allocator::LinkedListAllocatorModule,
-        nonresident_allocator::NonResidentBuddyAllocatorModule,
-        persistent_storage::FilePersistentStorageModule,
+        allocator::LinkedListAllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, object_management::DefaultObjectManagementModule, persistent_storage::FilePersistentStorageModule
     },
     VNVConfig, VNVHeap,
 };
@@ -19,12 +17,13 @@ fn main() {
         max_dirty_bytes: 100,
     };
     let mut buffer = [0u8; 512];
+    let heap = LinkedListAllocatorModule::new();
 
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
-        FilePersistentStorageModule,
-    > = VNVHeap::new(&mut buffer, storage, config).unwrap();
+        DefaultObjectManagementModule
+    > = VNVHeap::new(&mut buffer, storage, heap, config, |_, _| {}).unwrap();
 
     let mut obj = heap.allocate::<u32>(10).unwrap();
 
