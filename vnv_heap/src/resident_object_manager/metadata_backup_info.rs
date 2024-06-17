@@ -8,13 +8,6 @@ impl MetadataBackupInfo {
     const NONE_ELEMENT: usize = usize::MAX;
 
     #[inline]
-    pub(crate) fn new(offset: usize) -> Self {
-        debug_assert_ne!(offset, MetadataBackupInfo::NONE_ELEMENT);
-
-        Self { offset }
-    }
-
-    #[inline]
     pub(crate) const fn empty() -> Self {
         Self {
             offset: MetadataBackupInfo::NONE_ELEMENT,

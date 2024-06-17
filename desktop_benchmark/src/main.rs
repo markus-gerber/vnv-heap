@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use env_logger::{Builder, Env};
+// use env_logger::{Builder, Env};
 use vnv_heap::{
     benchmarks::{
         run_all_benchmarks,

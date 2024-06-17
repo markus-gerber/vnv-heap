@@ -40,3 +40,24 @@ impl LinkedListAllocatorModule {
         }
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use crate::modules::allocator::LinkedListAllocatorModule;
+    use super::{super::test::*, internal};
+
+    #[test]
+    fn test_allocate_at_simple_linked_list() {
+        test_allocate_at_simple(LinkedListAllocatorModule::new(), LinkedListAllocatorModule::new(), |heap1, heap2, diff| {
+            internal::test::check_heap_integrity(&mut heap1.inner, &mut heap2.inner, diff)
+        })
+    }
+    
+    #[test]
+    fn test_allocate_at_restore_state_linked_list() {
+        test_allocate_at_restore_state(LinkedListAllocatorModule::new(), LinkedListAllocatorModule::new(), |heap1, heap2, diff| {
+            internal::test::check_heap_integrity(&mut heap1.inner, &mut heap2.inner, diff)
+        })
+    }
+}

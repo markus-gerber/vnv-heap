@@ -1,4 +1,7 @@
-// code from https://github.com/rust-osdev/linked-list-allocator
+// original code from https://github.com/rust-osdev/linked-list-allocator
+// modifications: added allocate_at
+
+#![allow(dead_code)]
 
 use core::alloc::Layout;
 use core::mem::MaybeUninit;
@@ -265,87 +268,12 @@ pub fn align_up(addr: *mut u8, align: usize) -> *mut u8 {
 }
 
 #[cfg(test)]
-mod test {
-    use std::alloc::Layout;
-    use std::ptr::NonNull;
-    use super::super::hole::test::check_cursor_integrity;
+pub(super) mod test {
+    use crate::modules::allocator::linked_list::hole::test::check_cursor_integrity;
+
     use super::Heap;
 
-    fn convert_ptr(ptr: NonNull<u8>, diff: usize) -> *mut u8 {
-        ((ptr.as_ptr() as usize) + diff) as *mut u8
+    pub(crate) fn check_heap_integrity(heap1: &mut Heap, heap2: &mut Heap, diff: isize) {
+        check_cursor_integrity(heap1.holes.cursor(), heap2.holes.cursor(), diff)
     }
-
-    #[test]
-    fn test_allocate_at_simple() {
-        let mut buffer = [0u8; 2000];
-        let diff = buffer.len() / 2;
-        let mut heap1 = unsafe { Heap::new(&mut buffer[0], buffer.len() / 2) };
-        let mut heap2 = unsafe { Heap::new(&mut buffer[buffer.len() / 2], buffer.len() / 2) };
-
-        let ptr1 = heap1.allocate_first_fit(Layout::new::<u128>()).unwrap();
-        let ptr2 = heap1.allocate_first_fit(Layout::new::<u64>()).unwrap();
-        let ptr3 = heap1.allocate_first_fit(Layout::new::<u128>()).unwrap();
-
-        unsafe { heap1.deallocate(ptr1, Layout::new::<u128>()) };
-        unsafe { heap2.allocate_at(Layout::new::<u64>(), convert_ptr(ptr2, diff)).unwrap(); }
-        unsafe { heap2.allocate_at(Layout::new::<u128>(), convert_ptr(ptr3, diff)).unwrap(); }
-
-        check_cursor_integrity(heap1.holes.cursor(), heap2.holes.cursor(), diff);
-        
-        unsafe { heap1.deallocate(ptr3, Layout::new::<u128>()) };
-        unsafe { heap2.deallocate(NonNull::new(convert_ptr(ptr3, diff)).unwrap(), Layout::new::<u128>()) };
-        
-        check_cursor_integrity(heap1.holes.cursor(), heap2.holes.cursor(), diff);
-    }
-
-    #[test]
-    fn test_allocate_at_restore_state() {
-        let mut buffer = [0u8; 2000];
-        let diff = buffer.len() / 2;
-        let mut heap1 = unsafe { Heap::new(&mut buffer[0], buffer.len() / 2) };
-        let mut heap2 = unsafe { Heap::new(&mut buffer[buffer.len() / 2], buffer.len() / 2) };
-
-        macro_rules! allocate {
-            ($layout: expr) => {
-                {
-                    let ptr1 = heap1.allocate_first_fit($layout).unwrap();
-                    let ptr2 = heap2.allocate_first_fit($layout).unwrap();
-                    (ptr1, ptr2, $layout)
-                }
-            };
-        }
-
-        macro_rules! deallocate {
-            ($ptrs: ident) => {
-                unsafe {
-                    heap1.deallocate($ptrs.0, $ptrs.2);
-                    heap2.deallocate($ptrs.1, $ptrs.2);
-                }
-                drop($ptrs);
-            };
-        }
-
-        let ptr1 = allocate!(Layout::new::<u128>());
-        let ptr2 = allocate!(Layout::new::<u64>());
-        let ptr3 = allocate!(Layout::new::<u8>());
-        let ptr4 = allocate!(Layout::new::<u8>());
-        let ptr5 = allocate!(Layout::new::<u64>());
-        let ptr6 = allocate!(Layout::new::<u128>());
-
-        deallocate!(ptr2);
-        deallocate!(ptr6);
-
-        // reset heap2
-        drop(heap2);
-        let len = buffer.len();
-        buffer[len / 2..].fill(0);
-        let mut heap2 = unsafe { Heap::new(&mut buffer[buffer.len() / 2], buffer.len() / 2) };
-
-        for ptrs in [ptr1, ptr3, ptr4, ptr5] {
-            unsafe { heap2.allocate_at(ptrs.2, ptrs.1.as_ptr()).unwrap() };
-        }
-
-        check_cursor_integrity(heap1.holes.cursor(), heap2.holes.cursor(), diff);
-    }
-
 }

@@ -1,7 +1,7 @@
 use super::ResidentObjectMetadataBackup;
 use crate::modules::{
     nonresident_allocator::{
-        AtomicPushOnlyNonResidentLinkedList, Iter, NonResidentLinkedList,
+        AtomicPushOnlyNonResidentLinkedList, Iter,
         SharedAtomicLinkedListHeadPtr,
     },
     persistent_storage::PersistentStorageModule,
@@ -24,6 +24,7 @@ impl MetadataBackupList {
 
     /// The total size of an item stored in this list in persistent storage
     #[inline]
+    #[allow(dead_code)]
     pub(crate) const fn total_item_size() -> usize {
         AtomicPushOnlyNonResidentLinkedList::<ResidentObjectMetadataBackup>::total_item_size()
     }
@@ -35,6 +36,7 @@ impl MetadataBackupList {
 
     /// Return `true` if the list is empty
     #[inline]
+    #[allow(dead_code)]
     pub(crate) fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
@@ -75,13 +77,6 @@ impl MetadataBackupList {
     #[inline]
     pub(crate) fn len(&self) -> usize {
         self.length
-    }
-
-    /// Converts base offset of the `NonResidentLinkedListItem<T>` provided by
-    /// `iter(...)` or `remove_where(...)` to the offset of `NonResidentLinkedListItem<T>.data`
-    #[inline]
-    pub fn get_data_offset(base_offset: usize) -> usize {
-        NonResidentLinkedList::<ResidentObjectMetadataBackup>::get_data_offset(base_offset)
     }
 }
 

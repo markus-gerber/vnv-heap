@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use core::alloc::Layout;
 use core::mem;
 use core::mem::{align_of, size_of};
@@ -61,8 +63,6 @@ impl Cursor {
     // unmodified, and has made no changes to the linked list of holes.
     unsafe fn split_at(self, required_layout: Layout, ptr: *mut u8) -> Result<(), Self> {
         let front_padding;
-        let alloc_ptr;
-        let alloc_size;
         let back_padding;
 
         // Here we create a scope, JUST to make sure that any created references do not
@@ -125,8 +125,6 @@ impl Cursor {
             }
 
             // Yes! We have successfully placed our allocation as well.
-            alloc_ptr = aligned_addr;
-            alloc_size = required_size;
 
             // Okay, time to move onto the back padding.
             let back_padding_size = hole_end as usize - allocation_end as usize;
@@ -880,7 +878,7 @@ pub(super) mod test {
 
     use super::Cursor;
 
-    pub(crate) fn check_cursor_integrity(mut cursor1: Option<Cursor>, mut cursor2: Option<Cursor>, difference: usize) {
+    pub(crate) fn check_cursor_integrity(mut cursor1: Option<Cursor>, mut cursor2: Option<Cursor>, difference: isize) {
         loop {
             match (cursor1, cursor2) {
                 (Some(cur1), Some(cur2)) => {
@@ -888,7 +886,7 @@ pub(super) mod test {
                     let ptr2 = (cur2.current() as *const Hole) as usize;
 
                     assert_eq!(cur1.current().size, cur2.current().size);
-                    assert_eq!(ptr1 + difference, ptr2);
+                    assert_eq!(((ptr1 as isize) + difference) as usize, ptr2);
 
                     cursor1 = cur1.next();
                     cursor2 = cur2.next();

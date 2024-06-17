@@ -1,7 +1,10 @@
+mod internal;
+mod linked_list;
+
 use core::{alloc::Layout, ptr::NonNull};
 
 use super::AllocatorModule;
-use buddy_system_allocator::Heap;
+use internal::Heap;
 
 /// Buddy allocator module
 pub struct BuddyAllocatorModule<const ORDER: usize> {
@@ -26,7 +29,7 @@ impl<const ORDER: usize> AllocatorModule for BuddyAllocatorModule<ORDER> {
     }
     
     unsafe fn allocate_at(&mut self, layout: Layout, ptr: *mut u8) -> Result<(), ()> {
-        todo!()
+        self.inner.alloc_at(layout, ptr)
     }
 }
 
@@ -35,5 +38,24 @@ impl<const ORDER: usize> BuddyAllocatorModule<ORDER> {
         Self {
             inner: Heap::new()
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{super::test::*, internal, BuddyAllocatorModule};
+
+    #[test]
+    fn test_allocate_at_simple_buddy() {
+        test_allocate_at_simple(BuddyAllocatorModule::<16>::new(), BuddyAllocatorModule::<16>::new(), |heap1, heap2, diff| {
+            internal::test::check_heap_integrity(&mut heap1.inner, &mut heap2.inner, diff)
+        })
+    }
+
+    #[test]
+    fn test_allocate_at_restore_state_buddy() {
+        test_allocate_at_restore_state(BuddyAllocatorModule::<16>::new(), BuddyAllocatorModule::<16>::new(), |heap1, heap2, diff| {
+            internal::test::check_heap_integrity(&mut heap1.inner, &mut heap2.inner, diff)
+        })
     }
 }

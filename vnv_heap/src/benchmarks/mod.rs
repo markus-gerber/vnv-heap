@@ -1,6 +1,5 @@
 use core::{any::type_name, mem::size_of};
 
-use std::any::TypeId;
 #[cfg(not(test))]
 use std::io::stdout;
 

@@ -6,10 +6,10 @@ use std::{
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
 
 use crate::{
-    calc_resident_buf_cutoff_size, modules::{
+    modules::{
         allocator::LinkedListAllocatorModule,
         nonresident_allocator::NonResidentBuddyAllocatorModule,
-        object_management::DefaultObjectManagementModule, persistent_storage::FilePersistentStorageModule,
+        object_management::DefaultObjectManagementModule,
     }, test::get_test_heap, vnv_persist_all, VNVObject
 };
 
