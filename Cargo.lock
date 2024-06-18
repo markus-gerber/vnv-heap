@@ -28,6 +28,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "desktop_persist"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "libc",
+ "log",
+ "rand",
+ "vnv_heap",
+]
+
+[[package]]
 name = "desktop_playground"
 version = "0.1.0"
 dependencies = [
@@ -278,6 +289,7 @@ name = "vnv_heap"
 version = "0.1.0"
 dependencies = [
  "env_logger",
+ "libc",
  "log",
  "memoffset",
  "polonius-the-crab",

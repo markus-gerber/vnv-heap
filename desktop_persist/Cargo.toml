@@ -1,0 +1,13 @@
+[package]
+name = "desktop_persist"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+env_logger = "0.10.2"
+log = { version = "0.4.21", features = [ "max_level_trace", "release_max_level_warn" ] }
+vnv_heap = { path = "../vnv_heap", features = ["persist_debug_prints"] }
+rand = { version = "0.8.5", features = ["small_rng"], default-features = false }
+libc = "0.2.155"

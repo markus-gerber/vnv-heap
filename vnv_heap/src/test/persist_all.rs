@@ -34,6 +34,7 @@ fn test_persist_all_simple() {
             let buffer = unsafe { slice_from_raw_parts_mut(base_ptr, size).as_mut() }.unwrap();
             buffer.fill(0);
 
+            // we can use print here because in our example this will only be called by the main thread
             println!("finished clearing buffer with {} bytes", size);
         },
     );

@@ -605,6 +605,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
     }
 }
 
+#[allow(dead_code)]
 pub(crate) const fn get_total_resident_size<T: Sized>() -> usize {
     size_of::<ResidentObject<T>>()
 }

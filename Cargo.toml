@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "desktop_benchmark",
+    "desktop_persist",
     "desktop_playground",
     "vnv_heap"
 ]

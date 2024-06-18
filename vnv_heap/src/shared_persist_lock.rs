@@ -5,7 +5,7 @@ use core::{
 use std::{cell::UnsafeCell, mem::ManuallyDrop};
 use try_lock::{Locked, TryLock};
 
-use crate::vnv_persist_all;
+use crate::{persist_access_point::print_persist_debug, vnv_persist_all};
 
 pub(crate) struct SharedPersistLock<'a, T> {
     persist_queued: &'a AtomicBool,
@@ -62,6 +62,8 @@ impl<T> Drop for SharedPersistGuard<'_, '_, T> {
         // continue while vnv_persist_all is called
 
         if self.persist_queued.swap(false, Ordering::SeqCst) {
+            print_persist_debug("persist was queued! persist now...\n");
+
             // persist was called during this lock call
             // call persist again, as now the lock is available again
 

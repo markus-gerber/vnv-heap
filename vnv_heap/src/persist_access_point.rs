@@ -93,12 +93,16 @@ impl PersistAccessPoint {
         };
 
         if let Some(inner) = lock_guard.as_mut() {
+            print_persist_debug("persist was triggered\n");
+
             // ###### TRY TO GET ALL NECESSARY LOCKS ######
 
             {
                 // there wont be any race conditions here as its guaranteed that no other threads
                 // run during this handler
                 if inner.heap_lock.try_lock().is_none() || inner.storage.is_locked() {
+                    print_persist_debug("cannot acquire lock. persist queued...\n");
+
                     inner.persist_queued.store(true, Ordering::SeqCst);
                     return;
                 }
@@ -157,8 +161,21 @@ impl PersistAccessPoint {
                 inner.resident_buf_base_ptr,
                 inner.resident_buf_size
             );
+
+            print_persist_debug("restore finished\n");
         }
     }
+}
+
+#[cfg(not(feature = "persist_debug_prints"))]
+pub(crate) fn print_persist_debug(_text: &str) {
+    // do nothing
+}
+
+#[cfg(feature = "persist_debug_prints")]
+pub(crate) fn print_persist_debug(text: &str) {
+    // this could be called from a signal handler, so do not use print
+    unsafe { libc::write(libc::STDOUT_FILENO, text.as_ptr() as *const libc::c_void, text.len()) };
 }
 
 struct PersistAccessPointInner {
