@@ -1,0 +1,15 @@
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+cstr = "0.2.10"
+log = "0.4"
+zephyr = { path = "../zephyr-rust/rust/zephyr" }
+zephyr-macros = { path = "../zephyr-rust/rust/zephyr-macros" }
+zephyr-logger = { path = "../zephyr-rust/rust/zephyr-logger" }
+libc = "0.2"
+vnv_heap = { path = "../../vnv_heap", features = ["persist_debug_unsafe_prints"] }
+spi_fram_storage = { path = "../common/spi_fram_storage" }
+rand = { version = "0.8.5", features = ["small_rng"], default-features = false }

@@ -20,6 +20,7 @@ libc = { version = "0.2.155", optional = true }
 [features]
 default = []
 persist_debug_prints = ["dep:libc"]
+persist_debug_unsafe_prints = []
 benchmarks = ["dep:serde", "dep:serde_json", "dep:seq-macro", "dep:rand"]
 
 [dev-dependencies]

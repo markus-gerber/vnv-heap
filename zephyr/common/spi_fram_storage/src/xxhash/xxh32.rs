@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 //!32 bit version of xxhash algorithm
 //!
 //!Written using C implementation as reference.

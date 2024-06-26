@@ -167,7 +167,7 @@ impl PersistAccessPoint {
     }
 }
 
-#[cfg(not(feature = "persist_debug_prints"))]
+#[cfg(all(not(feature = "persist_debug_prints"), not(feature = "persist_debug_unsafe_prints")))]
 pub(crate) fn print_persist_debug(_text: &str) {
     // do nothing
 }
@@ -176,6 +176,12 @@ pub(crate) fn print_persist_debug(_text: &str) {
 pub(crate) fn print_persist_debug(text: &str) {
     // this could be called from a signal handler, so do not use print
     unsafe { libc::write(libc::STDOUT_FILENO, text.as_ptr() as *const libc::c_void, text.len()) };
+}
+
+#[cfg(feature = "persist_debug_unsafe_prints")]
+pub(crate) fn print_persist_debug(text: &str) {
+    // using print in a signal handler is not safe
+    print!("{}", text);
 }
 
 struct PersistAccessPointInner {
