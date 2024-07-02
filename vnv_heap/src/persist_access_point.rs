@@ -110,47 +110,11 @@ impl PersistAccessPoint {
 
             // ###### START PERSISTING STATE ######
             persist(&inner.resident_list, &inner.backup_list, &mut inner.storage);
-            /*
-                        // size of the data to save here
-                        let size = unsafe {
-                            *(inner.resident_buf_base_ptr as *mut usize)
-                                .as_ref()
-                                .unwrap()
-                        };
-
-                        // persist pre data for resident buffersize
-                        unsafe {
-                            println!("persist {} pre bytes", size);
-                            let slice =
-                                slice_from_raw_parts(inner.resident_buf_base_ptr.add(size_of::<usize>()), size)
-                                    .as_ref()
-                                    .unwrap();
-                            inner.storage.write(size_of::<usize>(), slice).unwrap();
-                        }
-                        let mut cloned_storage = inner.storage.clone();
-
-            */
 
             // ###### FINISHED PERSISTING STATE: EXECUTING HANDLER NOW ######
             (inner.handler)(inner.resident_buf_base_ptr, inner.resident_buf_size);
 
             // ###### HANDLER RETURNED: RESTORING STATE NOW ######
-            /*// restore pre data for resident buffer
-            unsafe {
-                (inner.resident_buf_base_ptr as *mut usize).write(size);
-                println!("restore {} pre bytes", size);
-
-                let slice = slice_from_raw_parts_mut(
-                    inner.resident_buf_base_ptr.add(size_of::<usize>()),
-                    size,
-                )
-                .as_mut()
-                .unwrap();
-                println!("pre read");
-                cloned_storage.read(size_of::<usize>(), slice).unwrap();
-                println!("finished read");
-            }*/
-
             restore(
                 &inner.resident_list,
                 &inner.backup_list,
