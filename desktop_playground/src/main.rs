@@ -22,7 +22,8 @@ fn main() {
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
-        DefaultObjectManagementModule
+        DefaultObjectManagementModule,
+        FilePersistentStorageModule
     > = VNVHeap::new(&mut buffer, storage, heap, config, |_, _| {}).unwrap();
 
     let mut obj = heap.allocate::<u32>(10).unwrap();

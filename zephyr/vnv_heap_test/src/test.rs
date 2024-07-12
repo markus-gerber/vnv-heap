@@ -20,7 +20,8 @@ pub fn test_heap_persistency() {
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
-        DefaultObjectManagementModule
+        DefaultObjectManagementModule,
+        SpiFramStorageModule
     > = VNVHeap::new(&mut buffer, storage, LinkedListAllocatorModule::new(), config, |_, _| {}).unwrap();
 
     const SEED: u64 = 5446535461589659585;

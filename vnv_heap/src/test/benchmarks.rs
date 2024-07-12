@@ -26,6 +26,7 @@ fn test_benchmarks() {
             LinkedListAllocatorModule,
             NonResidentBuddyAllocatorModule<16>,
             DefaultObjectManagementModule,
+            FilePersistentStorageModule
         >,
     >(
         get_bench_heap,
@@ -46,6 +47,7 @@ fn get_bench_heap(
     LinkedListAllocatorModule,
     NonResidentBuddyAllocatorModule<16>,
     DefaultObjectManagementModule,
+    FilePersistentStorageModule
 > {
     get_test_heap("test_benchmarks", 4096 * 4, buf, max_dirty, |_, _| {})
 }

@@ -39,7 +39,8 @@ pub extern "C" fn rust_main() {
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
-        DefaultObjectManagementModule
+        DefaultObjectManagementModule,
+        SpiFramStorageModule
     > = VNVHeap::new(&mut buffer, storage, LinkedListAllocatorModule::new(), config, |base_ptr, size| {
         // TODO: is printing safe to communicate with UART? If not: make it safe
 	    print!("clearing buffer... ");

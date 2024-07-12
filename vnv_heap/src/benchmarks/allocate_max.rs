@@ -1,8 +1,7 @@
 use crate::{
     modules::{
-        allocator::AllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, object_management::ObjectManagementModule,
-    },
-    VNVHeap,
+        allocator::AllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
+    }, VNVHeap
 };
 use core::hint::black_box;
 use serde::Serialize;
@@ -19,24 +18,54 @@ pub struct AllocateMaxBenchmarkOptions {
 pub struct AllocateMaxBenchmark<
     'a,
     'b: 'a,
-    A: AllocatorModule,
+    A: AllocatorModule + 'static,
     M: ObjectManagementModule,
+    S: PersistentStorageModule + 'static,
     const OBJ_SIZE: usize,
 > {
-    heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M>,
+    heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M, S>,
+    blockers: [usize; 16]
 }
 
 impl<
         'a,
         'b: 'a,
-        A: AllocatorModule,
+        A: AllocatorModule + 'static,
         M: ObjectManagementModule,
+        S: PersistentStorageModule,
         const OBJ_SIZE: usize,
-    > AllocateMaxBenchmark<'a, 'b, A, M, OBJ_SIZE>
+    > AllocateMaxBenchmark<'a, 'b, A, M, S, OBJ_SIZE>
 {
-    pub fn new(heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M>) -> Self {
+    pub fn new(heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M, S>) -> Self {
+        let mut blockers = [0; 16];
+
+        {
+            let mut inner = heap.get_inner().borrow_mut();
+            assert_eq!(inner.get_resident_object_manager().resident_object_count, 0);
+            assert!(inner.get_resident_object_manager().resident_object_meta_backup.len() == 0);
+
+            let (storage, _, allocator) = inner.get_modules_mut();
+            let free_list = allocator.get_free_list_mut();
+            let mut pop = false;
+            for (i, bucket) in free_list.iter_mut().enumerate().rev() {
+                if !bucket.is_empty() {
+                    if !pop {
+                        // this is the biggest item, don't remove it but remove
+                        // all items that are next
+                        pop = true;
+                    } else {
+                        blockers[i] = bucket.pop(storage).unwrap().unwrap();
+                        assert!(bucket.is_empty());    
+                    }
+                }
+            }
+
+            drop(inner);
+        }
+
         Self {
             heap,
+            blockers
         }
     }
 }
@@ -45,8 +74,9 @@ impl<
         'a,
         A: AllocatorModule + 'static,
         M: ObjectManagementModule,
+        S: PersistentStorageModule,
         const OBJ_SIZE: usize,
-    > Benchmark<AllocateMaxBenchmarkOptions> for AllocateMaxBenchmark<'a, '_, A, M, OBJ_SIZE>
+    > Benchmark<AllocateMaxBenchmarkOptions> for AllocateMaxBenchmark<'a, '_, A, M, S, OBJ_SIZE>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
@@ -55,8 +85,6 @@ impl<
 
     #[inline]
     fn execute<T: Timer>(&mut self) -> u32 {
-        // TODO: allocate free buckets except the biggest one
-
         let timer = T::start();
 
         let item = black_box(self.heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE])).unwrap();
@@ -73,5 +101,28 @@ impl<
             object_size: OBJ_SIZE,
             modules: ModuleOptions::new::<A, NonResidentBuddyAllocatorModule<16>>()
         }
+    }
+}
+
+impl<
+        'a,
+        A: AllocatorModule + 'static,
+        M: ObjectManagementModule,
+        S: PersistentStorageModule,
+        const OBJ_SIZE: usize,
+    > Drop for AllocateMaxBenchmark<'a, '_, A, M, S, OBJ_SIZE>
+{
+    fn drop(&mut self) {
+        let mut inner = self.heap.get_inner().borrow_mut();
+        
+        let (storage, _, allocator) = inner.get_modules_mut();
+        let free_list = allocator.get_free_list_mut();
+        for (i, ptr) in self.blockers.iter().enumerate() {
+            if *ptr != 0 {
+                unsafe { free_list[i].push(*ptr as usize, storage).unwrap() };
+            }
+        }
+
+        drop(inner);
     }
 }

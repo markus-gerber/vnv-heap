@@ -63,9 +63,9 @@ impl RunAllBenchmarkOptions {
 
 pub fn run_all_benchmarks<
     TIMER: Timer,
-    S: PersistentStorageModule,
+    S: PersistentStorageModule + 'static,
     M: ObjectManagementModule,
-    F: Fn(&mut [u8], usize) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, M>,
+    F: Fn(&mut [u8], usize) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, M, S>,
 >(
     get_bench_heap: F,
     mut run_options: BenchmarkRunOptions,
@@ -79,7 +79,7 @@ pub fn run_all_benchmarks<
             120
         } else if size_of::<usize>() == 4 {
             // zephyr with SPI Fram Storage module
-            56
+            64
         } else {
             panic!("uhhm");
         }
@@ -126,7 +126,7 @@ pub fn run_all_benchmarks<
             // because of the size of the metadata
             // STEP_COUNT has a different value for different target platforms!
             #[cfg(target_pointer_width = "32")]
-            for_obj_size_impl!($index, $inner, 30);
+            for_obj_size_impl!($index, $inner, 29);
 
             #[cfg(target_pointer_width = "64")]
             for_obj_size_impl!($index, $inner, 26);
@@ -167,9 +167,8 @@ pub fn run_all_benchmarks<
             let mut buf = [0u8; BUF_SIZE];
             let res_size = buf.len();
             let heap = get_bench_heap(&mut buf, res_size);
-            let bench: AllocateMinBenchmark<A, M, SIZE> = AllocateMinBenchmark::new(&heap);
+            let bench: AllocateMinBenchmark<A, M, S, SIZE> = AllocateMinBenchmark::new(&heap);
             bench.run_benchmark::<TIMER>(&mut run_options);
-        
         });
         for_obj_size!(I, {
             handle_curr_iteration(&mut curr_iteration, iteration_count);
@@ -177,7 +176,7 @@ pub fn run_all_benchmarks<
             let mut buf = [0u8; BUF_SIZE];
             let res_size = buf.len();
             let mut heap = get_bench_heap(&mut buf, res_size);
-            let bench = AllocateMaxBenchmark::<A, M, SIZE>::new(&mut heap);
+            let bench = AllocateMaxBenchmark::<A, M, S, SIZE>::new(&mut heap);
             bench.run_benchmark::<TIMER>(&mut run_options);
         });
     }
@@ -189,9 +188,8 @@ pub fn run_all_benchmarks<
             let mut buf = [0u8; BUF_SIZE];
             let res_size = buf.len();
             let heap = get_bench_heap(&mut buf, res_size);
-            let bench: DeallocateMinBenchmark<A, M, SIZE> = DeallocateMinBenchmark::new(&heap);
+            let bench: DeallocateMinBenchmark<A, M, S, SIZE> = DeallocateMinBenchmark::new(&heap);
             bench.run_benchmark::<TIMER>(&mut run_options);
-        
         });
         for_obj_size!(I, {
             handle_curr_iteration(&mut curr_iteration, iteration_count);
@@ -203,8 +201,7 @@ pub fn run_all_benchmarks<
             let res_size = buf.len();
             let mut heap = get_bench_heap(&mut buf, res_size);
             let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
-            let bench = DeallocateMaxBenchmark::<A, M, SIZE, BLOCKER_SIZE>::new(&mut heap, start_res_size);
-            println!("bsize={}, size={}, cutoff={}", BLOCKER_SIZE, SIZE, RESIDENT_CUTOFF_SIZE);
+            let bench = DeallocateMaxBenchmark::<A, M, S, SIZE, BLOCKER_SIZE>::new(&mut heap, start_res_size);
             bench.run_benchmark::<TIMER>(&mut run_options);
         });
     }

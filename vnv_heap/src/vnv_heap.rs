@@ -24,6 +24,7 @@ use crate::{
 use core::{
     alloc::Layout, cell::RefCell, marker::PhantomData, mem::size_of, sync::atomic::AtomicBool,
 };
+use std::mem::ManuallyDrop;
 
 static mut PERSIST_ACCESS_POINT: PersistAccessPoint = PersistAccessPoint::empty();
 
@@ -65,19 +66,31 @@ pub(crate) const fn calc_resident_buf_default_dirty_size<
     size_of::<ResidentBufPersistentStorage<A, S>>()
 }
 
-pub struct VNVHeap<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementModule>
-{
-    inner: RefCell<VNVHeapInner<'a, A, N, M>>,
+pub struct VNVHeap<
+    'a,
+    A: AllocatorModule,
+    N: NonResidentAllocatorModule,
+    M: ObjectManagementModule,
+    S: PersistentStorageModule + 'static,
+> {
+    inner: ManuallyDrop<RefCell<VNVHeapInner<'a, A, N, M>>>,
+
+    cutoff_ptr: *mut ResidentBufPersistentStorage<A, S>,
 
     /// For test environment we want to wait until a new heap can be created
     #[cfg(test)]
     _mutex_guard: std::sync::MutexGuard<'static, ()>,
 }
 
-impl<'a, A: AllocatorModule + 'static, N: NonResidentAllocatorModule, M: ObjectManagementModule>
-    VNVHeap<'a, A, N, M>
+impl<
+        'a,
+        A: AllocatorModule + 'static,
+        N: NonResidentAllocatorModule,
+        M: ObjectManagementModule,
+        S: PersistentStorageModule + 'static,
+    > VNVHeap<'a, A, N, M, S>
 {
-    pub fn new<S: PersistentStorageModule + 'static>(
+    pub fn new(
         resident_buffer: &'a mut [u8],
         storage_module: S,
         heap: A,
@@ -97,6 +110,8 @@ impl<'a, A: AllocatorModule + 'static, N: NonResidentAllocatorModule, M: ObjectM
             ()
         })?;
 
+        let cutoff_ptr =
+            (&mut resident_buffer[0] as *mut u8) as *mut ResidentBufPersistentStorage<A, S>;
         let (
             cutoff,
             resident_buffer,
@@ -131,7 +146,7 @@ impl<'a, A: AllocatorModule + 'static, N: NonResidentAllocatorModule, M: ObjectM
                 persist_handler,
                 heap_lock,
                 persist_queued,
-                *heap.try_lock().unwrap()
+                *heap.try_lock().unwrap(),
             )?
         }
 
@@ -146,19 +161,20 @@ impl<'a, A: AllocatorModule + 'static, N: NonResidentAllocatorModule, M: ObjectM
         non_resident_allocator.init(0, storage_reference.get_max_size(), &mut storage_reference)?;
 
         Ok(VNVHeap {
-            inner: RefCell::new(VNVHeapInner {
+            inner: ManuallyDrop::new(RefCell::new(VNVHeapInner {
                 storage_reference,
                 resident_object_manager,
                 non_resident_allocator,
                 _phantom_data: PhantomData,
-            }),
+            })),
+            cutoff_ptr,
 
             #[cfg(test)]
             _mutex_guard: mutex_guard,
         })
     }
 
-    fn prepare_access_point<S: PersistentStorageModule + 'static>(
+    fn prepare_access_point(
         heap: A,
         resident_buffer: &'a mut [u8],
         storage_module: S,
@@ -234,9 +250,7 @@ impl<'a, A: AllocatorModule + 'static, N: NonResidentAllocatorModule, M: ObjectM
     }
 
     /// Returns the size which the `resident_buffer` has to be, so `usable_resident_buffer_size` bytes can be used effectively
-    pub const fn calc_resident_buffer_size<S: PersistentStorageModule>(
-        usable_resident_buffer_size: usize,
-    ) -> usize {
+    pub const fn calc_resident_buffer_size(usable_resident_buffer_size: usize) -> usize {
         usable_resident_buffer_size + calc_resident_buf_cutoff_size::<A, S>()
     }
 
@@ -246,14 +260,19 @@ impl<'a, A: AllocatorModule + 'static, N: NonResidentAllocatorModule, M: ObjectM
     }
 }
 
-impl<A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementModule> Drop
-    for VNVHeap<'_, A, N, M>
+impl<
+        A: AllocatorModule,
+        N: NonResidentAllocatorModule,
+        M: ObjectManagementModule,
+        S: PersistentStorageModule,
+    > Drop for VNVHeap<'_, A, N, M, S>
 {
     fn drop(&mut self) {
-        unsafe { PERSIST_ACCESS_POINT.unset().unwrap() };
-
-        // all of the other data of resident_buffer does not need to be dropped
-        // (-> ResidentBufPersistentStorage)
+        unsafe {
+            PERSIST_ACCESS_POINT.unset().unwrap();
+            ManuallyDrop::drop(&mut self.inner);
+            self.cutoff_ptr.drop_in_place();
+        }
     }
 }
 
@@ -369,5 +388,20 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
     #[cfg(feature = "benchmarks")]
     pub(crate) fn get_non_resident_allocator(&self) -> &N {
         &self.non_resident_allocator
+    }
+
+    #[cfg(feature = "benchmarks")]
+    pub(crate) fn get_modules_mut(
+        &mut self,
+    ) -> (
+        &mut SharedStorageReference<'a, 'a>,
+        &mut ResidentObjectManager<'a, 'a, A, M>,
+        &mut N,
+    ) {
+        (
+            &mut self.storage_reference,
+            &mut self.resident_object_manager,
+            &mut self.non_resident_allocator,
+        )
     }
 }

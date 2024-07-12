@@ -146,6 +146,10 @@ impl<const ORDER: usize> NonResidentBuddyAllocatorModule<ORDER> {
     pub(crate) fn get_free_list(&self) -> &[SimpleNonResidentLinkedList; ORDER] {
         &self.free_list
     }
+    #[cfg(feature = "benchmarks")]
+    pub(crate) fn get_free_list_mut(&mut self) -> &mut [SimpleNonResidentLinkedList; ORDER] {
+        &mut self.free_list
+    }
 }
 
 fn prev_power_of_two(num: usize) -> usize {

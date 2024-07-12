@@ -25,7 +25,8 @@ pub extern "C" fn rust_main() {
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
-        DefaultObjectManagementModule
+        DefaultObjectManagementModule,
+        SpiFramStorageModule
     > = VNVHeap::new(&mut buffer, storage, LinkedListAllocatorModule::new(), config, |_, _| {}).unwrap();
 
     let mut obj = heap.allocate::<u32>(10).unwrap();

@@ -1,6 +1,6 @@
 use crate::{
     modules::{
-        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule, object_management::ObjectManagementModule,
+        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule, object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
     }, resident_object_manager::get_total_resident_size, VNVHeap, VNVObject
 };
 use core::hint::black_box;
@@ -42,7 +42,7 @@ impl<
         const BLOCKER_COUNT: usize,
     > GetMax1Benchmark<'a, 'b, A, N, M, OBJ_SIZE, BLOCKER_SIZE, BLOCKER_COUNT>
 {
-    pub fn new(heap: &'a VNVHeap<'b, A, N, M>, resident_buffer_size: usize) -> Self {
+    pub fn new<S: PersistentStorageModule>(heap: &'a VNVHeap<'b, A, N, M, S>, resident_buffer_size: usize) -> Self {
         assert_eq!(resident_buffer_size, heap.get_inner().borrow_mut().get_resident_object_manager().get_remaining_dirty_size());
 
         assert!(BLOCKER_COUNT * (BLOCKER_SIZE + 16) >= resident_buffer_size, "Blockers should be able to easily fill resident buffer");
@@ -158,7 +158,7 @@ impl<
     > GetMax2Benchmark<'a, 'b, A, N, M, OBJ_SIZE, BLOCKER_SIZE>
 {
 
-    pub fn new(heap: &'a VNVHeap<'b, A, N, M>, resident_buffer_size: usize) -> Self {
+    pub fn new<S: PersistentStorageModule>(heap: &'a VNVHeap<'b, A, N, M, S>, resident_buffer_size: usize) -> Self {
         assert_eq!(heap.get_inner().borrow_mut().get_resident_object_manager().get_remaining_dirty_size(), resident_buffer_size, "whole buffer should be able to be dirty");
         // blocker size should been calculated with this function
         assert_eq!(resident_buffer_size, get_total_resident_size::<[u8; BLOCKER_SIZE]>(), "blocker size is wrong! {} != {}", resident_buffer_size, get_total_resident_size::<[u8; BLOCKER_SIZE]>());

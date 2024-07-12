@@ -4,6 +4,7 @@ use crate::{
         nonresident_allocator::NonResidentBuddyAllocatorModule,
         object_management::DefaultObjectManagementModule,
         persistent_storage::test::get_test_storage,
+        persistent_storage::FilePersistentStorageModule
     },
     VNVHeap,
 };
@@ -24,6 +25,7 @@ fn get_test_heap<'a>(
     LinkedListAllocatorModule,
     NonResidentBuddyAllocatorModule<16>,
     DefaultObjectManagementModule,
+    FilePersistentStorageModule
 > {
     use crate::VNVConfig;
 

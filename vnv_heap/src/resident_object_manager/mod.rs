@@ -24,7 +24,7 @@ mod metadata_backup_list;
 mod persist;
 pub(crate) mod resident_list;
 pub(crate) mod resident_object;
-mod resident_object_backup;
+pub(crate) mod resident_object_backup;
 
 pub(crate) use metadata_backup_list::{MetadataBackupList, SharedMetadataBackupPtr};
 pub(crate) use persist::*;

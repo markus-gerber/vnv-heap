@@ -1,6 +1,6 @@
 use crate::{
     modules::{
-        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule, object_management::ObjectManagementModule
+        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule, object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule
     },
     VNVHeap, VNVObject,
 };
@@ -30,7 +30,7 @@ pub struct GetMinBenchmark<
 impl<'a, 'b: 'a, A: AllocatorModule + 'static, N: NonResidentAllocatorModule, M: ObjectManagementModule, const OBJ_SIZE: usize>
     GetMinBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
 {
-    pub fn new(heap: &'a VNVHeap<'b, A, N, M>) -> Self {
+    pub fn new<S: PersistentStorageModule>(heap: &'a VNVHeap<'b, A, N, M, S>) -> Self {
         let item = heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap();
         drop(item.get().unwrap());
 

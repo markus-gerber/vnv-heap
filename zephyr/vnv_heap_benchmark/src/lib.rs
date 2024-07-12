@@ -38,15 +38,16 @@ pub extern "C" fn rust_main() {
         ) -> VNVHeap<
             LinkedListAllocatorModule,
             NonResidentBuddyAllocatorModule<16>,
-            DefaultObjectManagementModule
+            DefaultObjectManagementModule,
+            SpiFramStorageModule
         >,
     >(
         get_bench_heap,
         BenchmarkRunOptions {
             cold_start: 0,
             machine_name: "esp32c3",
-            repetitions: 500,
-            result_buffer: &mut [0; 500],
+            repetitions: 20,
+            result_buffer: &mut [0; 20],
         },
         /*RunAllBenchmarkOptions {
             run_deallocate_benchmarks: true,
@@ -100,7 +101,7 @@ impl Timer for ZephyrTimer {
 fn get_bench_heap(
     buf: &mut [u8],
     max_dirty: usize,
-) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, DefaultObjectManagementModule> {
+) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, DefaultObjectManagementModule, SpiFramStorageModule> {
     let storage = unsafe { SpiFramStorageModule::new() }.unwrap();
     let config = VNVConfig {
         max_dirty_bytes: max_dirty,

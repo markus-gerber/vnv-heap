@@ -47,6 +47,7 @@ fn main() {
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
         DefaultObjectManagementModule,
+        FilePersistentStorageModule
     > = VNVHeap::new(&mut buffer, storage, heap, config, |base_ptr, size| {
         let buffer = unsafe { slice_from_raw_parts_mut(base_ptr, size).as_mut() }.unwrap();
         buffer.fill(0);
