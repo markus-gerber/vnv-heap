@@ -49,9 +49,9 @@ impl<
     pub fn new(heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M, S>) -> Self {
         let mut blockers = [0; 16];
         let bucket_size = max(
-            size_of::<ResidentObject<[u8; OBJ_SIZE]>>().next_power_of_two(),
+            size_of::<[u8; OBJ_SIZE]>().next_power_of_two(),
             max(
-                align_of::<ResidentObject<[u8; OBJ_SIZE]>>(),
+                align_of::<[u8; OBJ_SIZE]>(),
                 size_of::<usize>(),
             ),
         );
@@ -124,7 +124,7 @@ impl<'a, 'b: 'a, A: AllocatorModule, M: ObjectManagementModule, S: PersistentSto
 
         let timer = T::start();
 
-        let item = black_box(self.heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE])).unwrap();
+        let item = black_box(self.heap.allocate::<[u8; OBJ_SIZE]>(black_box([0u8; OBJ_SIZE]))).unwrap();
         let res = timer.stop();
 
         drop(item);

@@ -8,20 +8,27 @@ use serde::Serialize;
 mod allocate_max;
 mod allocate_min;
 mod deallocate_max;
-mod deallocate_min;
+mod deallocate_case1;
 mod get_max;
 mod get_min;
 mod persistent_storage_read;
 mod persistent_storage_write;
+mod deallocate_min;
+mod get_case1;
+mod allocate_case1;
 
 pub use allocate_max::*;
 pub use allocate_min::*;
 pub use deallocate_max::*;
-pub use deallocate_min::*;
+pub use deallocate_case1::*;
 pub use get_max::*;
 pub use get_min::*;
 pub use persistent_storage_read::*;
 pub use persistent_storage_write::*;
+pub use deallocate_min::*;
+pub use get_case1::*;
+pub use allocate_case1::*;
+
 
 use crate::{
     modules::{
@@ -137,13 +144,13 @@ pub fn run_all_benchmarks<
     let mut iteration_count = 0;
 
     if options.run_allocate_benchmarks {
-        iteration_count += 2 * STEP_COUNT;
+        iteration_count += 3 * STEP_COUNT;
     }
     if options.run_deallocate_benchmarks {
-        iteration_count += 2 * STEP_COUNT;
+        iteration_count += 3 * STEP_COUNT;
     }
     if options.run_get_benchmarks {
-        iteration_count += 4 * STEP_COUNT;
+        iteration_count += 5 * STEP_COUNT;
     }
     if options.run_persistent_storage_benchmarks {
         iteration_count += 2 * STEP_COUNT;
@@ -176,7 +183,19 @@ pub fn run_all_benchmarks<
             let mut buf = [0u8; BUF_SIZE];
             let res_size = buf.len();
             let mut heap = get_bench_heap(&mut buf, res_size);
-            let bench = AllocateMaxBenchmark::<A, M, S, SIZE>::new(&mut heap);
+            let bench = AllocateCase1Benchmark::<A, M, S, SIZE>::new(&mut heap);
+            bench.run_benchmark::<TIMER>(&mut run_options);
+        });
+        for_obj_size!(I, {
+            handle_curr_iteration(&mut curr_iteration, iteration_count);
+            const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
+            const METADATA_SIZE: usize = get_resident_size::<()>();
+            const BLOCKER_SIZE: usize = BUF_SIZE - METADATA_SIZE - RESIDENT_CUTOFF_SIZE;
+
+            let mut buf = [0u8; BUF_SIZE];
+            let res_size = buf.len();
+            let mut heap = get_bench_heap(&mut buf, res_size);
+            let bench = AllocateMaxBenchmark::<A, M, S, SIZE, BLOCKER_SIZE>::new(&mut heap);
             bench.run_benchmark::<TIMER>(&mut run_options);
         });
     }
@@ -189,6 +208,15 @@ pub fn run_all_benchmarks<
             let res_size = buf.len();
             let heap = get_bench_heap(&mut buf, res_size);
             let bench: DeallocateMinBenchmark<A, M, S, SIZE> = DeallocateMinBenchmark::new(&heap);
+            bench.run_benchmark::<TIMER>(&mut run_options);
+        });
+        for_obj_size!(I, {
+            handle_curr_iteration(&mut curr_iteration, iteration_count);
+            const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
+            let mut buf = [0u8; BUF_SIZE];
+            let res_size = buf.len();
+            let heap = get_bench_heap(&mut buf, res_size);
+            let bench: DeallocateCase1Benchmark<A, M, S, SIZE> = DeallocateCase1Benchmark::new(&heap);
             bench.run_benchmark::<TIMER>(&mut run_options);
         });
         for_obj_size!(I, {
@@ -247,6 +275,17 @@ pub fn run_all_benchmarks<
             let heap = get_bench_heap(&mut buf, res_size);
             let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
             let bench: GetMax2Benchmark<A, NonResidentBuddyAllocatorModule<16>, M, SIZE, BLOCKER_SIZE> = GetMax2Benchmark::new(&heap, start_res_size);
+            bench.run_benchmark::<TIMER>(&mut run_options);
+        });
+        for_obj_size!(I, {
+            handle_curr_iteration(&mut curr_iteration, iteration_count);
+            const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
+
+            let mut buf = [0u8; BUF_SIZE];
+            let res_size = buf.len();
+            let heap = get_bench_heap(&mut buf, res_size);
+            let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
+            let bench: GetCase1Benchmark<A, NonResidentBuddyAllocatorModule<16>, M, S, SIZE> = GetCase1Benchmark::new(&heap, start_res_size);
             bench.run_benchmark::<TIMER>(&mut run_options);
         });
     }
@@ -357,6 +396,7 @@ pub trait Benchmark<O: Serialize> {
                 machine_name: options.machine_name,
                 cold_start: options.cold_start,
                 repetitions: options.repetitions,
+                ticks_per_ms: T::get_ticks_per_ms(),
                 data: &options.result_buffer,
             };
             serde_json::to_writer(stdout(), &run_info).unwrap();    
@@ -409,6 +449,7 @@ pub struct BenchmarkRunInfo<'a, O: Serialize> {
     machine_name: &'static str,
     cold_start: u32,
     repetitions: u32,
+    ticks_per_ms: u32,
     data: &'a [u32],
 }
 
@@ -429,6 +470,8 @@ impl BenchmarkRunResult {
 }
 
 pub trait Timer {
+    fn get_ticks_per_ms() -> u32;
+
     fn start() -> Self;
 
     fn stop(self) -> u32;

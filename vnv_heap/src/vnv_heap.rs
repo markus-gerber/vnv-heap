@@ -305,8 +305,18 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
             .non_resident_allocator
             .allocate(layout, &mut self.storage_reference)?;
 
-        write_storage_data(&mut self.storage_reference, offset, &initial_value)?;
+        let initial_value = match self.resident_object_manager.try_to_allocate(initial_value, offset, &mut self.non_resident_allocator, &mut self.storage_reference) {
+            Ok(()) => {
+                return Ok(AllocationIdentifier::<T>::from_offset(offset))
+            },
+            Err(val) => {
+                // could not put this new object into memory
+                // write this object now onto persistent storage instead...
+                val
+            }
+        };
 
+        write_storage_data(&mut self.storage_reference, offset, &initial_value)?;
         Ok(AllocationIdentifier::<T>::from_offset(offset))
     }
 
@@ -373,6 +383,10 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
 
     pub(crate) fn is_resident<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) -> bool {
         self.resident_object_manager.is_resident(identifier)
+    }
+
+    pub(crate) fn unload_object<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) -> Result<(), ()> {        
+        self.resident_object_manager.unload_object(identifier, &mut self.non_resident_allocator, &mut self.storage_reference)
     }
 
     #[cfg(feature = "benchmarks")]

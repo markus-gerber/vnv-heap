@@ -44,14 +44,14 @@ pub extern "C" fn rust_main() {
     >(
         get_bench_heap,
         BenchmarkRunOptions {
-            cold_start: 0,
+            cold_start: 5,
             machine_name: "esp32c3",
-            repetitions: 20,
-            result_buffer: &mut [0; 20],
+            repetitions: 5,
+            result_buffer: &mut [0; 5],
         },
         /*RunAllBenchmarkOptions {
             run_deallocate_benchmarks: true,
-            run_persistent_storage_benchmarks: true,
+        //    run_persistent_storage_benchmarks: true,
             ..Default::default()
         },*/
         RunAllBenchmarkOptions::all()
@@ -66,35 +66,57 @@ pub extern "C" fn rust_main() {
     println!("[BENCH-STATUS] Finished in {}h {}m {}s", hours, mins, secs);
 }
 
+fn measure_timer() {
+    let mut x = [0u32; 1000];
+    for _ in 0..100 { 
+        for i in 0..1000 {
+            let timer = ZephyrTimer::start();
+            x[i] = timer.stop();
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        for i in 0..1000 {
+            println!("{}", x[i]);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    // dirty way to stop the CPU
+    assert!(false);
+}
+
 struct ZephyrTimer {
     start_time: u32,
 }
 
 impl Timer for ZephyrTimer {
+
+    fn get_ticks_per_ms() -> u32 {
+        (unsafe { helper_sys_clock_hw_cycles_per_sec() }) / 1000
+    }
+
     #[inline]
     fn start() -> Self {
-        Self {
+        std::thread::sleep(std::time::Duration::from_micros(1));
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+        let obj = Self {
             start_time: unsafe { helper_k_cycle_get_32() },
-        }
+        };
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+
+        obj
     }
 
     #[inline]
     fn stop(self) -> u32 {
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
         let end_time = unsafe { helper_k_cycle_get_32() };
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+
+        assert!(end_time > self.start_time, "There should be no timer overflow!");
 
         let delta = end_time - self.start_time;
-        let cycles_per_sec = unsafe { helper_sys_clock_hw_cycles_per_sec() };
 
-        // avoiding overflow of (delta * b) by dividing
-        // cycles_per_sec (without losing accuracy)
-        let mut a = 1;
-        let mut b = 1_000_000;
-        while cycles_per_sec % (a * 10) == 0 && b > 1 {
-            a *= 10;
-            b /= 10;
-        }
-
-        (delta * b) / (cycles_per_sec / a)
+        delta
     }
 }
 

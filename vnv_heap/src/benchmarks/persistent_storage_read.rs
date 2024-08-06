@@ -13,12 +13,14 @@ pub struct PersistentStorageReadBenchmarkOptions {
 }
 
 pub struct PersistentStorageReadBenchmark<'a, S: PersistentStorageModule, const OBJ_SIZE: usize> {
-    storage_module: &'a mut S
+    storage_module: &'a mut S,
+    data: [u8; OBJ_SIZE]
 }
 impl<'a, S: PersistentStorageModule, const OBJ_SIZE: usize> PersistentStorageReadBenchmark<'a, S, OBJ_SIZE> {
     pub fn new(storage_module: &'a mut S) -> Self {
         Self {
-            storage_module
+            storage_module,
+            data: [0; OBJ_SIZE]
         }
     }
 }
@@ -36,11 +38,9 @@ impl<'a, S: PersistentStorageModule, const OBJ_SIZE: usize> Benchmark<Persistent
     }
 
     fn execute<T: super::Timer>(&mut self) -> u32 {
-        let mut data = [0u8; OBJ_SIZE];
-        
         let timer = T::start();
 
-        black_box(self.storage_module.read(0, &mut data)).unwrap();
+        black_box(self.storage_module.read(0, black_box(&mut self.data))).unwrap();
 
         timer.stop()
     }

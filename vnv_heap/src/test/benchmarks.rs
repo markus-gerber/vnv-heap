@@ -57,6 +57,10 @@ struct DesktopTimer {
 }
 
 impl Timer for DesktopTimer {
+    fn get_ticks_per_ms() -> u32 {
+        1000
+    }
+
     #[inline]
     fn start() -> Self {
         Self {

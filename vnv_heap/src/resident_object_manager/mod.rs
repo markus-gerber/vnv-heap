@@ -91,6 +91,28 @@ impl<'a, 'b, A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManage
                     .unwrap()
                     .init(start_ref, resident_buffer.len())
             };
+
+        /*
+            // dirty way to test which object sizes can be allocated and which cannot
+            unsafe {
+                let x = guard.as_mut().unwrap();
+                seq_macro::seq!(I in 896..1024 {
+                    {
+                        match x.allocate(std::alloc::Layout::new::<ResidentObject<[u8; I]>>()) {
+                            Err(()) => {
+                                println!("{}: error, size: {}, align: {}", I, std::alloc::Layout::new::<ResidentObject<[u8; I]>>().size(), std::alloc::Layout::new::<ResidentObject<[u8; I]>>().align());
+                            },
+                            Ok(ptr) => {
+                                println!("{}: success, size: {}, align: {}", I, std::alloc::Layout::new::<ResidentObject<[u8; I]>>().size(), std::alloc::Layout::new::<ResidentObject<[u8; I]>>().align());
+                                x.deallocate(ptr, std::alloc::Layout::new::<ResidentObject<[u8; I]>>());
+                            }
+                        }
+
+                        
+                    }
+                });
+            }
+            */
         }
 
         let instance = ResidentObjectManager {
@@ -295,6 +317,108 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
 
         self.resident_object_count += 1;
         Ok(obj_ref)
+    }
+
+    pub(crate) fn unload_object<
+        T: Sized,
+        S: PersistentStorageModule,
+        N: NonResidentAllocatorModule,
+    >(
+        &mut self,
+        alloc_id: &AllocationIdentifier<T>,
+        non_resident_allocator: &mut N,
+        storage: &mut S,
+    ) -> Result<(), ()> {
+        let mut iter = self.resident_list.iter_mut();
+        while let Some(mut element) = iter.next() {
+            if element.get_element().inner.offset == alloc_id.offset {
+                // element found
+                {
+                    let element_ref = element.get_element();
+                    if element_ref.inner.ref_cnt != 0 {
+                        return Err(());
+                    }
+
+                }
+
+                unsafe { ResidentObject::<T>::unload_resident_object(element, storage, &mut self.heap, &mut self.remaining_dirty_size).expect("unloading should succeed") };
+                self.resident_object_count -= 1;
+
+                break;
+            }
+        }
+
+        return Ok(());
+    }
+
+    pub(crate) fn try_to_allocate<T, N: NonResidentAllocatorModule, S: PersistentStorageModule>(&mut self, data: T, offset: usize, non_resident_allocator: &mut N, storage: &mut S) -> Result<(), T> {
+        let dirty_size = size_of::<T>() + ResidentObjectMetadata::fresh_object_dirty_size();
+        if self.remaining_dirty_size < dirty_size {
+            // should avoid syncing
+            return Err(data);
+        }
+
+        if self.resident_object_count == self.resident_object_meta_backup.len() {
+            // acquire new slot for backup
+            let ptr =
+                non_resident_allocator.allocate(MetadataBackupList::item_layout(), storage);
+            let ptr = match ptr {
+                Ok(res) => res,
+                Err(_) => {
+                    return Err(data);
+                }
+            };
+            
+            let res = unsafe { self.resident_object_meta_backup.push(
+                ptr,
+                ResidentObjectMetadataBackup::new_unused(),
+                storage,
+            ) };
+            if let Err(()) = res {
+                return Err(data);
+            }
+        }
+
+        let obj_layout = Layout::new::<ResidentObject<T>>();
+        let guard = self.heap.try_lock().unwrap();
+        let res_ptr = unsafe { guard.as_mut().unwrap().allocate(obj_layout) };
+        let res_ptr = match res_ptr {
+            Ok(res) => res,
+            Err(_) => {
+                return Err(data);
+            }
+        };
+
+        self.remaining_dirty_size -= dirty_size;
+
+        // read data now and store it to the allocated region in memory
+        let ptr = res_ptr.as_ptr() as *mut ResidentObject<T>;
+
+        let mut metadata = ResidentObjectMetadata::new::<T>(offset);
+        metadata.inner.dirty_status.set_data_dirty(true);
+
+        unsafe { ptr.write(ResidentObject {
+            metadata,
+            data
+        }) };
+
+        {
+            // some checks and append to resident list
+            let obj_ref = unsafe { ptr.as_mut().unwrap() };
+
+            debug_assert_eq!(
+                dirty_size,
+                obj_ref.metadata.dirty_size(),
+                "Previously calculated dirty size should match the current/actual one"
+            );
+
+            unsafe { self.resident_list.push(&mut obj_ref.metadata) };
+        }
+
+        drop(guard);
+        self.resident_object_count += 1;
+
+        Ok(())
     }
 
     /// Makes the object non resident.

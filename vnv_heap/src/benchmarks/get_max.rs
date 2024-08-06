@@ -209,8 +209,6 @@ impl<
         // resident buffer should be completely filled with dirty objects by now
         // the new object has to sync and unload not needed objects
 
-        // TODO its worse too if some references are in use too
-
         let timer = T::start();
 
         let item_ref = black_box(self.object.get().unwrap());

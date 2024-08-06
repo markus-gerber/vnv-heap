@@ -46,9 +46,9 @@ impl<'a, 'b: 'a, A: AllocatorModule, M: ObjectManagementModule, S: PersistentSto
     pub fn new(heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M, S>) -> Self {
         let mut blockers = [0; 16];
         let bucket_size = max(
-            size_of::<ResidentObject<[u8; OBJ_SIZE]>>().next_power_of_two(),
+            size_of::<[u8; OBJ_SIZE]>().next_power_of_two(),
             max(
-                align_of::<ResidentObject<[u8; OBJ_SIZE]>>(),
+                align_of::<[u8; OBJ_SIZE]>(),
                 size_of::<usize>(),
             ),
         );
@@ -118,13 +118,14 @@ impl<
 
     #[inline]
     fn execute<T: Timer>(&mut self) -> u32 {
-        let item = self
+        let mut item = self
             .heap
             .allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE])
             .unwrap();
 
         {
             let heap_inner = self.heap.get_inner().borrow_mut();
+            // TODO check if the object bucket is calculated correctly
             assert!(
                 heap_inner.get_non_resident_allocator().get_free_list()[self.object_bucket_index]
                     .is_empty(),
@@ -132,9 +133,14 @@ impl<
             );
         }
 
+        {
+            item.unload().expect("should be unloaded");
+            assert!(!item.is_resident(), "item should not be resident");
+        }
+
         let timer = T::start();
 
-        black_box(drop(item));
+        black_box(drop(black_box(item)));
 
         let res = timer.stop();
 

@@ -23,7 +23,6 @@ fn test_persist_all_simple() {
 
     const BUFFER_SIZE: usize = 1200;
     let mut buffer = [0u8; BUFFER_SIZE];
-    let buffer_ptr = (&mut buffer[0]) as *mut u8;
 
     let heap = get_test_heap(
         "test_persist_all_simple",
@@ -143,7 +142,7 @@ fn test_persist_all_simple() {
 
     allocate!();
 
-    checked_persist(buffer_ptr, &mut objects, &mut check_states, &mut resident);
+    checked_persist(null_mut(), &mut objects, &mut check_states, &mut resident);
 
     for _ in 0..100 {
         allocate!();

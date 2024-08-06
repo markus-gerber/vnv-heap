@@ -74,6 +74,11 @@ impl<
         let mut heap = self.vnv_heap.borrow_mut();
         heap.is_resident(&self.allocation_identifier)
     }
+
+    pub fn unload(&mut self) -> Result<(), ()> {
+        let mut heap = self.vnv_heap.borrow_mut();
+        heap.unload_object(&self.allocation_identifier)    
+    }
 }
 
 impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementModule> Drop

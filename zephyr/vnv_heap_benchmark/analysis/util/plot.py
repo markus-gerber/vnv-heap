@@ -1,6 +1,9 @@
 # some utils that help with plotting the measurements
 
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
 
 def set_gird(grid_offset: int, max_x: int, ax):
     if max_x % grid_offset != 0:
@@ -12,3 +15,14 @@ def set_gird(grid_offset: int, max_x: int, ax):
 
     ax.set_xticks(major_ticks)
     ax.set_xticks(minor_ticks, minor=True)
+
+def save_plot(name: str):
+    plt.savefig(f"../figures/{name}.pdf", bbox_inches='tight')
+
+    if "VNV_HEAP_THESIS_DIR" in os.environ:
+        thesis_dir = os.environ["VNV_HEAP_THESIS_DIR"]
+        plt.savefig(f"{thesis_dir}/figures/plot_{name}.pdf", bbox_inches='tight')
+
+def set_theme(colors=3):
+    sns.set_theme()
+    sns.set_palette("mako", n_colors=colors)

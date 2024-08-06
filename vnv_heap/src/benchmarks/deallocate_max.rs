@@ -99,7 +99,7 @@ impl<
         {
             let mut inner = heap.get_inner().borrow_mut();
             let (storage, obj_manager, allocator) = inner.get_modules_mut();
-            assert_eq!(obj_manager.resident_object_count, 0);
+            assert_eq!(obj_manager.resident_object_count, 1);
 
             if obj_manager.resident_object_meta_backup.is_empty() {
                 let ptr = allocator
@@ -198,7 +198,7 @@ impl<
 
         let timer = T::start();
 
-        drop(black_box(obj));
+        black_box(drop(black_box(obj)));
 
         let res = timer.stop();
 
