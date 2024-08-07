@@ -83,7 +83,7 @@ pub fn run_all_benchmarks<
     const RESIDENT_CUTOFF_SIZE: usize = {
         if size_of::<usize>() == 8 {
             // desktop with File Storage Module
-            120
+            112
         } else if size_of::<usize>() == 4 {
             // zephyr with SPI Fram Storage module
             60
@@ -138,7 +138,7 @@ pub fn run_all_benchmarks<
             for_obj_size_impl!($index, $inner, 30);
 
             #[cfg(target_pointer_width = "64")]
-            for_obj_size_impl!($index, $inner, 26);
+            for_obj_size_impl!($index, $inner, 27);
         };
     }
 
