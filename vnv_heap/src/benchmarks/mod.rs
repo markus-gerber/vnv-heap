@@ -86,7 +86,7 @@ pub fn run_all_benchmarks<
             120
         } else if size_of::<usize>() == 4 {
             // zephyr with SPI Fram Storage module
-            64
+            60
         } else {
             panic!("uhhm");
         }
@@ -99,7 +99,9 @@ pub fn run_all_benchmarks<
     const MIN_OBJ_SIZE: usize = 0;
 
     // additional cost of linked list allocator (holes)
-    const ADDITIONAL_ALLOCATOR_COST: usize = 16;
+    // const ADDITIONAL_ALLOCATOR_COST: usize = 16;
+    const ADDITIONAL_ALLOCATOR_COST: usize = 0; // just for testing
+    
 
     const MAX_OBJ_SIZE: usize = {
         const BIG_OBJ: usize = get_total_resident_size::<[u8; BUF_SIZE]>();
@@ -133,7 +135,7 @@ pub fn run_all_benchmarks<
             // because of the size of the metadata
             // STEP_COUNT has a different value for different target platforms!
             #[cfg(target_pointer_width = "32")]
-            for_obj_size_impl!($index, $inner, 29);
+            for_obj_size_impl!($index, $inner, 30);
 
             #[cfg(target_pointer_width = "64")]
             for_obj_size_impl!($index, $inner, 26);
@@ -405,7 +407,7 @@ pub trait Benchmark<O: Serialize> {
 
         let res = BenchmarkRunResult::from_buffer(&options.result_buffer);
         println!(
-            "-> Finished {}: mean={}us, min={}us, max={}us",
+            "-> Finished {}: mean={}, min={}, max={}",
             self.get_name(),
             res.mean_latency,
             res.min_latency,

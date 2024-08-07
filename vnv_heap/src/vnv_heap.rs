@@ -15,7 +15,7 @@ use crate::{
     },
     persist_access_point::PersistAccessPoint,
     resident_object_manager::{
-        resident_list::ResidentList, MetadataBackupList, ResidentObjectManager,
+        resident_list::ResidentList, resident_object::ResidentObjectMetadata, MetadataBackupList, ResidentObjectManager
     },
     shared_persist_lock::SharedPersistLock,
     vnv_object::VNVObject,
@@ -31,6 +31,12 @@ static mut PERSIST_ACCESS_POINT: PersistAccessPoint = PersistAccessPoint::empty(
 /// For test environment we want to wait until a new heap can be created
 #[cfg(test)]
 static PERSIST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[derive(Debug)]
+pub struct LayoutInfo {
+    cutoff_layout: Layout,
+    resident_object_metadata: Layout,
+}
 
 /// Persists all existing heaps.
 ///
@@ -257,6 +263,13 @@ impl<
     #[cfg(feature = "benchmarks")]
     pub(crate) fn get_inner(&self) -> &RefCell<VNVHeapInner<'a, A, N, M>> {
         &self.inner
+    }
+
+    pub fn get_layout_info() -> LayoutInfo {
+        LayoutInfo {
+            resident_object_metadata: Layout::new::<ResidentObjectMetadata>(),
+            cutoff_layout: Layout::new::<ResidentBufPersistentStorage<A, S>>(),
+        }
     }
 }
 

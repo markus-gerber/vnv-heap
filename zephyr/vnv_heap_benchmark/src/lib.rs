@@ -28,6 +28,11 @@ pub extern "C" fn rust_main() {
     zephyr_logger::init(log::LevelFilter::Trace);
     let mut time: i64 = unsafe { helper_k_uptime_get() };
     
+    {
+        let layout_info = VNVHeap::<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, DefaultObjectManagementModule, SpiFramStorageModule>::get_layout_info();
+        println!("layout_info: {:?}", layout_info);
+    }
+
     run_all_benchmarks::<
         ZephyrTimer,
         SpiFramStorageModule,

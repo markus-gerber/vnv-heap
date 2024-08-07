@@ -11,7 +11,6 @@ use super::hole::HoleList;
 
 /// A fixed size heap backed by a linked list of free memory blocks.
 pub struct Heap {
-    used: usize,
     holes: HoleList,
 }
 
@@ -21,7 +20,6 @@ impl Heap {
     /// Creates an empty heap. All allocate calls will return `None`.
     pub const fn empty() -> Heap {
         Heap {
-            used: 0,
             holes: HoleList::empty(),
         }
     }
@@ -53,7 +51,6 @@ impl Heap {
     ///
     /// The provided memory range must be valid for the `'static` lifetime.
     pub unsafe fn init(&mut self, heap_bottom: *mut u8, heap_size: usize) {
-        self.used = 0;
         self.holes = HoleList::new(heap_bottom, heap_size);
     }
 
@@ -120,7 +117,6 @@ impl Heap {
     /// The provided memory range must be valid for the `'static` lifetime.
     pub unsafe fn new(heap_bottom: *mut u8, heap_size: usize) -> Heap {
         Heap {
-            used: 0,
             holes: HoleList::new(heap_bottom, heap_size),
         }
     }
@@ -150,7 +146,6 @@ impl Heap {
     pub fn allocate_first_fit(&mut self, layout: Layout) -> Result<NonNull<u8>, ()> {
         match self.holes.allocate_first_fit(layout) {
             Ok((ptr, aligned_layout)) => {
-                self.used += aligned_layout.size();
                 Ok(ptr)
             }
             Err(err) => Err(err),
@@ -163,7 +158,6 @@ impl Heap {
     pub unsafe fn allocate_at(&mut self, layout: Layout, ptr: *mut u8) -> Result<(), ()> {
         match self.holes.allocate_at(layout, ptr) {
             Ok(aligned_layout) => {
-                self.used += aligned_layout.size();
                 Ok(())
             }
             Err(err) => Err(err),
@@ -182,7 +176,7 @@ impl Heap {
     /// `ptr` must be a pointer returned by a call to the [`allocate_first_fit`] function with
     /// identical layout. Undefined behavior may occur for invalid arguments.
     pub unsafe fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) {
-        self.used -= self.holes.deallocate(ptr, layout).size();
+        let _ = self.holes.deallocate(ptr, layout);
     }
 
     /// Returns the bottom address of the heap.
@@ -209,16 +203,6 @@ impl Heap {
     /// over memory from [`bottom`][Self::bottom] to the address returned.
     pub fn top(&self) -> *mut u8 {
         unsafe { self.holes.top.add(self.holes.pending_extend as usize) }
-    }
-
-    /// Returns the size of the used part of the heap
-    pub fn used(&self) -> usize {
-        self.used
-    }
-
-    /// Returns the size of the free part of the heap
-    pub fn free(&self) -> usize {
-        self.size() - self.used
     }
 
     /// Extends the size of the heap by creating a new hole at the end.
