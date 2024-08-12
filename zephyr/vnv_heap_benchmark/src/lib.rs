@@ -49,10 +49,10 @@ pub extern "C" fn rust_main() {
     >(
         get_bench_heap,
         BenchmarkRunOptions {
-            cold_start: 5,
+            cold_start: 10,
             machine_name: "esp32c3",
-            repetitions: 5,
-            result_buffer: &mut [0; 5],
+            repetitions: 10,
+            result_buffer: &mut [0; 10],
         },
         /*RunAllBenchmarkOptions {
             run_deallocate_benchmarks: true,

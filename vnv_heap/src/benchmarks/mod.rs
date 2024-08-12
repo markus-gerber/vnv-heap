@@ -182,10 +182,13 @@ pub fn run_all_benchmarks<
         for_obj_size!(I, {
             handle_curr_iteration(&mut curr_iteration, iteration_count);
             const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
+            const METADATA_SIZE: usize = get_resident_size::<()>();
+            const BLOCKER_SIZE: usize = BUF_SIZE - METADATA_SIZE - RESIDENT_CUTOFF_SIZE;
+
             let mut buf = [0u8; BUF_SIZE];
             let res_size = buf.len();
             let mut heap = get_bench_heap(&mut buf, res_size);
-            let bench = AllocateCase1Benchmark::<A, M, S, SIZE>::new(&mut heap);
+            let bench = AllocateCase1Benchmark::<A, M, S, SIZE, BLOCKER_SIZE>::new(&mut heap);
             bench.run_benchmark::<TIMER>(&mut run_options);
         });
         for_obj_size!(I, {

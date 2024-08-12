@@ -64,6 +64,7 @@ impl<
                         // this is the biggest item, don't remove it but remove
                         // all items that are next
                         pop = true;
+                        // println!("the biggest bucket is {}", 2_i32.pow(i as u32));
                     } else {
                         blockers[i] = bucket.pop(storage).unwrap().unwrap();
                         assert!(bucket.is_empty());    
@@ -113,6 +114,28 @@ impl<
                 self.debug_obj.get().is_err(),
                 "Loading debug object should result in an error"
             );
+        }
+        {
+            let mut heap_inner = self.heap.get_inner().borrow_mut();
+            let (storage, resident, non_resident) = heap_inner.get_modules_mut();
+
+            unsafe { resident.resident_object_meta_backup.unsafe_remove_unused(storage, non_resident, 1) }
+
+            assert_eq!(resident.resident_object_count, 1);
+            assert_eq!(resident.resident_object_meta_backup.len(), 1);
+        }
+        {
+            let mut inner = self.heap.get_inner().borrow_mut();
+            let (_, _, allocator) = inner.get_modules_mut();
+            let free_list = allocator.get_free_list_mut();
+            let mut found = false;
+            for (i, bucket) in free_list.iter_mut().enumerate().rev() {
+                if !found && !bucket.is_empty() {
+                    found = true;
+                } else {
+                    assert!(bucket.is_empty(), "bucket {} should be empty", i);
+                }
+            }
         }
 
         let timer = T::start();

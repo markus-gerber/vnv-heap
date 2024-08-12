@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "counter_example",
     "desktop_benchmark",
     "desktop_persist",
     "desktop_playground",

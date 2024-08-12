@@ -3,11 +3,12 @@ use crate::modules::{
     nonresident_allocator::{
         AtomicPushOnlyNonResidentLinkedList, Iter,
         SharedAtomicLinkedListHeadPtr,
+        NonResidentAllocatorModule
     },
     persistent_storage::PersistentStorageModule,
 };
 use core::alloc::Layout;
-
+        
 pub(crate) struct MetadataBackupList {
     inner: AtomicPushOnlyNonResidentLinkedList<ResidentObjectMetadataBackup>,
     length: usize,
@@ -77,6 +78,23 @@ impl MetadataBackupList {
     #[inline]
     pub(crate) fn len(&self) -> usize {
         self.length
+    }
+
+    // DO NOT USE THIS EXCEPT FOR BENCHMARKS!
+    #[cfg(feature = "benchmarks")]
+    pub(crate) unsafe fn unsafe_remove_unused<S: PersistentStorageModule, N: NonResidentAllocatorModule>(&mut self, storage: &mut S, non_resident: &mut N, min: usize) {
+        if self.length <= min {
+            return;
+        }
+
+        while let Some(ptr) = self.inner.unsafe_remove_where(storage, |item| item.is_unused()) {
+            non_resident.deallocate(ptr, MetadataBackupList::item_layout(), storage).unwrap();
+            self.length -= 1;
+
+            if self.length <= min {
+                return;
+            }
+        }
     }
 }
 

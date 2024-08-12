@@ -436,6 +436,40 @@ impl<T: Sized> AtomicPushOnlyNonResidentLinkedList<T> {
             ptr: &self.head,
         }
     }
+
+    #[cfg(feature = "benchmarks")]
+    pub unsafe fn unsafe_remove_where<S: PersistentStorageModule>(&mut self, storage: &mut S, function: fn(T) -> bool) -> Option<usize> {
+        let mut prev = NEXT_NULL;
+        let mut curr = self.head.load(Ordering::SeqCst);
+
+        while curr != NEXT_NULL {
+            let curr_element:  NonResidentLinkedListItem<T> = read_storage_data(storage, curr).unwrap();
+
+            if function(curr_element.data) {
+                // remove current item
+                if prev == NEXT_NULL {
+                    // this is the first item in the list
+                    // so to remove it, we need to update the head
+                    self.head.store(curr_element.next, Ordering::SeqCst)
+                } else {
+                    // this is not the first item in the list
+                    // so we need to update the previous item, to remove it
+                    write_storage_data(storage, prev, &curr_element.next).unwrap();
+                }
+
+                // tell potential cache layers that this item is not needed anymore for now
+                storage.forget_region(curr, NonResidentLinkedList::<T>::total_item_size());
+
+                return Some(curr)
+            }
+
+            // advance
+            prev = curr;
+            curr = curr_element.next;
+        }
+
+        return None;
+    }
 }
 
 pub struct SharedAtomicLinkedListHeadPtr<'a, T> {

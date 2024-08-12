@@ -97,6 +97,12 @@ impl<
             drop(inner);
         }
 
+        {
+            // make sure backup item list is already created
+            let item = black_box(heap.allocate::<[u8; OBJ_SIZE]>(black_box([0u8; OBJ_SIZE]))).unwrap();
+            drop(item);
+        }
+
         Self {
             heap,
             blockers,
@@ -117,6 +123,10 @@ impl<'a, 'b: 'a, A: AllocatorModule, M: ObjectManagementModule, S: PersistentSto
     fn execute<T: Timer>(&mut self) -> u32 {
         {
             let heap_inner = self.heap.get_inner().borrow_mut();
+
+            assert_eq!(heap_inner.get_resident_object_manager().resident_object_count, 0);
+            assert!(heap_inner.get_resident_object_manager().resident_object_meta_backup.len() == 1);
+
             assert!(!heap_inner.get_non_resident_allocator().get_free_list()
                 [self.object_bucket_index]
                 .is_empty());
