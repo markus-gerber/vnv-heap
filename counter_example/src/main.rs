@@ -32,8 +32,7 @@ fn main() {
     > = VNVHeap::new(&mut buffer, storage, heap, config, |_, _| {}).unwrap();
 
     {
-        // allocate new unsigned 32-bit integer
-        // initial value is 17
+        // allocate new counter
         let mut obj = heap.allocate::<Counter>(Counter::new(0)).unwrap();
 
         {

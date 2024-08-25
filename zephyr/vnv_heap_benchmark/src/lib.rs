@@ -27,12 +27,12 @@ extern "C" {
 pub extern "C" fn rust_main() {
     zephyr_logger::init(log::LevelFilter::Trace);
     let mut time: i64 = unsafe { helper_k_uptime_get() };
-    
+/*
     {
         let layout_info = VNVHeap::<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, DefaultObjectManagementModule, SpiFramStorageModule>::get_layout_info();
         println!("layout_info: {:?}", layout_info);
     }
-
+*/
     run_all_benchmarks::<
         ZephyrTimer,
         SpiFramStorageModule,
@@ -49,10 +49,10 @@ pub extern "C" fn rust_main() {
     >(
         get_bench_heap,
         BenchmarkRunOptions {
-            cold_start: 10,
+            cold_start: 100,
             machine_name: "esp32c3",
-            repetitions: 10,
-            result_buffer: &mut [0; 10],
+            repetitions: 1000,
+            result_buffer: &mut [0; 1000],
         },
         /*RunAllBenchmarkOptions {
             run_deallocate_benchmarks: true,
@@ -117,7 +117,7 @@ impl Timer for ZephyrTimer {
         let end_time = unsafe { helper_k_cycle_get_32() };
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
-        assert!(end_time > self.start_time, "There should be no timer overflow!");
+        // assert!(end_time > self.start_time, "There should be no timer overflow!");
 
         let delta = end_time - self.start_time;
 

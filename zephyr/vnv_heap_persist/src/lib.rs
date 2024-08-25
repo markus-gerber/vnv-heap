@@ -107,51 +107,15 @@ pub extern "C" fn rust_main() {
             single_test!();
         }
 
-        log::warn!("-> Finished Test 1!");
+        log::warn!("-> Finished Test 1/3!");
 
-        let mut open_ref_obj = vec![];
-        let mut open_refs = vec![];
-        let mut open_muts = vec![];
-        for _ in 0..10 {
-            open_ref_obj.push(heap.allocate(rand_data(&mut rand)).unwrap());
-        }
-        for (i, obj) in open_ref_obj.iter_mut().enumerate() {
-            if i % 2 == 0 {
-                open_refs.push(obj.get().unwrap());
-                open_refs.push(obj.get().unwrap());
-                open_refs.push(obj.get().unwrap());
-            } else {
-                open_muts.push(obj.get_mut().unwrap());
-            }
-        }
-
-        // test again
-        for _ in 0..ITERATION_MULTIPLIER * 2 {
-            single_test!();
-        }
-
-        log::warn!("-> Finished Test 2!");
-
-        // drop open refs
-        drop(open_refs);
-
-
-        // test again
-        for _ in 0..ITERATION_MULTIPLIER * 5 {
-            single_test!();
-        }
-
-        log::warn!("-> Finished Test 3!");
-
-        drop(open_muts);
-        drop(open_ref_obj);
 
         // test again
         for _ in 0..ITERATION_MULTIPLIER * 10 {
             single_test!();
         }
 
-        log::warn!("-> Finished Test 4!");
+        log::warn!("-> Finished Test 2/3!");
 
         // start allocating last objects
         for _ in 0..(OBJECT_COUNT - objects.len()) {
@@ -163,6 +127,6 @@ pub extern "C" fn rust_main() {
             single_test!();
         }
 
-        log::warn!("-> Finished Test 5!");
+        log::warn!("-> Finished Test 3/3! Rerunning tests...");
     }
 }

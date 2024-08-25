@@ -20,8 +20,8 @@ atomic_int last_pressed;
 static void button_pressed(const struct device *port, struct gpio_callback *cb, gpio_port_pins_t pins) {
 	// debounce button press
 	uint32_t curr_time = (uint32_t) k_uptime_get();
-	if (curr_time - last_pressed < 300) {
-		last_pressed = curr_time;
+	if (curr_time - last_pressed < 500) {
+		// last_pressed = curr_time;
 		return;
 	}
 	last_pressed = curr_time;
