@@ -23,7 +23,12 @@ def save_plot(name: str):
         thesis_dir = os.environ["VNV_HEAP_THESIS_DIR"]
         plt.savefig(f"{thesis_dir}/figures/plot_{name}.pdf", bbox_inches='tight')
 
-def set_theme(colors=3, skip=0):
+def set_theme(colors=3, skip=0, ignore=-1):
     sns.set_theme()
-    sns.set_palette(palette=sns.color_palette("mako", n_colors=3)[skip:])
+
+    palette = sns.color_palette("mako", n_colors=colors)[skip:]
+    if ignore != -1:
+        palette.pop(ignore)
+
+    sns.set_palette(palette=palette)
 
