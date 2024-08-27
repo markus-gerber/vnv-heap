@@ -64,6 +64,7 @@ fn main() {
 
 // called once power failure is imminent
 // persist the state of all vNVHeaps in this application
+#[allow(unused)]
 fn persist() {
     // unsafe: this should not be called if another
     // call of this function did not finish yet

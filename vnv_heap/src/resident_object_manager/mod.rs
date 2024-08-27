@@ -322,11 +322,9 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
     pub(crate) fn unload_object<
         T: Sized,
         S: PersistentStorageModule,
-        N: NonResidentAllocatorModule,
     >(
         &mut self,
         alloc_id: &AllocationIdentifier<T>,
-        non_resident_allocator: &mut N,
         storage: &mut S,
     ) -> Result<(), ()> {
         let mut iter = self.resident_list.iter_mut();

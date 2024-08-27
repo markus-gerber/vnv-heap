@@ -26,7 +26,9 @@ pub struct AllocateCase1Benchmark<
 > {
     
     heap: &'a VNVHeap<'b, A, NonResidentBuddyAllocatorModule<16>, M, S>,
-    blocker: VNVObject<'a, 'b, [u8; BLOCKER_SIZE], A, NonResidentBuddyAllocatorModule<16>, M>,
+
+    // not accessed but still needed for blocking
+    _blocker: VNVObject<'a, 'b, [u8; BLOCKER_SIZE], A, NonResidentBuddyAllocatorModule<16>, M>,
     blockers: [usize; 16],
 }
 
@@ -49,7 +51,7 @@ impl<
             blocker.get().unwrap();
         }
         {
-            let mut inner = heap.get_inner().borrow_mut();
+            let inner = heap.get_inner().borrow_mut();
             assert_eq!(inner.get_resident_object_manager().resident_object_count, 1);
             assert_eq!(inner.get_resident_object_manager().resident_object_meta_backup.len(), 1);
         }
@@ -86,7 +88,7 @@ impl<
         Self {
             heap,
             blockers,
-            blocker
+            _blocker: blocker
         }
     }
 }

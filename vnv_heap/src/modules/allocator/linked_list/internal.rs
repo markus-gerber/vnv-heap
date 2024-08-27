@@ -145,7 +145,7 @@ impl Heap {
     #[allow(clippy::result_unit_err)]
     pub fn allocate_first_fit(&mut self, layout: Layout) -> Result<NonNull<u8>, ()> {
         match self.holes.allocate_first_fit(layout) {
-            Ok((ptr, aligned_layout)) => {
+            Ok((ptr, _aligned_layout)) => {
                 Ok(ptr)
             }
             Err(err) => Err(err),
@@ -157,7 +157,7 @@ impl Heap {
     /// `ptr` has to aligned correctly
     pub unsafe fn allocate_at(&mut self, layout: Layout, ptr: *mut u8) -> Result<(), ()> {
         match self.holes.allocate_at(layout, ptr) {
-            Ok(aligned_layout) => {
+            Ok(_aligned_layout) => {
                 Ok(())
             }
             Err(err) => Err(err),

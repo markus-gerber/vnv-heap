@@ -34,7 +34,9 @@ static PERSIST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[derive(Debug)]
 pub struct LayoutInfo {
+    #[allow(unused)]
     cutoff_layout: Layout,
+    #[allow(unused)]
     resident_object_metadata: Layout,
 }
 
@@ -399,7 +401,7 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
     }
 
     pub(crate) fn unload_object<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) -> Result<(), ()> {        
-        self.resident_object_manager.unload_object(identifier, &mut self.non_resident_allocator, &mut self.storage_reference)
+        self.resident_object_manager.unload_object(identifier, &mut self.storage_reference)
     }
 
     #[cfg(feature = "benchmarks")]

@@ -1,10 +1,9 @@
 use crate::{
     modules::{
         allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule, object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
-    }, resident_object_manager::get_total_resident_size, VNVHeap, VNVObject
+    }, VNVHeap, VNVObject
 };
 use core::hint::black_box;
-use std::array::from_fn;
 use serde::Serialize;
 
 use super::{Benchmark, ModuleOptions, Timer};
@@ -24,7 +23,7 @@ pub struct GetCase1Benchmark<
     S: PersistentStorageModule + 'static,
     const OBJ_SIZE: usize,
 > {
-    heap: &'a VNVHeap<'b, A, N, M, S>,
+    _heap: &'a VNVHeap<'b, A, N, M, S>,
     object: VNVObject<'a, 'b, [u8; OBJ_SIZE], A, N, M>,
 }
 
@@ -44,7 +43,7 @@ impl<
         let object = heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap();
 
         Self {
-            heap,
+            _heap: heap,
             object,
         }
     }

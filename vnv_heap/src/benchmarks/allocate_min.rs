@@ -5,7 +5,7 @@ use crate::{
         object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
     },
     resident_object_manager::{
-        resident_object::ResidentObject, resident_object_backup::ResidentObjectMetadataBackup,
+        resident_object_backup::ResidentObjectMetadataBackup,
         MetadataBackupList,
     },
     VNVHeap,

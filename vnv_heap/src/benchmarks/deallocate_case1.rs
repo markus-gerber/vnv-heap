@@ -1,22 +1,14 @@
 use crate::{
     modules::{
         allocator::AllocatorModule,
-        nonresident_allocator::{NonResidentAllocatorModule, NonResidentBuddyAllocatorModule},
+        nonresident_allocator::NonResidentBuddyAllocatorModule,
         object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
-    },
-    resident_object_manager::{
-        resident_object::ResidentObject, resident_object_backup::ResidentObjectMetadataBackup,
-        MetadataBackupList,
     },
     VNVHeap,
 };
 use core::hint::black_box;
 use serde::Serialize;
-use std::{
-    alloc::Layout,
-    cmp::max,
-    mem::{align_of, size_of},
-};
+
 
 use super::{Benchmark, ModuleOptions, Timer};
 
