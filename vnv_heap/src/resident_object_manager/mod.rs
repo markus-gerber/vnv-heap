@@ -339,7 +339,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
 
                 }
 
-                unsafe { ResidentObject::<T>::unload_resident_object(element, storage, &mut self.heap, &mut self.remaining_dirty_size).expect("unloading should succeed") };
+                unsafe { ResidentObject::<T>::unload_resident_object(element, storage, &mut self.heap, &mut self.remaining_dirty_size, false).expect("unloading should succeed") };
                 self.resident_object_count -= 1;
 
                 break;
@@ -437,9 +437,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         let mut iter_mut = self.resident_list.iter_mut();
         while let Some(mut curr) = iter_mut.next() {
             let found = {
-                // important: drop the item reference here
-                // so we can iterate over the dirty list later
-                // (without having two mutable references to the same data)
                 let item_ref = curr.get_element();
 
                 item_ref.inner.offset == alloc_id.offset
@@ -452,6 +449,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                         storage,
                         &mut self.heap,
                         &mut self.remaining_dirty_size,
+                        true
                     )?
                 }
 

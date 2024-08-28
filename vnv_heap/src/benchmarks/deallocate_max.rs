@@ -90,18 +90,20 @@ impl<
             get_total_resident_size::<[u8; BLOCKER_SIZE]>()
         );
 
-        let blocker = heap
+        let mut blocker = heap
             .allocate::<[u8; BLOCKER_SIZE]>([0u8; BLOCKER_SIZE])
             .unwrap();
+        blocker.unload().unwrap();
 
-        let debug_obj = heap.allocate::<()>(()).unwrap();
+
+        let mut debug_obj = heap.allocate::<()>(()).unwrap();
+        debug_obj.unload().unwrap();
 
         {
             let mut inner = heap.get_inner().borrow_mut();
             let (storage, obj_manager, allocator) = inner.get_modules_mut();
-            assert_eq!(obj_manager.resident_object_count, 1);
 
-            if obj_manager.resident_object_meta_backup.is_empty() {
+            if obj_manager.resident_object_meta_backup.len() == 1 {
                 let ptr = allocator
                     .allocate(MetadataBackupList::item_layout(), storage)
                     .unwrap();
@@ -113,6 +115,8 @@ impl<
                     )
                 }
                 .unwrap();
+            } else {
+                panic!("chaos");
             }
         }
 
@@ -125,7 +129,7 @@ impl<
                     .get_resident_object_manager()
                     .resident_object_meta_backup
                     .len(),
-                1
+                2
             );
 
             let (storage, _, allocator) = inner.get_modules_mut();
@@ -174,6 +178,27 @@ impl<
 
     #[inline]
     fn execute<T: Timer>(&mut self) -> u32 {
+        {
+            let mut inner = self.heap.get_inner().borrow_mut();
+            assert_eq!(
+                inner
+                    .get_resident_object_manager()
+                    .resident_object_meta_backup
+                    .len(),
+                2
+            );
+            let (_, _, allocator) = inner.get_modules_mut();
+            let free_list = allocator.get_free_list_mut();
+            let mut found = false;
+            for (i, bucket) in free_list.iter_mut().enumerate().rev() {
+                if !found && !bucket.is_empty() {
+                    found = true;
+                } else {
+                    assert!(bucket.is_empty(), "bucket {} should be empty", i);
+                }
+            }
+        }
+
         let obj = self.heap.allocate(DeallocateDropRequiredObject {
             inner: [0u8; OBJ_SIZE],
         });

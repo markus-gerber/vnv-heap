@@ -211,7 +211,7 @@ impl<
 
         let timer = T::start();
 
-        let item_ref = black_box(self.object.get().unwrap());
+        let item_ref = black_box(self.object.get_mut().unwrap());
         let res = timer.stop();
 
         drop(item_ref);

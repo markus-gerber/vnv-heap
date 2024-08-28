@@ -62,6 +62,7 @@ impl<T: Sized> ResidentObject<T> {
         storage: &mut S,
         allocator_module: &mut SharedPersistLock<*mut A>,
         dirty_size: &mut usize,
+        unsafe_no_sync: bool
     ) -> Result<(), ()> {
         debug_assert_eq!(
             delete_handle.get_element().inner.ref_cnt,
@@ -77,8 +78,10 @@ impl<T: Sized> ResidentObject<T> {
             let resident_obj: &mut ResidentObject<T> = resident_ptr.as_mut().unwrap();
             let prev_dirty_size = resident_obj.metadata.dirty_size();
 
-            // sync unsynced changes
-            resident_obj.persist_user_data(storage)?;
+            if !unsafe_no_sync {
+                // sync unsynced changes
+                resident_obj.persist_user_data(storage)?;
+            }
 
             prev_dirty_size
         };

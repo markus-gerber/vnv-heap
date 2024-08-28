@@ -152,7 +152,7 @@ pub fn run_all_benchmarks<
         iteration_count += 3 * STEP_COUNT;
     }
     if options.run_get_benchmarks {
-        iteration_count += 5 * STEP_COUNT;
+        iteration_count += 3 * STEP_COUNT;
     }
     if options.run_persistent_storage_benchmarks {
         iteration_count += 2 * STEP_COUNT;
@@ -250,6 +250,7 @@ pub fn run_all_benchmarks<
             let bench: GetMinBenchmark<A, NonResidentBuddyAllocatorModule<16>, M, SIZE> = GetMinBenchmark::new(&heap);
             bench.run_benchmark::<TIMER>(&mut run_options);
         });
+        /* 
         seq_macro::seq!(BLOCKERS_SIZE in 0..2 {
             {
                 for_obj_size!(I, {
@@ -267,7 +268,7 @@ pub fn run_all_benchmarks<
                     bench.run_benchmark::<TIMER>(&mut run_options);
                 });
             }
-        });
+        });*/
         for_obj_size!(I, {
             handle_curr_iteration(&mut curr_iteration, iteration_count);
 

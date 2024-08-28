@@ -164,7 +164,7 @@ For executing benchmarks on an ESP32-C3 with the Zephyr RTOS just run
 This will automatically start the benchmark and record the results in a json file.
 This json file can then be used in the JupyterNotebooks found in [zephyr/vnv_heap_benchmark/analysis](zephyr/vnv_heap_benchmark/analysis/).
 
-Benchmark results recorded for the ESP32-C3 with a Fujitsu MB85RS64V FRAM module and the Zephyr RTOS are stored in [this](zephyr/vnv_heap_benchmark/output/2024-08-27%2011-40-37%20full.json) JSON file.
+Benchmark results recorded for the ESP32-C3 with a Fujitsu MB85RS64V FRAM module and the Zephyr RTOS are stored in [this](zephyr/vnv_heap_benchmark/output/2024-08-28%2009-53-03%20full.json) JSON file.
 The finished plots look as follows:
 
 [**Raw Storage Latency**](zephyr/vnv_heap_benchmark/analysis/spi_fram.ipynb):
