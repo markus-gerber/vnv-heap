@@ -8,7 +8,37 @@ The following should give you an overview of the thesis, its implementation and 
 
 ### Abstract
 
+With the increasing popularity of embedded devices in Internet of Things (IoT) environments that
+do not provide a continuous power source, there is a great need for systems that can tolerate
+power failures and provide continuous progress. This is especially true for intermittently-powered
+systems, which suffer from frequent power failures as they do not harvest enough energy from the
+environment to continuously power their Microcontroller Units (MCUs). An established approach
+to achieve full system persistence, is to utilize the Operating System (OS) to persist the system’s
+state once a power failure is imminent. However, due to limited energy, in order to limit the
+amount of state that has to be saved at this point, the OS has to persist a portion of the state during
+runtime. While the OS can achieve this with its own data in a straightforward manner, adapting
+this to the user-land applications on low-end devices is more challenging. To solve this problem, I
+present the virtual Non-Volatile Heap (vNVHeap), which provides a heap for user-land applications
+to dynamically allocate objects that are persisted and restored by the vNVHeap. At runtime, it
+limits the amount of modified bytes by persisting necessary data. This limits the amount of data
+that has to be persisted before the system shuts down due to lack of energy and aids the OS to
+reach full system persistence efficiently. Furthermore, since most objects allocated by the heap
+are persisted anyway, the vNVHeap is able to unload currently unused objects, thus increasing the
+effective usable Random-Access Memory (RAM) for a given application. For providing an ergonomic
+and safe interface for this and for ensuring invariants, this work leverages Resource Acquisition Is
+Initialization (RAII) and the concept of borrowing. For evaluation, I implement the vNVHeap in
+Rust, deploy it on a low-end ESP32-C3 MCU with an Fujitsu MB85RS64V Ferroelectric Random
+Access Memory (FRAM) module and the Zephyr Real Time Operating System (RTOS) and evaluate
+allocating and deallocating objects and obtaining references. I show that the latency of the former
+two operations ranges from 53 μs to 7.3 ms for a 1 KiByte RAM buffer. With the former setup, I also
+show that applications can obtain references between 1.6 μs and an unlikely worst case of 2.5 ms.
+These results show that the vNVHeap operates highly efficiently while also aiding the OS to reach
+full system persistence in the event of a power failure and increasing the effective usable RAM of
+user-land applications.
+
 ### Evaluation Hardware
+
+I evaluated this implementation of the vNVHeap on an **ESP32-C3** with an **Fujitsu MB85RS64V FRAM module**, which look connected like this:
 
 ![esp32-c3 and fram image](./assets/esp32c3_w_fram.png)
 
@@ -136,9 +166,9 @@ To use the vNVHeap in an application follow these steps.
 
 More examples for using vNVHeap can be found in different directories:
 
-- [counter_example](counter_example/): Simple counter example.
+- [counter_example](counter_example/): Simple counter example. You can run it by executing `cargo run`.
 - [desktop_persist](desktop_persist/): Example how to use the persist interrupt to persist vNVHeap. Run [desktop_persist/run_checked_output.sh](desktop_persist/run_checked_output.sh) to automatically persist the vNVHeap multiple times a second.
-- [desktop_playground](desktop_playground/): Another simple usage example.
+- [desktop_playground](desktop_playground/): Another simple usage example. You can run it by executing `cargo run`.
 - [zephyr/vnv_heap_persist](zephyr/vnv_heap_persist/): A example that uses a button to trigger persists on an ESP32-C3 with a Fujitsu MB85RS64V FRAM module and Zephyr RTOS. Pin connections:
   - SCK: Pin 6
   - MISO: Pin 2
@@ -235,4 +265,32 @@ Of course these tests don't catch all cases, but give a first indication when a 
         ```
 
 2. Add a link to your `zephyr-rust` directory in the [zephyr](zephyr/) directory so it looks like this: `zephyr/zephyr-rust/[content of zephyr-rust]`
-3. *Optional*: If you attach an ESP32-C3 with the MB85RS64V FRAM in [this configuration](#further-examples), you should now be able to run the pre-defined scripts e.g. `run_debug.sh`, `run_release.sh`. Use `FLASH=0` to only compile the code and prevent to flash it.
+3. *[Optional]*: Only necessary if you want to run this on an ESP32-C3
+    1. Enable atomics for the target by editing the file in `zephyr-rust/rust/tagets/riscv32imc-unknown-zephyr-elf.json`. Now set `atomic-cas` to `true` and `target-pointer-width` to `32`. The contents of the file should now look like this:
+
+        ```json
+        {
+            "arch": "riscv32",
+            "atomic-cas": true,
+            "cpu": "generic-rv32",
+            "data-layout": "e-m:e-p:32:32-i64:64-n32-S128",
+            "eh-frame-header": false,
+            "emit-debug-gdb-scripts": false,
+            "features": "+m,+c",
+            "linker": "rust-lld",
+            "linker-flavor": "ld.lld",
+            "llvm-target": "riscv32",
+            "max-atomic-width": 32,
+            "panic-strategy": "abort",
+            "relocation-model": "static",
+            "target-pointer-width": "32",
+            "target-family": "zephyr",
+            "os": "zephyr",
+            "position-independent-executables": "false",
+            "dynamic-linking": "false",
+            "has-thread-local": "false"
+        }
+        ```
+
+    2. If you now connect an ESP32-C3 you should now be able to run the pre-defined scripts e.g. `run_debug.sh`, `run_release.sh`. Use `FLASH=0` to only compile the code and to disable flashing it.
+    3. Additionally, if you attach an MB85RS64V FRAM module as in [this configuration](#further-examples) you can run the pre-defined benchmarks in [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/) yourself. A easy way to do this is to execute the `run_benchmark.sh` script.
