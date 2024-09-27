@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-def set_gird(grid_offset: int, max_x: int, ax):
+def set_grid(grid_offset: int, max_x: int, ax):
     if max_x % grid_offset != 0:
         max_x = (max_x / grid_offset) * grid_offset
         max_x += grid_offset
