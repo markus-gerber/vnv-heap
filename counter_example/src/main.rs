@@ -1,20 +1,31 @@
 use vnv_heap::{
     modules::{
-        allocator::LinkedListAllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, object_management::DefaultObjectManagementModule, persistent_storage::FilePersistentStorageModule
-    }, vnv_persist_all, VNVConfig, VNVHeap
+        allocator::LinkedListAllocatorModule,
+        nonresident_allocator::NonResidentBuddyAllocatorModule,
+        object_management::DefaultObjectManagementModule,
+        persistent_storage::FilePersistentStorageModule,
+    },
+    vnv_persist_all, VNVConfig, VNVHeap,
 };
 
 struct Counter {
-    val: u32
+    val: u32,
 }
 
 impl Counter {
-    fn new(initial_value: u32) -> Self { Self { val: initial_value } }
-    fn increase(&mut self) { self.val += 1; }
-    fn increase_by(&mut self, inc: u32) { self.val += inc; }
-    fn get_val(&self) -> u32 { self.val }
+    fn new(initial_value: u32) -> Self {
+        Self { val: initial_value }
+    }
+    fn increase(&mut self) {
+        self.val += 1;
+    }
+    fn increase_by(&mut self, inc: u32) {
+        self.val += inc;
+    }
+    fn get_val(&self) -> u32 {
+        self.val
+    }
 }
-
 
 fn main() {
     let storage = FilePersistentStorageModule::new("test.data".to_string(), 4096).unwrap();
@@ -28,7 +39,7 @@ fn main() {
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
         DefaultObjectManagementModule,
-        FilePersistentStorageModule
+        FilePersistentStorageModule,
     > = VNVHeap::new(&mut buffer, storage, heap, config, |_, _| {}).unwrap();
 
     {
@@ -58,7 +69,6 @@ fn main() {
             let obj_ref = obj.get().unwrap();
             println!("counter: {}", obj_ref.get_val());
         } // implicit drop of immutable reference: object could be unloaded
-
     } // implicit drop of obj1: free memory
 }
 

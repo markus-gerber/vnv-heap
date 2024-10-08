@@ -1,22 +1,27 @@
-
-extern crate zephyr_macros;
 extern crate zephyr;
-extern crate zephyr_logger;
 extern crate zephyr_core;
+extern crate zephyr_logger;
+extern crate zephyr_macros;
 
-use std::{
-    array,
-    ptr::slice_from_raw_parts_mut,
-};
+use std::{array, ptr::slice_from_raw_parts_mut};
 
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
 
 use spi_fram_storage::SpiFramStorageModule;
-use vnv_heap::{vnv_persist_all, VNVConfig, VNVHeap, modules::{nonresident_allocator::NonResidentBuddyAllocatorModule, allocator::LinkedListAllocatorModule, object_management::DefaultObjectManagementModule}};
+use vnv_heap::{
+    modules::{
+        allocator::LinkedListAllocatorModule,
+        nonresident_allocator::NonResidentBuddyAllocatorModule,
+        object_management::DefaultObjectManagementModule,
+    },
+    vnv_persist_all, VNVConfig, VNVHeap,
+};
 
 #[no_mangle]
 pub extern "C" fn persist() {
-    unsafe { vnv_persist_all(); }
+    unsafe {
+        vnv_persist_all();
+    }
 }
 
 #[no_mangle]
@@ -29,32 +34,42 @@ pub extern "C" fn rust_main() {
         array::from_fn(|_| rand.next_u32() as u8)
     }
 
+    // configure vNVHeap
     let storage = unsafe { SpiFramStorageModule::new() }.unwrap();
-    
+
     let config = VNVConfig {
-        max_dirty_bytes: 600
+        max_dirty_bytes: 600,
     };
     let mut buffer = [0u8; 1000];
-    
+
+    // init vNVHeap
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
         DefaultObjectManagementModule,
-        SpiFramStorageModule
-    > = VNVHeap::new(&mut buffer, storage, LinkedListAllocatorModule::new(), config, |base_ptr, size| {
-        // TODO: is printing safe to communicate with UART? If not: make it safe
-	    print!("clearing buffer... ");
-        
-        let buffer = unsafe { slice_from_raw_parts_mut(base_ptr, size).as_mut() }.unwrap();
-        buffer.fill(0);
+        SpiFramStorageModule,
+    > = VNVHeap::new(
+        &mut buffer,
+        storage,
+        LinkedListAllocatorModule::new(),
+        config,
+        |base_ptr, size| {
+            print!("clearing buffer... ");
 
-        // TODO: is printing safe to communicate with UART? If not: make it safe
-	    println!("ok");
-    }).unwrap();
+            // clear vNVHeap's managed memory region
+            let buffer = unsafe {
+                slice_from_raw_parts_mut(base_ptr, size).as_mut()
+            }.unwrap();
+            buffer.fill(0);
+
+            println!("ok");
+        },
+    )
+    .unwrap();
 
     const SEED: u64 = 5446535461589659585;
     const OBJECT_COUNT: usize = 200;
-    const ITERATION_MULTIPLIER: usize = 1000;
+    const ITERATION_MULTIPLIER: usize = 5000;
 
     println!("starting tests...");
     loop {
@@ -62,7 +77,7 @@ pub extern "C" fn rust_main() {
 
         let mut objects = vec![];
         let mut check_states = vec![];
-        
+
         macro_rules! allocate {
             () => {
                 let data = rand_data(&mut rand);
@@ -80,7 +95,7 @@ pub extern "C" fn rust_main() {
                     // get mut and change data
                     let mut mut_ref = objects[i].get_mut().unwrap();
                     assert_eq!(*mut_ref, check_states[i]);
-                    
+
                     let data = rand_data(&mut rand);
                     *mut_ref = data;
                     check_states[i] = data;
@@ -96,9 +111,8 @@ pub extern "C" fn rust_main() {
             };
         }
 
-        
         // start allocating some first objects
-        for _ in 0..OBJECT_COUNT/3 {
+        for _ in 0..OBJECT_COUNT / 3 {
             allocate!();
         }
 
@@ -108,7 +122,6 @@ pub extern "C" fn rust_main() {
         }
 
         log::warn!("-> Finished Test 1/3!");
-
 
         // test again
         for _ in 0..ITERATION_MULTIPLIER * 10 {
