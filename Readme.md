@@ -254,18 +254,26 @@ Of course these tests don't catch all cases, but give a first indication when a 
 
 ## Setting up Zephyr
 
-1. Follow the installation instructions of [zephyr-rust](https://github.com/tylerwhall/zephyr-rust/tree/b0dbd3a1b2fe80363b802c01d5891121151b4732). Notes:
-    - It is important to activate the zephyr environment every time you work with it. If you use distrobox you can simple add a similar line `source zephyrproject/zephyr/zephyr-env.sh` to your `.bashrc` script.
+1. Follow the installation instructions of [zephyr-rust](https://github.com/tylerwhall/zephyr-rust/tree/ff51ff709f79b2adbcbd0c34644eab59bce0dc11) at commit *ff51ff709f79b2adbcbd0c34644eab59bce0dc11*. This requires Rust *1.75.0* and Zephyr *3.7.0*. Notes:
+    - It is important to activate the zephyr environment every time you work with it.
     - Also make sure that your `~/.zephyrrc` file contains similar content:
 
         ```bash
-        export ZEPHYR_EXTRA_MODULES=/home/markus/Distrobox/zephyrbox/zephyr-rust
+        export ZEPHYR_EXTRA_MODULES=~/zephyr-rust
         export WEST_BASE=~/zephyrproject
         export ZEPHYR_BASE=~/zephyrproject/zephyr
         ```
 
 2. Add a link to your `zephyr-rust` directory in the [zephyr](zephyr/) directory so it looks like this: `zephyr/zephyr-rust/[content of zephyr-rust]`
-3. *[Optional]*: Only necessary if you want to run this on an ESP32-C3
+3. Add following lines to the contents of `rust/zephyr-sys/wrapper.h` in your `zehpyr-rust` directory (this will enable the generation of Rust bindings for the SPI interfaces):
+
+    ```c
+    #ifdef CONFIG_SPI
+    #include <zephyr/drivers/spi.h>
+    #endif
+    ```
+
+4. *[Optional]*: Only necessary if you want to run this on an ESP32-C3. (*Explanation*: These steps are necessary because the vNV-Heap requires atomics, but the ESP32-C3 does not provide the "a" cpu extension as it only contains a single RISC-V core. However, atomics can be "simulated" solely by turning off interrupts until an atomic operation is finished.)
     1. Enable atomics for the target by editing the file in `zephyr-rust/rust/tagets/riscv32imc-unknown-zephyr-elf.json`. Now set `atomic-cas` to `true` and `target-pointer-width` to `32`. The contents of the file should now look like this:
 
         ```json
