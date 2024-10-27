@@ -33,14 +33,14 @@ fn main() {
         max_dirty_bytes: 1024,
     };
     let mut buffer = [0u8; 2048];
-    let heap = LinkedListAllocatorModule::new();
+    let alloc_module = LinkedListAllocatorModule::new();
 
     let heap: VNVHeap<
         LinkedListAllocatorModule,
         NonResidentBuddyAllocatorModule<16>,
         DefaultObjectManagementModule,
         FilePersistentStorageModule,
-    > = VNVHeap::new(&mut buffer, storage, heap, config, |_, _| {}).unwrap();
+    > = VNVHeap::new(&mut buffer, storage, alloc_module, config, |_, _| {}).unwrap();
 
     {
         // allocate new counter

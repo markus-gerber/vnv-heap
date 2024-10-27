@@ -2,13 +2,15 @@ use super::ResidentObjectMetadataBackup;
 use crate::modules::{
     nonresident_allocator::{
         AtomicPushOnlyNonResidentLinkedList, Iter,
-        SharedAtomicLinkedListHeadPtr,
-        NonResidentAllocatorModule
+        SharedAtomicLinkedListHeadPtr
     },
     persistent_storage::PersistentStorageModule,
 };
 use core::alloc::Layout;
-        
+
+#[cfg(feature = "benchmarks")]
+use crate::modules::nonresident_allocator::NonResidentAllocatorModule;
+
 pub(crate) struct MetadataBackupList {
     inner: AtomicPushOnlyNonResidentLinkedList<ResidentObjectMetadataBackup>,
     length: usize,
