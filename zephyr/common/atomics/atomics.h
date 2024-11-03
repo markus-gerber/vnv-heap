@@ -4,11 +4,11 @@
 #include <stdint.h>
 
 #define _ATOMIC_ENTER_CRITICAL() ({ \
-    int key = arch_irq_lock(); \
+    int key = irq_lock(); \
     key; \
 })
 
-#define _ATOMIC_EXIT_CRITICAL(key)  arch_irq_unlock(key);	
+#define _ATOMIC_EXIT_CRITICAL(key)  irq_unlock(key);	
 
 
 #ifdef __clang__

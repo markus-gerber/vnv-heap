@@ -21,6 +21,8 @@ extern "C" {
     pub fn helper_k_cycle_get_32() -> u32;
     pub fn helper_sys_clock_hw_cycles_per_sec() -> u32;
     pub fn helper_k_uptime_get() -> i64;
+    pub fn helper_irq_lock() -> u64;
+    pub fn helper_irq_unlock(key: u64);
 }
 
 #[no_mangle]
@@ -91,6 +93,7 @@ fn measure_timer() {
 
 struct ZephyrTimer {
     start_time: u32,
+    irq_key: u64
 }
 
 impl Timer for ZephyrTimer {
@@ -101,10 +104,12 @@ impl Timer for ZephyrTimer {
 
     #[inline]
     fn start() -> Self {
-        std::thread::sleep(std::time::Duration::from_micros(1));
+        let irq_key = unsafe { helper_irq_lock() };
+
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
         let obj = Self {
             start_time: unsafe { helper_k_cycle_get_32() },
+            irq_key
         };
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
@@ -118,6 +123,8 @@ impl Timer for ZephyrTimer {
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
         // assert!(end_time > self.start_time, "There should be no timer overflow!");
+
+        unsafe { helper_irq_unlock(self.irq_key) };
 
         let delta = end_time - self.start_time;
 

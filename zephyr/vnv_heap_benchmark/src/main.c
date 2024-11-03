@@ -24,6 +24,15 @@ int64_t helper_k_uptime_get() {
 	return k_uptime_get();
 }
 
+uint64_t helper_irq_lock() {
+	int key = irq_lock();
+	return key;
+}
+
+void helper_irq_unlock(uint64_t key) {
+	irq_unlock(key);
+}
+
 void main(void) {
 	rust_main();
 }
