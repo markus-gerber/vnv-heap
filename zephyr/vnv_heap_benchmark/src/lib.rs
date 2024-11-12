@@ -23,6 +23,7 @@ extern "C" {
     pub fn helper_k_uptime_get() -> i64;
     pub fn helper_irq_lock() -> u64;
     pub fn helper_irq_unlock(key: u64);
+    pub fn Cache_Invalidate_ICache_All();
 }
 
 #[no_mangle]
@@ -51,7 +52,7 @@ pub extern "C" fn rust_main() {
     >(
         get_bench_heap,
         BenchmarkRunOptions {
-            cold_start: 100,
+            cold_start: 0,
             machine_name: "esp32c3",
             repetitions: 1000,
             result_buffer: &mut [0; 1000],
@@ -105,7 +106,7 @@ impl Timer for ZephyrTimer {
     #[inline]
     fn start() -> Self {
         let irq_key = unsafe { helper_irq_lock() };
-
+        unsafe { Cache_Invalidate_ICache_All(); }
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
         let obj = Self {
             start_time: unsafe { helper_k_cycle_get_32() },
