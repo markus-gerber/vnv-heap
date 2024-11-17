@@ -405,6 +405,7 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
     }
 
     #[cfg(feature = "benchmarks")]
+    #[allow(unused)]
     pub(crate) fn get_storage_module(&mut self) -> &mut SharedStorageReference<'a, 'a> {
         &mut self.storage_reference
     }

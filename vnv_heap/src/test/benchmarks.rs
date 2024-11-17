@@ -2,34 +2,18 @@ use std::time::Instant;
 
 use crate::{
     benchmarks::{run_all_benchmarks, BenchmarkRunOptions, RunAllBenchmarkOptions, Timer},
-    modules::{
-        allocator::LinkedListAllocatorModule,
-        nonresident_allocator::NonResidentBuddyAllocatorModule,
-        object_management::DefaultObjectManagementModule,
-        persistent_storage::FilePersistentStorageModule,
-    },
-    VNVHeap,
+    modules::persistent_storage::FilePersistentStorageModule,
 };
 
-use super::get_test_heap;
+use super::get_test_storage;
 
 #[test]
 fn test_benchmarks() {
     run_all_benchmarks::<
         DesktopTimer,
         FilePersistentStorageModule,
-        DefaultObjectManagementModule,
-        fn(
-            &mut [u8],
-            usize,
-        ) -> VNVHeap<
-            LinkedListAllocatorModule,
-            NonResidentBuddyAllocatorModule<16>,
-            DefaultObjectManagementModule,
-            FilePersistentStorageModule
-        >,
+        _
     >(
-        get_bench_heap,
         BenchmarkRunOptions {
             cold_start: 0,
             machine_name: "desktop",
@@ -37,19 +21,12 @@ fn test_benchmarks() {
             result_buffer: &mut [0; 10],
         },
         RunAllBenchmarkOptions::all(),
+        get_storage
     );
 }
 
-fn get_bench_heap(
-    buf: &mut [u8],
-    max_dirty: usize,
-) -> VNVHeap<
-    LinkedListAllocatorModule,
-    NonResidentBuddyAllocatorModule<16>,
-    DefaultObjectManagementModule,
-    FilePersistentStorageModule
-> {
-    get_test_heap("test_benchmarks", 4096 * 4, buf, max_dirty, |_, _| {})
+fn get_storage() -> FilePersistentStorageModule {
+    get_test_storage("test.data", 4096 * 4)
 }
 
 struct DesktopTimer {

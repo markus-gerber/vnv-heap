@@ -7,10 +7,7 @@ use vnv_heap::{
         BenchmarkRunOptions,
         RunAllBenchmarkOptions, Timer,
     },
-    modules::{
-        allocator::LinkedListAllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, object_management::DefaultObjectManagementModule, persistent_storage::FilePersistentStorageModule
-    },
-    VNVConfig, VNVHeap,
+    modules::persistent_storage::FilePersistentStorageModule,
 };
 
 struct DesktopTimer {
@@ -45,18 +42,8 @@ fn main() {
     run_all_benchmarks::<
         DesktopTimer,
         FilePersistentStorageModule,
-        DefaultObjectManagementModule,
-        fn(
-            &mut [u8],
-            usize,
-        ) -> VNVHeap<
-            LinkedListAllocatorModule,
-            NonResidentBuddyAllocatorModule<16>,
-            DefaultObjectManagementModule,
-            FilePersistentStorageModule
-        >,
+        _
     >(
-        get_bench_heap,
         BenchmarkRunOptions {
             cold_start: 0,
             machine_name: "desktop",
@@ -69,30 +56,11 @@ fn main() {
             run_long_persistent_storage_benchmarks: true,
             ..Default::default()
         }*/
-        RunAllBenchmarkOptions::all()
+        RunAllBenchmarkOptions::all(),
+        get_storage,
     );
 }
 
-fn get_bench_heap(
-    buf: &mut [u8],
-    max_dirty: usize,
-) -> VNVHeap<
-    LinkedListAllocatorModule,
-    NonResidentBuddyAllocatorModule<16>,
-    DefaultObjectManagementModule,
-    FilePersistentStorageModule
-> {
-    let storage = FilePersistentStorageModule::new("test.data".to_string(), 4096 * 4).unwrap();
-    let config = VNVConfig {
-        max_dirty_bytes: max_dirty,
-    };
-
-    let heap: VNVHeap<
-        LinkedListAllocatorModule,
-        NonResidentBuddyAllocatorModule<16>,
-        DefaultObjectManagementModule,
-        FilePersistentStorageModule
-    > = VNVHeap::new(buf, storage, LinkedListAllocatorModule::new(), config, |_, _| {}).unwrap();
-
-    heap
+fn get_storage() -> FilePersistentStorageModule {
+    FilePersistentStorageModule::new("test.data".into(), 4096 * 4).unwrap()
 }

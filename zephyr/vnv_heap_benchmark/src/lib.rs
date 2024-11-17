@@ -8,14 +8,6 @@ use spi_fram_storage::SpiFramStorageModule;
 use vnv_heap::benchmarks::{
     BenchmarkRunOptions, Timer, run_all_benchmarks, RunAllBenchmarkOptions
 };
-use vnv_heap::{
-    modules::{
-        allocator::LinkedListAllocatorModule,
-        nonresident_allocator::NonResidentBuddyAllocatorModule,
-        object_management::DefaultObjectManagementModule
-    },
-    VNVConfig, VNVHeap,
-};
 
 extern "C" {
     pub fn helper_k_cycle_get_32() -> u32;
@@ -39,30 +31,21 @@ pub extern "C" fn rust_main() {
     run_all_benchmarks::<
         ZephyrTimer,
         SpiFramStorageModule,
-        DefaultObjectManagementModule,
-        fn(
-            &mut [u8],
-            usize,
-        ) -> VNVHeap<
-            LinkedListAllocatorModule,
-            NonResidentBuddyAllocatorModule<16>,
-            DefaultObjectManagementModule,
-            SpiFramStorageModule
-        >,
+        _
     >(
-        get_bench_heap,
         BenchmarkRunOptions {
             cold_start: 0,
             machine_name: "esp32c3",
-            repetitions: 1000,
-            result_buffer: &mut [0; 1000],
+            repetitions: 10,
+            result_buffer: &mut [0; 10],
         },
         /*RunAllBenchmarkOptions {
             run_deallocate_benchmarks: true,
         //    run_persistent_storage_benchmarks: true,
             ..Default::default()
         },*/
-        RunAllBenchmarkOptions::all()
+        RunAllBenchmarkOptions::all(),
+        get_storage
     );
 
     time = unsafe { helper_k_uptime_get() } - time; 
@@ -74,6 +57,7 @@ pub extern "C" fn rust_main() {
     println!("[BENCH-STATUS] Finished in {}h {}m {}s", hours, mins, secs);
 }
 
+#[allow(unused)]
 fn measure_timer() {
     let mut x = [0u32; 1000];
     for _ in 0..100 { 
@@ -123,8 +107,6 @@ impl Timer for ZephyrTimer {
         let end_time = unsafe { helper_k_cycle_get_32() };
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
 
-        // assert!(end_time > self.start_time, "There should be no timer overflow!");
-
         unsafe { helper_irq_unlock(self.irq_key) };
 
         let delta = end_time - self.start_time;
@@ -133,14 +115,6 @@ impl Timer for ZephyrTimer {
     }
 }
 
-fn get_bench_heap(
-    buf: &mut [u8],
-    max_dirty: usize,
-) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, DefaultObjectManagementModule, SpiFramStorageModule> {
-    let storage = unsafe { SpiFramStorageModule::new() }.unwrap();
-    let config = VNVConfig {
-        max_dirty_bytes: max_dirty,
-    };
-
-    VNVHeap::new(buf, storage, LinkedListAllocatorModule::new(), config, |_, _| {}).unwrap()
+fn get_storage() -> SpiFramStorageModule {
+    unsafe { SpiFramStorageModule::new() }.unwrap()
 }

@@ -80,8 +80,8 @@ impl<T> Drop for SharedPersistGuard<'_, '_, T> {
 impl<T: Clone> SharedPersistLock<'_, T> {
     pub(crate) fn try_lock_clone(&self) -> Option<Self> {
         self.try_lock().map(|guard| Self {
-            persist_queued: self.persist_queued.clone(),
-            lock: self.lock.clone(),
+            persist_queued: self.persist_queued,
+            lock: self.lock,
             inner: UnsafeCell::new(guard.obj_ref.clone()),
         })
     }
