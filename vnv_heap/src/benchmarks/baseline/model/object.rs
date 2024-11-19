@@ -1,6 +1,5 @@
 use std::{
-    cell::{RefCell, RefMut},
-    ops::{Deref, DerefMut},
+    cell::{RefCell, RefMut}, ops::{Deref, DerefMut}
 };
 
 use super::{memory_manager::MemoryManagerInner, AllocatorModule, PersistentStorageModule};

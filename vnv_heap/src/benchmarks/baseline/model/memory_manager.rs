@@ -54,7 +54,7 @@ impl<'a, const BUCKET_SIZE: usize, A: AllocatorModule, S: PersistentStorageModul
         self.inner.borrow().bucket_count
     }
 
-    pub(crate) fn get_inner(&mut self) -> RefMut<'_, MemoryManagerInner<'a, BUCKET_SIZE, A, S>> {
+    pub(crate) fn get_inner(&self) -> RefMut<'_, MemoryManagerInner<'a, BUCKET_SIZE, A, S>> {
         self.inner.borrow_mut()
     }
 }

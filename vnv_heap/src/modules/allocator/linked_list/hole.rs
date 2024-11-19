@@ -604,6 +604,9 @@ impl HoleList {
         
         aligned_layout
     }
+
+    #[cfg(debug_assertions)]
+    #[allow(unused)]
     pub(crate) fn debug(&mut self) {
         if let Some(cursor) = self.cursor() {
             let mut cursor = cursor;

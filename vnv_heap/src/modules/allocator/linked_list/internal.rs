@@ -226,6 +226,12 @@ impl Heap {
     pub unsafe fn extend(&mut self, by: usize) {
         self.holes.extend(by);
     }
+
+    #[cfg(debug_assertions)]
+    #[allow(unused)]
+    pub fn debug(&mut self) {
+        self.holes.debug();
+    }
 }
 
 /// Align downwards. Returns the greatest x with alignment `align`

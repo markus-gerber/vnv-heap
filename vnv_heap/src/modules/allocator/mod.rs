@@ -22,6 +22,10 @@ pub trait AllocatorModule {
 
     /// Allocates `layout` at the location of `ptr`
     unsafe fn allocate_at(&mut self, layout: Layout, ptr: *mut u8) -> Result<(), ()>;
+
+    #[cfg(debug_assertions)]
+    #[allow(unused)]
+    fn debug(&mut self);
 }
 
 #[cfg(test)]

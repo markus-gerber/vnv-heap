@@ -31,6 +31,12 @@ impl AllocatorModule for LinkedListAllocatorModule {
     unsafe fn allocate_at(&mut self, layout: Layout, ptr: *mut u8) -> Result<(), ()> {
         self.inner.allocate_at(layout, ptr)
     }
+
+    #[cfg(debug_assertions)]
+    #[allow(unused)]
+    fn debug(&mut self) {
+        self.inner.debug();
+    }
 }
 
 impl LinkedListAllocatorModule {

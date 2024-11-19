@@ -31,6 +31,12 @@ impl<const ORDER: usize> AllocatorModule for BuddyAllocatorModule<ORDER> {
     unsafe fn allocate_at(&mut self, layout: Layout, ptr: *mut u8) -> Result<(), ()> {
         self.inner.alloc_at(layout, ptr)
     }
+
+    #[cfg(debug_assertions)]
+    #[allow(unused)]
+    fn debug(&mut self) {
+
+    }
 }
 
 impl<const ORDER: usize> BuddyAllocatorModule<ORDER> {
