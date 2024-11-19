@@ -8,11 +8,20 @@ mod baseline_get_min;
 mod baseline_get_max;
 mod baseline_get_min_max;
 mod baseline_get_max_min;
+mod baseline_allocate_min;
+mod baseline_allocate_max;
+mod baseline_allocate_min_max;
+mod baseline_allocate_max_min;
 
 pub use baseline_get_min::*;
 pub use baseline_get_max::*;
 pub use baseline_get_min_max::*;
 pub use baseline_get_max_min::*;
+pub use baseline_allocate_min::*;
+pub use baseline_allocate_max::*;
+pub use baseline_allocate_min_max::*;
+pub use baseline_allocate_max_min::*;
+
 use model::MemoryManager;
 
 pub use super::*;
@@ -52,7 +61,7 @@ impl BenchmarkRunner for BaselineBenchmarkRunner {
             iteration_count += 4 * STEP_COUNT;
         }
         if options.run_baseline_allocate_benchmarks {
-//            iteration_count += 2 * STEP_COUNT;
+            iteration_count += 4 * STEP_COUNT;
         }
         if options.run_baseline_deallocate_benchmarks {
 //            iteration_count += 2 * STEP_COUNT;
@@ -111,6 +120,48 @@ impl BenchmarkRunner for BaselineBenchmarkRunner {
                 let mut memory_manager = MemoryManager::new(&mut buffer, &mut storage, 2, LinkedListAllocatorModule::new);
 
                 let bench: BaselineGetMaxBenchmark<SIZE, BUCKET_SIZE, A, S> = BaselineGetMaxBenchmark::new(&mut memory_manager);
+                bench.run_benchmark::<TIMER>(run_options);
+            });
+        }
+        if options.run_baseline_allocate_benchmarks {
+            for_obj_size!(I, {
+                handle_curr_iteration();
+                const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
+                let mut buffer = [0u8; BUCKET_SIZE];
+                let mut storage = get_storage();
+                let mut memory_manager = MemoryManager::new(&mut buffer, &mut storage, 2, LinkedListAllocatorModule::new);
+
+                let bench: BaselineAllocateMinBenchmark<SIZE, BUCKET_SIZE, A, S> = BaselineAllocateMinBenchmark::new(&mut memory_manager);
+                bench.run_benchmark::<TIMER>(run_options);
+            });
+            for_obj_size!(I, {
+                handle_curr_iteration();
+                const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
+                let mut buffer = [0u8; BUCKET_SIZE];
+                let mut storage = get_storage();
+                let mut memory_manager = MemoryManager::new(&mut buffer, &mut storage, 2, LinkedListAllocatorModule::new);
+
+                let bench: BaselineAllocateMaxMinBenchmark<SIZE, BUCKET_SIZE, A, S> = BaselineAllocateMaxMinBenchmark::new(&mut memory_manager);
+                bench.run_benchmark::<TIMER>(run_options);
+            });
+            for_obj_size!(I, {
+                handle_curr_iteration();
+                const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
+                let mut buffer = [0u8; BUCKET_SIZE];
+                let mut storage = get_storage();
+                let mut memory_manager = MemoryManager::new(&mut buffer, &mut storage, 2, LinkedListAllocatorModule::new);
+
+                let bench: BaselineAllocateMinMaxBenchmark<SIZE, BUCKET_SIZE, A, S> = BaselineAllocateMinMaxBenchmark::new(&mut memory_manager);
+                bench.run_benchmark::<TIMER>(run_options);
+            });
+            for_obj_size!(I, {
+                handle_curr_iteration();
+                const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
+                let mut buffer = [0u8; BUCKET_SIZE];
+                let mut storage = get_storage();
+                let mut memory_manager = MemoryManager::new(&mut buffer, &mut storage, 2, LinkedListAllocatorModule::new);
+
+                let bench: BaselineAllocateMaxBenchmark<SIZE, BUCKET_SIZE, A, S> = BaselineAllocateMaxBenchmark::new(&mut memory_manager);
                 bench.run_benchmark::<TIMER>(run_options);
             });
         }

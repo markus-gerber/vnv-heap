@@ -112,6 +112,14 @@ impl<'a, const BUCKET_SIZE: usize, A: AllocatorModule, S: PersistentStorageModul
         self.dirty = true;
     }
 
+    pub(crate) fn curr_resident_bucket(&self) -> usize {
+        self.current_bucket
+    }
+
+    pub(crate) fn allocator(&mut self) -> &mut A {
+        unsafe { self.allocator.as_mut().unwrap() }
+    }
+
     pub(crate) fn is_dirty(&self) -> bool {
         self.dirty
     }
