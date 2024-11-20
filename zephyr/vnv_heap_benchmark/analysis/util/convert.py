@@ -2,6 +2,36 @@
 import pandas as pd
 import numpy as np
 from typing import Literal
+from IPython.display import HTML, display
+
+def convert_datasets(raw_data, dataset_type: str, bench_names: list[(str, str)], columns: list[str]):
+    res = []
+
+    for (bench_id, bench_name) in bench_names:
+        converted = convert_data(raw_data, bench_id, columns)
+        converted["dataset_type"] = dataset_type
+        converted["benchmark_title"] = bench_name
+        res.append(converted)
+
+    return pd.concat(res)
+
+def display_dataset_infos(datasets: pd.DataFrame, scale: str = "us"):
+    for dataset_type in datasets["dataset_type"].unique():
+        for benchmark_title in datasets["benchmark_title"].unique():
+            dataset = datasets[(datasets["dataset_type"] == dataset_type) & (datasets["benchmark_title"] == benchmark_title)]
+            scaled_data = scale_data(dataset, scale)
+            display(HTML(f"<b>{dataset_type} - {benchmark_title}</b> [in {scale}]"))
+            display(scaled_data["mean"].agg(["min", "max"]))
+
+
+def scale_and_filter_data(data: pd.DataFrame, unit: str, object_sizes: list[int]):
+    scaled = scale_data(data, unit)
+    filtered = scaled
+    
+    if len(object_sizes) > 0:
+        filtered = filtered[filtered["options.object_size"].isin(object_sizes)]
+
+    return filtered
 
 def convert_data(raw_data, bench_name: str, columns: list[str]):
     columns = columns.copy()
