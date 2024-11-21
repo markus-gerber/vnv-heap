@@ -76,7 +76,7 @@ impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManag
         unsafe {
             self.vnv_heap
                 .borrow_mut()
-                .release_mut(self.allocation_identifier, self.data_ref)
+                .release_mut(self.allocation_identifier)
         }
     }
 }

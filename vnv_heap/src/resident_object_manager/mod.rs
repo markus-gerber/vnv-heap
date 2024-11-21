@@ -620,7 +620,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
     pub(crate) unsafe fn release_mut<T: Sized>(
         &mut self,
         identifier: &AllocationIdentifier<T>,
-        _data: &mut T,
     ) {
         self.check_integrity();
         trace!("Release mutable reference (offset={})", identifier.offset);
@@ -645,7 +644,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
     pub(crate) unsafe fn release_ref<T: Sized>(
         &mut self,
         identifier: &AllocationIdentifier<T>,
-        _data: &T,
     ) {
         self.check_integrity();
         trace!("Release immutable reference (offset={})", identifier.offset);

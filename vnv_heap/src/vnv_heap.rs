@@ -383,17 +383,15 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
     pub(crate) unsafe fn release_mut<T: Sized>(
         &mut self,
         identifier: &AllocationIdentifier<T>,
-        data: &mut T,
     ) {
-        self.resident_object_manager.release_mut(identifier, data)
+        self.resident_object_manager.release_mut(identifier)
     }
 
     pub(crate) unsafe fn release_ref<T: Sized>(
         &mut self,
         identifier: &AllocationIdentifier<T>,
-        data: &T,
     ) {
-        self.resident_object_manager.release_ref(identifier, data)
+        self.resident_object_manager.release_ref(identifier)
     }
 
     pub(crate) fn is_resident<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) -> bool {
