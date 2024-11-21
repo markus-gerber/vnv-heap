@@ -4,9 +4,10 @@ mod allocate_min;
 mod deallocate_case1;
 mod deallocate_max;
 mod deallocate_min;
-mod get_case1;
 mod get_max;
 mod get_min;
+mod get_max_min;
+mod get_min_max;
 
 pub use allocate_case1::*;
 pub use allocate_max::*;
@@ -14,7 +15,8 @@ pub use allocate_min::*;
 pub use deallocate_case1::*;
 pub use deallocate_max::*;
 pub use deallocate_min::*;
-pub use get_case1::*;
+pub use get_max_min::*;
+pub use get_min_max::*;
 pub use get_max::*;
 pub use get_min::*;
 
@@ -94,7 +96,7 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
             iteration_count += 3 * STEP_COUNT;
         }
         if options.run_get_benchmarks {
-            iteration_count += 3 * STEP_COUNT;
+            iteration_count += 4 * STEP_COUNT;
         }
 
         iteration_count
@@ -260,8 +262,20 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
                 let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
-                let bench: GetCase1Benchmark<A, NonResidentBuddyAllocatorModule<16>, M, S, SIZE> =
-                    GetCase1Benchmark::new(&heap, start_res_size);
+                let bench: GetMaxMinBenchmark<A, NonResidentBuddyAllocatorModule<16>, M, S, SIZE> =
+                    GetMaxMinBenchmark::new(&heap, start_res_size);
+                bench.run_benchmark::<TIMER>(run_options);
+            });
+            for_obj_size!(I, {
+                handle_curr_iteration();
+                const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
+
+                let mut buf = [0u8; BUF_SIZE];
+                let res_size = buf.len();
+                let heap = get_bench_heap(&mut buf, res_size, get_storage());
+                let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
+                let bench: GetMinMaxBenchmark<A, NonResidentBuddyAllocatorModule<16>, M, S, SIZE> =
+                    GetMinMaxBenchmark::new(&heap, start_res_size);
                 bench.run_benchmark::<TIMER>(run_options);
             });
         }

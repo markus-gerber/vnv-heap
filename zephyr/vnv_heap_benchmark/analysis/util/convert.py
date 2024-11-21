@@ -4,11 +4,11 @@ import numpy as np
 from typing import Literal
 from IPython.display import HTML, display
 
-def convert_datasets(raw_data, dataset_type: str, bench_names: list[(str, str)], columns: list[str]):
+def convert_datasets(raw_data, dataset_type: str, bench_names: list[(str, str)], columns: list[str], unwrapped: bool = False):
     res = []
 
     for (bench_id, bench_name) in bench_names:
-        converted = convert_data(raw_data, bench_id, columns)
+        converted = convert_data(raw_data, bench_id, columns, unwrapped)
         converted["dataset_type"] = dataset_type
         converted["benchmark_title"] = bench_name
         res.append(converted)
@@ -33,7 +33,7 @@ def scale_and_filter_data(data: pd.DataFrame, unit: str, object_sizes: list[int]
 
     return filtered
 
-def convert_data(raw_data, bench_name: str, columns: list[str]):
+def convert_data(raw_data, bench_name: str, columns: list[str], unwrapped: bool = False):
     columns = columns.copy()
     columns.append("ticks_per_ms")
 
@@ -53,9 +53,19 @@ def convert_data(raw_data, bench_name: str, columns: list[str]):
             if key != "bench_options" and key != "data":
                 new[key] = item[key]
 
-        return new
+        if unwrapped:
+            res = []
+            for d in item["data"]:
+                new["mean"] = d
+                res.append(new.copy())
+            return res
+        else:
+            return [new]
 
-    data = pd.DataFrame(list(map(convert_item, data)), columns=columns)
+    unflattened = list(map(convert_item, data))
+    flattened = [x for xs in unflattened for x in xs]
+
+    data = pd.DataFrame(flattened, columns=columns)
 
     # make sure machine name, cold start and repetitions match
     if len(np.unique(data["cold_start"])) > 1 or len(np.unique(data["repetitions"])) > 1 or len(np.unique(data["machine_name"])) > 1:

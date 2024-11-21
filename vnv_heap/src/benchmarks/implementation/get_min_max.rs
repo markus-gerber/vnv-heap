@@ -1,23 +1,29 @@
 use crate::{
     modules::{
-        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule, object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
-    }, VNVHeap, VNVObject
+        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
+        object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
+    },
+    vnv_ref::VNVRef,
+    VNVHeap, VNVObject,
 };
 use core::hint::black_box;
 use serde::Serialize;
 
 use super::{Benchmark, ModuleOptions, Timer};
 
+const SMALLEST_OBJ_SIZE: usize = 0;
+type SmallestObjData = [u8; SMALLEST_OBJ_SIZE];
+
 #[derive(Serialize)]
-pub struct GetCase1BenchmarkOptions {
+pub struct GetMinMaxBenchmarkOptions {
     object_size: usize,
-    modules: ModuleOptions
+    modules: ModuleOptions,
 }
 
-pub struct GetCase1Benchmark<
+pub struct GetMinMaxBenchmark<
     'a,
     'b: 'a,
-    A: AllocatorModule,
+    A: AllocatorModule + 'static,
     N: NonResidentAllocatorModule,
     M: ObjectManagementModule,
     S: PersistentStorageModule + 'static,
@@ -35,12 +41,18 @@ impl<
         M: ObjectManagementModule,
         S: PersistentStorageModule + 'static,
         const OBJ_SIZE: usize,
-    > GetCase1Benchmark<'a, 'b, A, N, M, S, OBJ_SIZE>
+    > GetMinMaxBenchmark<'a, 'b, A, N, M, S, OBJ_SIZE>
 {
-
     pub fn new(heap: &'a VNVHeap<'b, A, N, M, S>, resident_buffer_size: usize) -> Self {
-        assert_eq!(heap.get_inner().borrow_mut().get_resident_object_manager().get_remaining_dirty_size(), resident_buffer_size, "whole buffer should be able to be dirty");
-        let object = heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap();
+        assert_eq!(
+            heap.get_inner()
+                .borrow_mut()
+                .get_resident_object_manager()
+                .get_remaining_dirty_size(),
+            resident_buffer_size,
+            "whole buffer should be able to be dirty"
+        );
+        let mut object = heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap();
 
         Self {
             _heap: heap,
@@ -49,21 +61,19 @@ impl<
     }
 }
 
-
 impl<
         'a,
         'b: 'a,
-        A: AllocatorModule,
+        A: AllocatorModule + 'static,
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
         S: PersistentStorageModule + 'static,
         const OBJ_SIZE: usize,
-    > Benchmark<GetCase1BenchmarkOptions>
-    for GetCase1Benchmark<'a, 'b, A, N, M, S, OBJ_SIZE>
+    > Benchmark<GetMinMaxBenchmarkOptions> for GetMinMaxBenchmark<'a, 'b, A, N, M, S, OBJ_SIZE>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
-        "get_case_1"
+        "get_min_max"
     }
 
     #[inline]
@@ -86,11 +96,10 @@ impl<
     }
 
     #[inline]
-    fn get_bench_options(&self) -> GetCase1BenchmarkOptions {
-        GetCase1BenchmarkOptions {
+    fn get_bench_options(&self) -> GetMinMaxBenchmarkOptions {
+        GetMinMaxBenchmarkOptions {
             object_size: OBJ_SIZE,
-            modules: ModuleOptions::new::<A, N>()
+            modules: ModuleOptions::new::<A, N>(),
         }
     }
 }
-
