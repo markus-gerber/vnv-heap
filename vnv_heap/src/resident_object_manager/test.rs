@@ -72,7 +72,7 @@ fn test_release_dirty_size() {
     for (offset, i) in offset_list.iter().zip(0..) {
         if i % 3 == 0 {
             unsafe {
-                let ptr = manager
+                manager
                     .get_ref(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
                         &mut non_resident_alloc,
@@ -82,7 +82,6 @@ fn test_release_dirty_size() {
 
                 manager.release_ref(
                     &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                    ptr.as_ref().unwrap(),
                 );
             }
         } else if i % 4 == 0 {
@@ -95,7 +94,7 @@ fn test_release_dirty_size() {
                 .unwrap();
         } else {
             unsafe {
-                let ptr = manager
+                manager
                     .get_mut(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
                         &mut non_resident_alloc,
@@ -105,7 +104,6 @@ fn test_release_dirty_size() {
 
                 manager.release_mut(
                     &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                    ptr.as_mut().unwrap(),
                 );
             }
         }
@@ -284,7 +282,6 @@ fn test_remain_resident() {
         unsafe {
             manager.release_ref(
                 &AllocationIdentifier::<TestObj>::from_offset(ref_offsets[i]),
-                ref_ptrs[i].as_ref().unwrap(),
             );
         }
     }
@@ -311,7 +308,6 @@ fn test_remain_resident() {
         unsafe {
             manager.release_ref(
                 &AllocationIdentifier::<TestObj>::from_offset(ref_offsets[i]),
-                ref_ptrs[i + ref_offsets.len()].as_ref().unwrap(),
             );
         }
     }
@@ -320,8 +316,7 @@ fn test_remain_resident() {
     for i in 0..mut_offsets.len() {
         unsafe {
             manager.release_mut(
-                &AllocationIdentifier::<TestObj>::from_offset(mut_offsets[i]),
-                mut_ptrs[i].as_mut().unwrap(),
+                &AllocationIdentifier::<TestObj>::from_offset(mut_offsets[i])
             );
         }
     }
