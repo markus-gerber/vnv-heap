@@ -2,16 +2,21 @@ use core::{
     mem::transmute,
     sync::atomic::{AtomicBool, Ordering},
 };
+use std::sync::atomic::AtomicPtr;
 use try_lock::TryLock;
 
 use crate::{
     modules::{allocator::AllocatorModule, persistent_storage::SharedStorageReference},
     resident_object_manager::{
-        persist, resident_list::SharedResidentListRef, restore, SharedMetadataBackupPtr,
+        persist, resident_list::SharedResidentListRef, restore,
     },
 };
 
 /// An object containing all necessary data
+/// 
+/// We need this as the VNVHeap object can be moved (if no objects).
+/// This would would break things, as we need to store a pointer the the necessary data once the VNVHeap is created
+/// so that `vnv_persist_all()` can access the needed data
 pub(crate) struct PersistAccessPoint {
     inner: TryLock<Option<PersistAccessPointInner>>,
 }
@@ -33,7 +38,6 @@ impl PersistAccessPoint {
         base_ptr: *mut u8,
         buf_size: usize,
         resident_list: SharedResidentListRef<'a>,
-        backup_list: SharedMetadataBackupPtr<'a>,
         storage: SharedStorageReference<'a, 'b>,
         handler: fn(*mut u8, usize) -> (),
         heap_lock: &TryLock<()>,
@@ -56,7 +60,6 @@ impl PersistAccessPoint {
             resident_buf_size: buf_size,
             // change the lifetime of these values
             resident_list: transmute(resident_list),
-            backup_list: transmute(backup_list),
             storage: transmute(storage),
             heap_lock: transmute(heap_lock),
             persist_queued: transmute(persist_queued),
@@ -108,16 +111,17 @@ impl PersistAccessPoint {
                 }
             }
 
+            #[cfg(debug_assertions)]
+            let metadata_backup = collect_metadata(&inner.resident_list);
+
             // ###### START PERSISTING STATE ######
-            persist(&inner.resident_list, &inner.backup_list, &mut inner.storage);
+            persist(&inner.resident_list, &mut inner.storage);
 
             // ###### FINISHED PERSISTING STATE: EXECUTING HANDLER NOW ######
             (inner.handler)(inner.resident_buf_base_ptr, inner.resident_buf_size);
 
             // ###### HANDLER RETURNED: RESTORING STATE NOW ######
             restore(
-                &inner.resident_list,
-                &inner.backup_list,
                 &mut inner.storage,
 
                 // this is safe as we could access the heap_lock
@@ -126,10 +130,61 @@ impl PersistAccessPoint {
                 inner.resident_buf_size
             );
 
+            #[cfg(debug_assertions)]
+            check_metadata(&inner.resident_list, metadata_backup);
+            
             print_persist_debug("restore finished\n");
         }
     }
 }
+
+
+#[cfg(debug_assertions)]
+use crate::resident_object_manager::resident_object_metadata::ResidentObjectMetadata;
+
+#[cfg(debug_assertions)]
+fn collect_metadata(resident_list: &SharedResidentListRef<'static>) -> Vec<(*const ResidentObjectMetadata, ResidentObjectMetadata)> {
+    
+    let mut res: Vec<(*const ResidentObjectMetadata, ResidentObjectMetadata)> = vec![];
+
+    let mut iter = resident_list.iter();
+    while let Some(item) = iter.next() {
+        let copy = ResidentObjectMetadata {
+            inner: item.inner.clone(),
+            next_resident_object: AtomicPtr::new(item.next_resident_object.load(Ordering::SeqCst))
+        };
+
+        res.push((item, copy));
+    }
+
+    return res;
+}
+
+#[cfg(debug_assertions)]
+fn check_metadata(resident_list: &SharedResidentListRef<'static>, list: Vec<(*const ResidentObjectMetadata, ResidentObjectMetadata)>) {
+
+    let mut iter = resident_list.iter();
+    let mut vec_iter = list.iter();
+
+    loop {
+        let item1 = iter.next();
+        let item2 = vec_iter.next();
+
+        if let (Some(item1), Some(item2)) = (item1, item2) {
+            assert_eq!((item1 as *const ResidentObjectMetadata), item2.0);
+            assert_eq!(item1.next_resident_object.load(Ordering::SeqCst), item2.1.next_resident_object.load(Ordering::SeqCst));
+            assert!(item1.inner.dirty_status == item2.1.inner.dirty_status);
+            assert_eq!(item1.inner.layout, item2.1.inner.layout);
+            assert_eq!(item1.inner.offset, item2.1.inner.offset);
+            assert_eq!(item1.inner.ref_cnt, item2.1.inner.ref_cnt);
+
+        } else {
+            assert_eq!(item1.is_none(), item2.is_none(), "The lists have different sizes!");
+            break;
+        }
+    }
+}
+
 
 #[cfg(all(not(feature = "persist_debug_prints"), not(feature = "persist_debug_unsafe_prints")))]
 pub(crate) fn print_persist_debug(_text: &str) {
@@ -152,7 +207,6 @@ struct PersistAccessPointInner {
     resident_buf_base_ptr: *mut u8,
     resident_buf_size: usize,
     resident_list: SharedResidentListRef<'static>,
-    backup_list: SharedMetadataBackupPtr<'static>,
     storage: SharedStorageReference<'static, 'static>,
     handler: fn(*mut u8, usize) -> (),
     heap_lock: &'static TryLock<()>,

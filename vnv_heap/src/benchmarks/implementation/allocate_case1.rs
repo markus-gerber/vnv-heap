@@ -53,7 +53,6 @@ impl<
         {
             let inner = heap.get_inner().borrow_mut();
             assert_eq!(inner.get_resident_object_manager().resident_object_count, 1);
-            assert_eq!(inner.get_resident_object_manager().resident_object_meta_backup.len(), 1);
         }
 
         blocker.unload().unwrap();
@@ -63,7 +62,6 @@ impl<
         {
             let mut inner = heap.get_inner().borrow_mut();
             assert_eq!(inner.get_resident_object_manager().resident_object_count, 0);
-            assert_eq!(inner.get_resident_object_manager().resident_object_meta_backup.len(), 1);
 
             let (storage, _, allocator) = inner.get_modules_mut();
             let free_list = allocator.get_free_list_mut();

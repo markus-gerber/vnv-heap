@@ -1,46 +1,77 @@
-use super::{calc_resident_obj_layout, resident_list::SharedResidentListRef, ResidentObjectMetadata, ResidentObjectMetadataBackup, SharedMetadataBackupPtr};
-use crate::modules::{allocator::AllocatorModule, persistent_storage::SharedStorageReference};
+use std::ptr::null_mut;
+
+use super::{
+    calc_resident_obj_layout_dynamic, resident_list::SharedResidentListRef,
+    resident_object_metadata::ResidentObjectMetadata, ResidentObjectMetadataBackup,
+};
+use crate::modules::{
+    allocator::AllocatorModule,
+    persistent_storage::{
+        persistent_storage_util::{read_storage_data, write_storage_data},
+        SharedStorageReference,
+    },
+};
 
 pub(crate) fn persist(
     resident_list: &SharedResidentListRef,
-    backup_list: &SharedMetadataBackupPtr,
     storage_ref: &mut SharedStorageReference,
 ) {
-    // create second storage reference so its easier to do 
+    // step 1: get iterator to resident list
     let mut iter = resident_list.iter();
-    let mut meta_slot_iter = backup_list.get_atomic_iter();
-    while let Some(item) = iter.next() {
+
+    // step 2: persist all objects
+    let mut first_item_offset: usize = 0;
+    let mut curr = iter.next();
+    while let Some(item) = curr {
+        if first_item_offset == 0 {
+            first_item_offset = item.inner.offset;
+        }
+
         // sync user data if needed
         if item.inner.dirty_status.is_data_dirty() {
             unsafe { item.write_user_data_dynamic(storage_ref).unwrap() };
         }
 
-        // sync metadata if needed
+        let next = iter.next();
+        let next_metadata_offset = if let Some(next_item) = next {
+            // we didn't reach the end of the list
+            // we want to write this offset as the next pointer for the current item
+            next_item.inner.offset
+        } else {
+            // end of list reached, we want to write 0 as the last ptr
+            0
+        };
+
         if item.inner.dirty_status.is_general_metadata_dirty() {
-            let backup_slot = if let Some(backup_slot) = item.inner.metadata_backup_node.get() {
-                backup_slot
-            } else {
-                let slot = meta_slot_iter.find(|_, item| {
-                    item.is_unused()
-                }, storage_ref);
-
-                // slot should exist and no error should occur
-                let slot = slot.unwrap().expect("metadata backup slot should exists");
-                slot.0.get_data_offset()
-            };
-
-            item.write_metadata(storage_ref, backup_slot, true).unwrap();
+            // general metadata is dirty
+            // write whole metadata including next pointer to non volatile storage
+            item.write_metadata(
+                storage_ref,
+                item.inner.dirty_status.is_general_metadata_dirty(),
+                next_metadata_offset,
+            )
+            .unwrap();
+        } else {
+            // general metadata is not dirty
+            // however we still need to persist the next pointer
+            item.write_next_ptr(
+                storage_ref,
+                next_metadata_offset
+            ).unwrap()
         }
+
+        curr = next;
     }
+
+    // step 3: write the offset of the first resident object to the start of the non volatile storage
+    write_storage_data(storage_ref, 0, &first_item_offset).unwrap();
 }
 
 pub(crate) fn restore(
-    resident_list: &SharedResidentListRef,
-    backup_list: &SharedMetadataBackupPtr,
     storage_ref: &mut SharedStorageReference,
     heap: &mut dyn AllocatorModule,
     resident_buf_base_ptr: *mut u8,
-    resident_buf_size: usize
+    resident_buf_size: usize,
 ) {
     // step 1: reset resident heaps state
     unsafe {
@@ -48,46 +79,43 @@ pub(crate) fn restore(
         heap.init(resident_buf_base_ptr, resident_buf_size);
     };
 
-    // step 2: restore metadata + reallocate resident objects
-    let mut backup_iter = backup_list.get_atomic_iter();
-    while let Some(item) = backup_iter.next(storage_ref).unwrap() {
-        if item.1.is_unused() {
-            continue;
+    // step 2: get the first storage offset where a resident object is stored
+    let mut curr_offset: usize = unsafe { read_storage_data(storage_ref, 0).unwrap() };
+
+    // step 3: reallocate + restore resident objects
+    let mut drag_item: Option<&mut ResidentObjectMetadata> = None;
+    while curr_offset != 0 {
+        let item: ResidentObjectMetadataBackup =
+            unsafe { read_storage_data(storage_ref, curr_offset).unwrap() };
+
+        // location where this object should be allocated
+        let dest_ptr = item.inner.offset as *mut u8;
+
+        // get layout of resident object
+        let resident_object_layout = calc_resident_obj_layout_dynamic(&item.inner.layout);
+        unsafe {
+            heap.allocate_at(resident_object_layout, dest_ptr).unwrap();
         }
+        // location of the next item stored
+        let next_offset = item.next_resident_object;
 
-        let ptr = item.1.resident_ptr as *mut u8;
+        // convert to resident object metadata and write to RAM
+        let metadata = item.to_metadata(curr_offset, null_mut());
 
-        // reallocate resident object
-        let resident_object_layout = calc_resident_obj_layout(item.1.inner.layout.clone());
-        unsafe { heap.allocate_at(resident_object_layout, ptr).unwrap(); }
+        let dest_ptr = dest_ptr as *mut ResidentObjectMetadata;
+        unsafe { dest_ptr.write(metadata) };
 
-        let metadata = item.1.to_metadata();
-
-        let remove_original_slot = metadata.inner.metadata_backup_node.get().is_none();
-
-        let ptr = ptr as *mut ResidentObjectMetadata;
-        unsafe { ptr.write(metadata) };
-
-        if remove_original_slot {
-            // object metadata was not stored before the recovery in this slot
-            // so to avoid race conditions, remove it from this slot
-
-            unsafe { ResidentObjectMetadataBackup::make_unused(item.0.get_data_offset(), storage_ref).unwrap(); }
-        }
-    }
-
-    // step 3: restore resident objects
-    let mut meta_iter = resident_list.iter();
-
-    loop {
-        let ptr = if let Some(meta_item) = meta_iter.next() {
-            (meta_item as *const ResidentObjectMetadata) as *mut ResidentObjectMetadata
-        } else {
-            break;
-        };
-
-        let meta_ref = unsafe { ptr.as_mut().unwrap() };
+        // load user data
+        let meta_ref = unsafe { dest_ptr.as_mut().unwrap() };
         unsafe { meta_ref.load_user_data(storage_ref).unwrap() }
-    }
 
+        // update next ptr of previous list item
+        if let Some(drag) = drag_item {
+            drag.next_resident_object
+                .store(dest_ptr, std::sync::atomic::Ordering::SeqCst);
+        }
+
+        drag_item = Some(meta_ref);
+        curr_offset = next_offset;
+    }
 }

@@ -2,8 +2,7 @@ use super::{allocator::AllocatorModule, persistent_storage::PersistentStorageMod
 use crate::{
     resident_object_manager::{
         resident_list::{DeleteHandle, IterMut, ResidentList},
-        resident_object::ResidentObjectMetadata,
-        MetadataBackupList,
+        resident_object_metadata::ResidentObjectMetadata,
     },
     shared_persist_lock::SharedPersistLock,
 };
@@ -135,7 +134,6 @@ impl<'a, 'b, S: PersistentStorageModule, A: AllocatorModule>
 
 pub(crate) struct DirtyItemListArguments<'a, 'b, A: AllocatorModule, S: PersistentStorageModule> {
     pub(crate) storage: &'a mut S,
-    pub(crate) resident_object_meta_backup: &'a mut MetadataBackupList,
     pub(crate) remaining_dirty_size: &'a mut usize,
     pub(crate) allocator: &'a SharedPersistLock<'b, *mut A>,
     pub(crate) resident_object_count: &'a mut usize,
@@ -189,7 +187,6 @@ impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '
     pub fn sync_metadata(&mut self) -> Result<usize, ()> {
         let dirty_size = self.delete_handle.get_element().persist_metadata(
             self.arguments.storage,
-            self.arguments.resident_object_meta_backup,
         )?;
         *self.arguments.remaining_dirty_size += dirty_size;
         Ok(dirty_size)

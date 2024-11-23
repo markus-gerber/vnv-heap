@@ -1,6 +1,5 @@
 use std::time::Instant;
 
-// use env_logger::{Builder, Env};
 use vnv_heap::{
     benchmarks::{
         run_all_benchmarks,
@@ -34,11 +33,13 @@ impl Timer for DesktopTimer {
 }
 
 fn main() {
-    /*Builder::from_env(Env::default())
+    /*
+    use env_logger::{Builder, Env};
+    Builder::from_env(Env::default())
         .filter_level(log::LevelFilter::Trace)
         .format_module_path(false)
-        .init();
-*/
+        .init();*/
+
     run_all_benchmarks::<
         DesktopTimer,
         FilePersistentStorageModule,
@@ -62,5 +63,5 @@ fn main() {
 }
 
 fn get_storage() -> FilePersistentStorageModule {
-    FilePersistentStorageModule::new("test.data".into(), 4096 * 4).unwrap()
+    FilePersistentStorageModule::new("test.data".into(), 4096 * 8).unwrap()
 }

@@ -143,10 +143,12 @@ impl<const ORDER: usize> NonResidentAllocatorModule for NonResidentBuddyAllocato
 
 impl<const ORDER: usize> NonResidentBuddyAllocatorModule<ORDER> {
     #[cfg(feature = "benchmarks")]
+    #[allow(unused)]
     pub(crate) fn get_free_list(&self) -> &[SimpleNonResidentLinkedList; ORDER] {
         &self.free_list
     }
     #[cfg(feature = "benchmarks")]
+    #[allow(unused)]
     pub(crate) fn get_free_list_mut(&mut self) -> &mut [SimpleNonResidentLinkedList; ORDER] {
         &mut self.free_list
     }

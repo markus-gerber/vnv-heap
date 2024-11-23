@@ -1,5 +1,4 @@
 use core::{
-    alloc::Layout,
     array,
     ptr::{null, null_mut},
 };
@@ -15,7 +14,7 @@ use crate::{
         object_management::DefaultObjectManagementModule,
         persistent_storage::{test::get_test_storage, PersistentStorageModule},
     },
-    resident_object_manager::{resident_list::ResidentList, MetadataBackupList}, shared_persist_lock::SharedPersistLock,
+    resident_object_manager::{calc_resident_obj_layout_static, calc_user_data_offset_static, resident_list::ResidentList}, shared_persist_lock::SharedPersistLock,
 };
 
 use super::ResidentObjectManager;
@@ -25,7 +24,7 @@ use super::ResidentObjectManager;
 #[test]
 fn test_release_dirty_size() {
     const INITIAL_DIRTY_SIZE: usize = 300;
-    const STORAGE_SIZE: usize = 4096 * 2;
+    const STORAGE_SIZE: usize = 4096 * 8;
     const OBJ_COUNT: usize = 200;
     type TestObj = [u8; 20];
 
@@ -33,7 +32,6 @@ fn test_release_dirty_size() {
     let mut storage = get_test_storage("rom_test_release_dirty_size", STORAGE_SIZE);
     let mut non_resident_alloc = NonResidentBuddyAllocatorModule::<16>::new();
 
-    let mut meta_backup = MetadataBackupList::new();
     let mut resident_list = ResidentList::new();
 
     let mut heap = LinkedListAllocatorModule::new();
@@ -48,7 +46,6 @@ fn test_release_dirty_size() {
             &mut buffer,
             INITIAL_DIRTY_SIZE,
             &mut resident_list,
-            &mut meta_backup,
             shared_heap_lock
         )
         .unwrap();
@@ -60,11 +57,11 @@ fn test_release_dirty_size() {
     let initial_data: TestObj = [0u8; 20];
     let offset_list: [usize; OBJ_COUNT] = array::from_fn(|_| {
         let offset = non_resident_alloc
-            .allocate(Layout::new::<TestObj>(), &mut storage)
+            .allocate(calc_resident_obj_layout_static::<TestObj>(), &mut storage)
             .unwrap();
 
         // zero out space
-        storage.write(offset, &initial_data).unwrap();
+        storage.write(offset + calc_user_data_offset_static::<TestObj>(), &initial_data).unwrap();
 
         offset
     });
@@ -75,7 +72,6 @@ fn test_release_dirty_size() {
                 manager
                     .get_ref(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                        &mut non_resident_alloc,
                         &mut storage,
                     )
                     .unwrap();
@@ -88,7 +84,6 @@ fn test_release_dirty_size() {
             manager
                 .drop(
                     &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                    &mut non_resident_alloc,
                     &mut storage,
                 )
                 .unwrap();
@@ -97,7 +92,6 @@ fn test_release_dirty_size() {
                 manager
                     .get_mut(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                        &mut non_resident_alloc,
                         &mut storage,
                     )
                     .unwrap();
@@ -113,7 +107,6 @@ fn test_release_dirty_size() {
         manager
             .drop(
                 &AllocationIdentifier::<TestObj>::from_offset(offset),
-                &mut non_resident_alloc,
                 &mut storage,
             )
             .unwrap();
@@ -127,7 +120,7 @@ fn test_release_dirty_size() {
 #[test]
 fn test_remain_resident() {
     const INITIAL_DIRTY_SIZE: usize = 300;
-    const STORAGE_SIZE: usize = 4096 * 2;
+    const STORAGE_SIZE: usize = 4096 * 8;
     const OBJ_COUNT: usize = 200;
     type TestObj = [u8; 20];
 
@@ -135,7 +128,6 @@ fn test_remain_resident() {
     let mut storage = get_test_storage("rom_test_remain_resident", STORAGE_SIZE);
     let mut non_resident_alloc = NonResidentBuddyAllocatorModule::<16>::new();
 
-    let mut meta_backup = MetadataBackupList::new();
     let mut resident_list = ResidentList::new();
 
     let mut heap = BuddyAllocatorModule::<16>::new();
@@ -150,7 +142,6 @@ fn test_remain_resident() {
             &mut buffer,
             INITIAL_DIRTY_SIZE,
             &mut resident_list,
-            &mut meta_backup,
             shared_heap_lock,
 
         )
@@ -163,11 +154,11 @@ fn test_remain_resident() {
     let initial_data: TestObj = [0u8; 20];
     let offset_list: [usize; OBJ_COUNT] = array::from_fn(|_| {
         let offset = non_resident_alloc
-            .allocate(Layout::new::<TestObj>(), &mut storage)
+            .allocate(calc_resident_obj_layout_static::<TestObj>(), &mut storage)
             .unwrap();
 
         // zero out space
-        storage.write(offset, &initial_data).unwrap();
+        storage.write(offset + calc_user_data_offset_static::<TestObj>(), &initial_data).unwrap();
 
         offset
     });
@@ -209,7 +200,6 @@ fn test_remain_resident() {
                 let ptr = manager
                     .get_ref(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                        &mut non_resident_alloc,
                         &mut storage,
                     )
                     .unwrap();
@@ -224,7 +214,6 @@ fn test_remain_resident() {
                 let ptr = manager
                     .get_mut(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                        &mut non_resident_alloc,
                         &mut storage,
                     )
                     .unwrap();
@@ -235,7 +224,6 @@ fn test_remain_resident() {
                 manager
                     .require_resident(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                        &mut non_resident_alloc,
                         &mut storage,
                     )
                     .unwrap();
@@ -256,7 +244,6 @@ fn test_remain_resident() {
                 let ptr = manager
                     .get_ref(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                        &mut non_resident_alloc,
                         &mut storage,
                     )
                     .unwrap();
@@ -267,7 +254,6 @@ fn test_remain_resident() {
                 manager
                     .require_resident(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                        &mut non_resident_alloc,
                         &mut storage,
                     )
                     .unwrap();
@@ -294,7 +280,6 @@ fn test_remain_resident() {
             manager
                 .require_resident(
                     &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                    &mut non_resident_alloc,
                     &mut storage,
                 )
                 .unwrap();
@@ -326,7 +311,6 @@ fn test_remain_resident() {
         manager
             .drop(
                 &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                &mut non_resident_alloc,
                 &mut storage,
             )
             .unwrap();

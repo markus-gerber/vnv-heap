@@ -26,7 +26,7 @@ fn test_persist_all_simple() {
 
     let heap = get_test_heap(
         "test_persist_all_simple",
-        2 * 4096,
+        8 * 4096,
         &mut buffer,
         800,
         |base_ptr, size| {
@@ -108,6 +108,7 @@ fn test_persist_all_simple() {
         check_states: &mut Vec<[u8; 10]>,
         resident: &mut Vec<bool>,
     ) {
+        println!("checked");
         for i in 0..objects.len() {
             resident[i] = objects[i].is_resident()
         }

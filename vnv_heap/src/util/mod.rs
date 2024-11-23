@@ -12,3 +12,8 @@ pub(crate) fn repr_c_layout(fields: &[Layout]) -> Result<Layout, LayoutError> {
     // Remember to finalize with `pad_to_align`!
     Ok(layout.pad_to_align())
 }
+
+#[inline]
+pub(crate) fn round_up_to_nearest(num: usize, multiple: usize) -> usize {
+    ((num + multiple - 1) / multiple) * multiple
+}

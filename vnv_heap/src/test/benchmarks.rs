@@ -26,7 +26,7 @@ fn test_benchmarks() {
 }
 
 fn get_storage() -> FilePersistentStorageModule {
-    get_test_storage("test.data", 4096 * 4)
+    get_test_storage("test.data", 4096 * 8)
 }
 
 struct DesktopTimer {

@@ -4,7 +4,7 @@ use core::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use super::resident_object::ResidentObjectMetadata;
+use super::resident_object_metadata::ResidentObjectMetadata;
 
 pub(crate) struct ResidentList {
     head: AtomicPtr<ResidentObjectMetadata>,
@@ -184,7 +184,7 @@ mod test {
 
     use crate::resident_object_manager::{
         dirty_status::DirtyStatus,
-        resident_object::{ResidentObjectMetadata, ResidentObjectMetadataInner},
+        resident_object_metadata::{ResidentObjectMetadata, ResidentObjectMetadataInner},
     };
     use std::{
         collections::VecDeque,

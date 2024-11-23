@@ -1,4 +1,4 @@
-use core::{alloc::Layout, cell::RefCell, marker::PhantomData};
+use core::{cell::RefCell, marker::PhantomData};
 
 use crate::{
     allocation_identifier::AllocationIdentifier,
@@ -57,7 +57,9 @@ impl<
         }
     }
 
-    pub fn get_mut(&mut self) -> Result<VNVMutRef<'a, '_, '_, 'b, T, A, N, M>, ()> {
+    pub fn get_mut(
+        &mut self,
+    ) -> Result<VNVMutRef<'a, '_, '_, 'b, T, A, N, M>, ()> {
         let mut heap = self.vnv_heap.borrow_mut();
         unsafe {
             let ptr: *mut T = heap.get_mut(&self.allocation_identifier)?;
@@ -77,7 +79,7 @@ impl<
 
     pub fn unload(&mut self) -> Result<(), ()> {
         let mut heap = self.vnv_heap.borrow_mut();
-        heap.unload_object(&self.allocation_identifier)    
+        heap.unload_object(&self.allocation_identifier)
     }
 
     #[allow(unused)]
@@ -90,12 +92,11 @@ impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManag
     for VNVObject<'_, '_, T, A, N, M>
 {
     fn drop(&mut self) {
-        let layout = Layout::new::<T>();
         let mut obj = self.vnv_heap.borrow_mut();
         unsafe {
             // TODO handle this error somehow?
-            match obj.deallocate(layout, &self.allocation_identifier) {
-                Ok(()) => {},
+            match obj.deallocate(&self.allocation_identifier) {
+                Ok(()) => {}
                 Err(()) => {
                     println!("could not deallocate");
                 }

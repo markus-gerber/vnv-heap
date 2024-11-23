@@ -1,4 +1,3 @@
-mod allocation_options;
 mod allocation_identifier;
 mod resident_object_manager;
 mod persist_access_point;

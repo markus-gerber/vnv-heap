@@ -4,10 +4,6 @@ use crate::{
         nonresident_allocator::{NonResidentAllocatorModule, NonResidentBuddyAllocatorModule},
         object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
     },
-    resident_object_manager::{
-        resident_object_backup::ResidentObjectMetadataBackup,
-        MetadataBackupList,
-    },
     VNVHeap,
 };
 use core::hint::black_box;
@@ -59,20 +55,6 @@ impl<'a, 'b: 'a, A: AllocatorModule, M: ObjectManagementModule, S: PersistentSto
             let (storage, obj_manager, allocator) = inner.get_modules_mut();
 
             assert_eq!(obj_manager.resident_object_count, 0);
-
-            if obj_manager.resident_object_meta_backup.is_empty() {
-                let ptr = allocator
-                    .allocate(MetadataBackupList::item_layout(), storage)
-                    .unwrap();
-                unsafe {
-                    obj_manager.resident_object_meta_backup.push(
-                        ptr,
-                        ResidentObjectMetadataBackup::new_unused(),
-                        storage,
-                    )
-                }
-                .unwrap();
-            }
 
             if allocator.get_free_list()[bucket_index as usize].is_empty() {
                 // we need to make sure that there is a pointer in this bucket

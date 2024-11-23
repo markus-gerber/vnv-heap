@@ -1,9 +1,10 @@
-use core::{alloc::Layout, marker::PhantomData, mem::size_of};
-use std::ptr::slice_from_raw_parts_mut;
+use core::ptr::slice_from_raw_parts_mut;
+use core::{marker::PhantomData, mem::size_of};
 
 use log::{debug, error, trace, warn};
 use memoffset::offset_of;
 use resident_list::ResidentList;
+use resident_object_metadata::ResidentObjectMetadata;
 
 use crate::modules::object_management::{
     DirtyItemList, DirtyItemListArguments, ObjectManagementModule, ResidentItemList,
@@ -13,20 +14,17 @@ use crate::shared_persist_lock::SharedPersistLock;
 use crate::{
     allocation_identifier::AllocationIdentifier,
     modules::{
-        allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
-        persistent_storage::PersistentStorageModule,
+        allocator::AllocatorModule, persistent_storage::PersistentStorageModule,
     },
 };
 
 mod dirty_status;
-mod metadata_backup_info;
-mod metadata_backup_list;
 mod persist;
 pub(crate) mod resident_list;
 pub(crate) mod resident_object;
 pub(crate) mod resident_object_backup;
+pub(crate) mod resident_object_metadata;
 
-pub(crate) use metadata_backup_list::{MetadataBackupList, SharedMetadataBackupPtr};
 pub(crate) use persist::*;
 use resident_object::*;
 use resident_object_backup::*;
@@ -34,15 +32,14 @@ use resident_object_backup::*;
 #[cfg(test)]
 mod test;
 
-pub(crate) struct ResidentObjectManager<'a: 'b, 'b, A: AllocatorModule, M: ObjectManagementModule> {
+pub(crate) struct ResidentObjectManager<
+    'a: 'b,
+    'b,
+    A: AllocatorModule,
+    M: ObjectManagementModule,
+> {
     /// In memory heap for resident objects and their metadata
     pub(crate) heap: SharedPersistLock<'b, *mut A>,
-
-    /// Allocated list inside non volatile storage
-    /// to backup metadata when PFI occurs
-    ///
-    /// Following is always true: `resident_object_meta_backup.len() >= resident_object_count`
-    pub(crate) resident_object_meta_backup: &'b mut MetadataBackupList,
 
     /// How many objects are currently resident?
     pub(crate) resident_object_count: usize,
@@ -66,7 +63,9 @@ pub(crate) struct ResidentObjectManager<'a: 'b, 'b, A: AllocatorModule, M: Objec
     pub(crate) _initial_dirty_size: usize,
 }
 
-impl<'a, 'b, A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'a, 'b, A, M> {
+impl<'a, 'b, A: AllocatorModule, M: ObjectManagementModule>
+    ResidentObjectManager<'a, 'b, A, M>
+{
     /// Create a new resident object manager
     ///
     /// **Note**: Will overwrite any data, at index 0 of the given persistent storage.
@@ -77,7 +76,6 @@ impl<'a, 'b, A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManage
         resident_buffer: &'a mut [u8],
         max_dirty_size: usize,
         resident_list: &'b mut ResidentList,
-        meta_backup_list: &'b mut MetadataBackupList,
         heap: SharedPersistLock<'b, *mut A>,
     ) -> Result<Self, ()> {
         {
@@ -92,7 +90,7 @@ impl<'a, 'b, A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManage
                     .init(start_ref, resident_buffer.len())
             };
 
-        /*
+            /*
             // dirty way to test which object sizes can be allocated and which cannot
             unsafe {
                 let x = guard.as_mut().unwrap();
@@ -108,7 +106,7 @@ impl<'a, 'b, A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManage
                             }
                         }
 
-                        
+
                     }
                 });
             }
@@ -118,7 +116,6 @@ impl<'a, 'b, A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManage
         let instance = ResidentObjectManager {
             resident_list,
             heap,
-            resident_object_meta_backup: meta_backup_list,
             resident_object_count: 0,
             remaining_dirty_size: max_dirty_size,
             object_manager: M::new(),
@@ -132,16 +129,16 @@ impl<'a, 'b, A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManage
     }
 }
 
-impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_, A, M> {
+impl<A: AllocatorModule, M: ObjectManagementModule>
+    ResidentObjectManager<'_, '_, A, M>
+{
     /// Makes the given object resident if not already and returns a pointer to the resident data
     unsafe fn require_resident<
         T: Sized,
         S: PersistentStorageModule,
-        N: NonResidentAllocatorModule,
     >(
         &mut self,
         alloc_id: &AllocationIdentifier<T>,
-        non_resident_allocator: &mut N,
         storage: &mut S,
     ) -> Result<&mut ResidentObject<T>, ()> {
         if let Some(metadata) = self.find_element_mut(&alloc_id) {
@@ -152,22 +149,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
 
         trace!("Make object resident (offset: {})", alloc_id.offset);
 
-        debug_assert!(
-            self.resident_object_count <= self.resident_object_meta_backup.len(),
-            "requirement should not be violated (resident_object_count={}, resident_object_meta_backup.len()={})", self.resident_object_count, self.resident_object_meta_backup.len()
-        );
-        if self.resident_object_count == self.resident_object_meta_backup.len() {
-            // acquire new slot for backup
-            let ptr =
-                non_resident_allocator.allocate(MetadataBackupList::item_layout(), storage)?;
-            self.resident_object_meta_backup.push(
-                ptr,
-                ResidentObjectMetadataBackup::new_unused(),
-                storage,
-            )?;
-        }
-
-        let obj_layout = Layout::new::<ResidentObject<T>>();
+        let obj_layout = calc_resident_obj_layout_static::<T>();
 
         let (mut obj_ptr, mut guard) = {
             // try to allocate
@@ -243,7 +225,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
 
             sync_dirty_data::<A, S, M>(
                 &mut self.remaining_dirty_size,
-                self.resident_object_meta_backup,
                 self.resident_list,
                 &mut self.object_manager,
                 required_bytes,
@@ -290,7 +271,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                 .as_mut()
                 .unwrap();
 
-            match storage.read(alloc_id.offset, data_slice) {
+            match storage.read(alloc_id.offset + calc_user_data_offset_static::<T>(), data_slice) {
                 Ok(()) => {
                     // success
                 }
@@ -319,10 +300,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         Ok(obj_ref)
     }
 
-    pub(crate) fn unload_object<
-        T: Sized,
-        S: PersistentStorageModule,
-    >(
+    pub(crate) fn unload_object<T: Sized, S: PersistentStorageModule>(
         &mut self,
         alloc_id: &AllocationIdentifier<T>,
         storage: &mut S,
@@ -336,10 +314,18 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                     if element_ref.inner.ref_cnt != 0 {
                         return Err(());
                     }
-
                 }
 
-                unsafe { ResidentObject::<T>::unload_resident_object(element, storage, &mut self.heap, &mut self.remaining_dirty_size, false).expect("unloading should succeed") };
+                unsafe {
+                    ResidentObject::<T>::unload_resident_object(
+                        element,
+                        storage,
+                        &mut self.heap,
+                        &mut self.remaining_dirty_size,
+                        false,
+                    )
+                    .expect("unloading should succeed")
+                };
                 self.resident_object_count -= 1;
 
                 break;
@@ -349,35 +335,18 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         return Ok(());
     }
 
-    pub(crate) fn try_to_allocate<T, N: NonResidentAllocatorModule, S: PersistentStorageModule>(&mut self, data: T, offset: usize, non_resident_allocator: &mut N, storage: &mut S) -> Result<(), T> {
+    pub(crate) fn try_to_allocate<T>(
+        &mut self,
+        data: T,
+        offset: usize,
+    ) -> Result<(), T> {
         let dirty_size = size_of::<T>() + ResidentObjectMetadata::fresh_object_dirty_size();
         if self.remaining_dirty_size < dirty_size {
             // should avoid syncing
             return Err(data);
         }
 
-        if self.resident_object_count == self.resident_object_meta_backup.len() {
-            // acquire new slot for backup
-            let ptr =
-                non_resident_allocator.allocate(MetadataBackupList::item_layout(), storage);
-            let ptr = match ptr {
-                Ok(res) => res,
-                Err(_) => {
-                    return Err(data);
-                }
-            };
-            
-            let res = unsafe { self.resident_object_meta_backup.push(
-                ptr,
-                ResidentObjectMetadataBackup::new_unused(),
-                storage,
-            ) };
-            if let Err(()) = res {
-                return Err(data);
-            }
-        }
-
-        let obj_layout = Layout::new::<ResidentObject<T>>();
+        let obj_layout = calc_resident_obj_layout_static::<T>();
         let guard = self.heap.try_lock().unwrap();
         let res_ptr = unsafe { guard.as_mut().unwrap().allocate(obj_layout) };
         let res_ptr = match res_ptr {
@@ -395,10 +364,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         let mut metadata = ResidentObjectMetadata::new::<T>(offset);
         metadata.inner.dirty_status.set_data_dirty(true);
 
-        unsafe { ptr.write(ResidentObject {
-            metadata,
-            data
-        }) };
+        unsafe { ptr.write(ResidentObject { metadata, data }) };
 
         {
             // some checks and append to resident list
@@ -422,16 +388,15 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
     /// Makes the object non resident.
     ///
     /// If `T` requires dropping, the object is made resident first and then dropped afterwards.
-    pub(crate) fn drop<T: Sized, N: NonResidentAllocatorModule, S: PersistentStorageModule>(
+    pub(crate) fn drop<T: Sized, S: PersistentStorageModule>(
         &mut self,
         alloc_id: &AllocationIdentifier<T>,
-        non_resident_allocator: &mut N,
         storage: &mut S,
     ) -> Result<(), ()> {
         self.check_integrity();
         if core::mem::needs_drop::<T>() {
             // require resident to drop object in memory
-            let _ = unsafe { self.require_resident(alloc_id, non_resident_allocator, storage) }?;
+            let _ = unsafe { self.require_resident(alloc_id, storage) }?;
         }
 
         let mut iter_mut = self.resident_list.iter_mut();
@@ -449,7 +414,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                         storage,
                         &mut self.heap,
                         &mut self.remaining_dirty_size,
-                        true
+                        true,
                     )?
                 }
 
@@ -483,18 +448,16 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
     pub(crate) unsafe fn get_mut<
         T: Sized,
         S: PersistentStorageModule,
-        N: NonResidentAllocatorModule,
     >(
         &mut self,
         identifier: &AllocationIdentifier<T>,
-        non_resident_allocator: &mut N,
         storage: &mut S,
     ) -> Result<*mut T, ()> {
         self.check_integrity();
         trace!("Get mutable reference (offset={})", identifier.offset);
 
         let obj_ref: *mut ResidentObject<T> =
-            self.require_resident(identifier, non_resident_allocator, storage)?;
+            self.require_resident(identifier, storage)?;
 
         let bytes_to_sync = {
             let meta_ref = &mut obj_ref.as_mut().unwrap().metadata;
@@ -521,7 +484,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
             // sync data now
             sync_dirty_data::<A, S, M>(
                 &mut self.remaining_dirty_size,
-                self.resident_object_meta_backup,
                 self.resident_list,
                 &mut self.object_manager,
                 bytes_to_sync,
@@ -553,13 +515,10 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                     // not enough bytes remaining to make metadata dirty
                     // flush dirty status now
 
-                    // because metadata is not dirty, there has to be a backup slot
-                    let backup_slot = meta_ref.inner.metadata_backup_node.get().unwrap();
-
                     // TODO: better way than unwrap?
                     // the problem here is that integrity of backup slot could be violated if this fails
                     ResidentObjectMetadataBackup::flush_dirty_status(
-                        backup_slot,
+                        meta_ref.inner.offset,
                         &meta_ref.inner.dirty_status,
                         storage,
                     )
@@ -583,17 +542,15 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
     pub(crate) unsafe fn get_ref<
         T: Sized,
         S: PersistentStorageModule,
-        N: NonResidentAllocatorModule,
     >(
         &mut self,
         identifier: &AllocationIdentifier<T>,
-        non_resident_allocator: &mut N,
         storage: &mut S,
     ) -> Result<*const T, ()> {
         self.check_integrity();
         trace!("Get mutable reference (offset={})", identifier.offset);
 
-        let obj_ref = self.require_resident(identifier, non_resident_allocator, storage)?;
+        let obj_ref = self.require_resident(identifier, storage)?;
         let meta_ref = &mut obj_ref.metadata.inner;
 
         debug_assert_ne!(
@@ -617,10 +574,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         Ok(&mut obj_ref.data)
     }
 
-    pub(crate) unsafe fn release_mut<T: Sized>(
-        &mut self,
-        identifier: &AllocationIdentifier<T>,
-    ) {
+    pub(crate) unsafe fn release_mut<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) {
         self.check_integrity();
         trace!("Release mutable reference (offset={})", identifier.offset);
         if let Some(meta_ptr) = self.find_element_mut(identifier) {
@@ -641,10 +595,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         self.check_integrity();
     }
 
-    pub(crate) unsafe fn release_ref<T: Sized>(
-        &mut self,
-        identifier: &AllocationIdentifier<T>,
-    ) {
+    pub(crate) unsafe fn release_ref<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) {
         self.check_integrity();
         trace!("Release immutable reference (offset={})", identifier.offset);
         if let Some(meta_ptr) = self.find_element_mut(identifier) {
@@ -742,7 +693,6 @@ unsafe fn sync_dirty_data<
     M: ObjectManagementModule,
 >(
     remaining_dirty_size: &'a mut usize,
-    resident_object_meta_backup: &'a mut MetadataBackupList,
     resident_list: &'a mut ResidentList,
     object_manager: &'a mut M,
     required_bytes: usize,
@@ -758,7 +708,6 @@ unsafe fn sync_dirty_data<
 
     let mut args = DirtyItemListArguments {
         remaining_dirty_size,
-        resident_object_meta_backup,
         storage: storage,
         allocator,
         resident_object_count,

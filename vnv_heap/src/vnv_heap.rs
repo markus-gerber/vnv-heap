@@ -3,7 +3,6 @@ use try_lock::TryLock;
 
 use crate::{
     allocation_identifier::AllocationIdentifier,
-    allocation_options::AllocationOptions,
     modules::{
         allocator::AllocatorModule,
         nonresident_allocator::NonResidentAllocatorModule,
@@ -15,7 +14,10 @@ use crate::{
     },
     persist_access_point::PersistAccessPoint,
     resident_object_manager::{
-        resident_list::ResidentList, resident_object::ResidentObjectMetadata, MetadataBackupList, ResidentObjectManager
+        resident_list::ResidentList,
+        resident_object::{calc_resident_obj_layout_static, calc_user_data_offset_static},
+        resident_object_metadata::ResidentObjectMetadata,
+        ResidentObjectManager,
     },
     shared_persist_lock::SharedPersistLock,
     vnv_object::VNVObject,
@@ -54,7 +56,6 @@ pub unsafe fn vnv_persist_all() {
 
 pub(crate) struct ResidentBufPersistentStorage<A: AllocatorModule, S: PersistentStorageModule> {
     resident_list: ResidentList,
-    metadata_backup_list: MetadataBackupList,
     storage_lock: TryLock<()>,
     heap_lock: TryLock<()>,
     persist_queued: AtomicBool,
@@ -124,7 +125,6 @@ impl<
             cutoff,
             resident_buffer,
             mut storage_reference,
-            metadata_backup,
             resident_list,
             heap,
             heap_lock,
@@ -147,7 +147,6 @@ impl<
                 &mut resident_buffer[0] as *mut u8,
                 resident_buffer.len(),
                 resident_list.get_shared_ref(),
-                metadata_backup.get_shared_head_ptr(),
                 storage_reference
                     .try_lock_clone()
                     .expect("should not fail: not locked yet"),
@@ -162,11 +161,14 @@ impl<
             resident_buffer,
             config.max_dirty_bytes,
             resident_list,
-            metadata_backup,
             heap,
         )?;
         let mut non_resident_allocator = N::new();
-        non_resident_allocator.init(0, storage_reference.get_max_size(), &mut storage_reference)?;
+        non_resident_allocator.init(
+            size_of::<usize>(),
+            storage_reference.get_max_size() - size_of::<usize>(),
+            &mut storage_reference,
+        )?;
 
         Ok(VNVHeap {
             inner: ManuallyDrop::new(RefCell::new(VNVHeapInner {
@@ -191,7 +193,6 @@ impl<
             usize,
             &mut [u8],
             SharedStorageReference,
-            &mut MetadataBackupList,
             &mut ResidentList,
             SharedPersistLock<*mut A>,
             &TryLock<()>,
@@ -213,7 +214,6 @@ impl<
             persist_queued: AtomicBool::new(false),
             resident_list: ResidentList::new(),
             storage: storage_module,
-            metadata_backup_list: MetadataBackupList::new(),
         };
 
         // write inner
@@ -231,7 +231,6 @@ impl<
                 &inner_ref.persist_queued,
                 &inner_ref.storage_lock,
             )),
-            &mut inner_ref.metadata_backup_list,
             &mut inner_ref.resident_list,
             SharedPersistLock::new(
                 &mut inner_ref.heap,
@@ -251,8 +250,7 @@ impl<
         'a: 'b,
     {
         let mut inner = self.inner.borrow_mut();
-        let allocation_options = AllocationOptions::new(initial_value);
-        let identifier = unsafe { inner.allocate(allocation_options)? };
+        let identifier = unsafe { inner.allocate(initial_value)? };
 
         Ok(VNVObject::new(&self.inner, identifier))
     }
@@ -308,22 +306,20 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
 {
     pub(crate) unsafe fn allocate<T: Sized>(
         &mut self,
-        options: AllocationOptions<T>,
+        initial_value: T,
     ) -> Result<AllocationIdentifier<T>, ()> {
         trace!("Allocate new object with {} bytes", size_of::<T>());
 
-        let AllocationOptions {
-            layout,
-            initial_value,
-        } = options;
-        let offset = self
-            .non_resident_allocator
-            .allocate(layout, &mut self.storage_reference)?;
+        let offset = self.non_resident_allocator.allocate(
+            calc_resident_obj_layout_static::<T>(),
+            &mut self.storage_reference,
+        )?;
 
-        let initial_value = match self.resident_object_manager.try_to_allocate(initial_value, offset, &mut self.non_resident_allocator, &mut self.storage_reference) {
-            Ok(()) => {
-                return Ok(AllocationIdentifier::<T>::from_offset(offset))
-            },
+        let initial_value = match self
+            .resident_object_manager
+            .try_to_allocate(initial_value, offset)
+        {
+            Ok(()) => return Ok(AllocationIdentifier::<T>::from_offset(offset)),
             Err(val) => {
                 // could not put this new object into memory
                 // write this object now onto persistent storage instead...
@@ -331,13 +327,16 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
             }
         };
 
-        write_storage_data(&mut self.storage_reference, offset, &initial_value)?;
+        write_storage_data(
+            &mut self.storage_reference,
+            offset + calc_user_data_offset_static::<T>(),
+            &initial_value,
+        )?;
         Ok(AllocationIdentifier::<T>::from_offset(offset))
     }
 
     pub(crate) unsafe fn deallocate<T: Sized>(
         &mut self,
-        layout: Layout,
         identifier: &AllocationIdentifier<T>,
     ) -> Result<(), ()> {
         trace!(
@@ -346,14 +345,11 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
             identifier.offset
         );
 
-        self.resident_object_manager.drop(
-            identifier,
-            &mut self.non_resident_allocator,
-            &mut self.storage_reference,
-        )?;
+        self.resident_object_manager
+            .drop(identifier, &mut self.storage_reference)?;
         self.non_resident_allocator.deallocate(
             identifier.offset,
-            layout,
+            calc_resident_obj_layout_static::<T>(),
             &mut self.storage_reference,
         )
     }
@@ -362,35 +358,23 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
         &mut self,
         identifier: &AllocationIdentifier<T>,
     ) -> Result<*mut T, ()> {
-        self.resident_object_manager.get_mut(
-            identifier,
-            &mut self.non_resident_allocator,
-            &mut self.storage_reference,
-        )
+        self.resident_object_manager
+            .get_mut(identifier, &mut self.storage_reference)
     }
 
     pub(crate) unsafe fn get_ref<T: Sized>(
         &mut self,
         identifier: &AllocationIdentifier<T>,
     ) -> Result<*const T, ()> {
-        self.resident_object_manager.get_ref(
-            identifier,
-            &mut self.non_resident_allocator,
-            &mut self.storage_reference,
-        )
+        self.resident_object_manager
+            .get_ref(identifier, &mut self.storage_reference)
     }
 
-    pub(crate) unsafe fn release_mut<T: Sized>(
-        &mut self,
-        identifier: &AllocationIdentifier<T>,
-    ) {
+    pub(crate) unsafe fn release_mut<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) {
         self.resident_object_manager.release_mut(identifier)
     }
 
-    pub(crate) unsafe fn release_ref<T: Sized>(
-        &mut self,
-        identifier: &AllocationIdentifier<T>,
-    ) {
+    pub(crate) unsafe fn release_ref<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) {
         self.resident_object_manager.release_ref(identifier)
     }
 
@@ -398,8 +382,12 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
         self.resident_object_manager.is_resident(identifier)
     }
 
-    pub(crate) fn unload_object<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) -> Result<(), ()> {        
-        self.resident_object_manager.unload_object(identifier, &mut self.storage_reference)
+    pub(crate) fn unload_object<T: Sized>(
+        &mut self,
+        identifier: &AllocationIdentifier<T>,
+    ) -> Result<(), ()> {
+        self.resident_object_manager
+            .unload_object(identifier, &mut self.storage_reference)
     }
 
     #[cfg(feature = "benchmarks")]
@@ -414,11 +402,13 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
     }
 
     #[cfg(feature = "benchmarks")]
+    #[allow(unused)]
     pub(crate) fn get_non_resident_allocator(&self) -> &N {
         &self.non_resident_allocator
     }
 
     #[cfg(feature = "benchmarks")]
+    #[allow(unused)]
     pub(crate) fn get_modules_mut(
         &mut self,
     ) -> (

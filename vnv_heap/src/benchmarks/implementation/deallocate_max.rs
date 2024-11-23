@@ -1,12 +1,11 @@
 use crate::{
     modules::{
         allocator::AllocatorModule,
-        nonresident_allocator::{NonResidentAllocatorModule, NonResidentBuddyAllocatorModule},
+        nonresident_allocator::NonResidentBuddyAllocatorModule,
         object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
     },
     resident_object_manager::{
-        get_total_resident_size, resident_object::ResidentObject,
-        resident_object_backup::ResidentObjectMetadataBackup, MetadataBackupList,
+        get_total_resident_size, resident_object::ResidentObject
     },
     VNVHeap, VNVObject,
 };
@@ -102,35 +101,12 @@ impl<
         {
             let mut inner = heap.get_inner().borrow_mut();
             let (storage, obj_manager, allocator) = inner.get_modules_mut();
-
-            if obj_manager.resident_object_meta_backup.len() == 1 {
-                let ptr = allocator
-                    .allocate(MetadataBackupList::item_layout(), storage)
-                    .unwrap();
-                unsafe {
-                    obj_manager.resident_object_meta_backup.push(
-                        ptr,
-                        ResidentObjectMetadataBackup::new_unused(),
-                        storage,
-                    )
-                }
-                .unwrap();
-            } else {
-                panic!("chaos");
-            }
         }
 
         let mut blockers = [0; 16];
 
         {
             let mut inner = heap.get_inner().borrow_mut();
-            assert_eq!(
-                inner
-                    .get_resident_object_manager()
-                    .resident_object_meta_backup
-                    .len(),
-                2
-            );
 
             let (storage, _, allocator) = inner.get_modules_mut();
             let free_list = allocator.get_free_list_mut();
@@ -180,13 +156,7 @@ impl<
     fn execute<T: Timer>(&mut self) -> u32 {
         {
             let mut inner = self.heap.get_inner().borrow_mut();
-            assert_eq!(
-                inner
-                    .get_resident_object_manager()
-                    .resident_object_meta_backup
-                    .len(),
-                2
-            );
+
             let (_, _, allocator) = inner.get_modules_mut();
             let free_list = allocator.get_free_list_mut();
             let mut found = false;

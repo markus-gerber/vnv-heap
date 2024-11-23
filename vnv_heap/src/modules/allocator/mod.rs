@@ -40,7 +40,7 @@ mod test {
 
     #[repr(C, align(128))]
     struct Buffer {
-        inner: [u8; 1000]
+        inner: [u8; 1000],
     }
 
     pub(super) fn test_allocate_at_simple<A: AllocatorModule, F: Fn(&mut A, &mut A, isize)>(
@@ -50,7 +50,8 @@ mod test {
     ) {
         let mut buffer1 = Buffer { inner: [0; 1000] };
         let mut buffer2 = Buffer { inner: [0; 1000] };
-        let diff = (((&buffer2.inner[0]) as *const u8) as isize) - ((&buffer1.inner[0]) as *const u8) as isize;
+        let diff = (((&buffer2.inner[0]) as *const u8) as isize)
+            - ((&buffer1.inner[0]) as *const u8) as isize;
 
         unsafe {
             heap1.init(&mut buffer1.inner[0], 2000 / 2);
@@ -80,14 +81,18 @@ mod test {
         }
     }
 
-    pub(super) fn test_allocate_at_restore_state<A: AllocatorModule, F: Fn(&mut A, &mut A, isize)>(
+    pub(super) fn test_allocate_at_restore_state<
+        A: AllocatorModule,
+        F: Fn(&mut A, &mut A, isize),
+    >(
         mut heap1: A,
         mut heap2: A,
         check_heap_integrity: F,
     ) {
         let mut buffer1 = Buffer { inner: [0; 1000] };
         let mut buffer2 = Buffer { inner: [0; 1000] };
-        let diff = (((&buffer2.inner[0]) as *const u8) as isize) - ((&buffer1.inner[0]) as *const u8) as isize;
+        let diff = (((&buffer2.inner[0]) as *const u8) as isize)
+            - ((&buffer1.inner[0]) as *const u8) as isize;
 
         macro_rules! allocate {
             ($layout: expr) => {{
