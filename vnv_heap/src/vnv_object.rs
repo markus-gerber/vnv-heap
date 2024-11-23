@@ -80,6 +80,7 @@ impl<
         heap.unload_object(&self.allocation_identifier)    
     }
 
+    #[allow(unused)]
     pub(crate) fn get_alloc_id(&self) -> &AllocationIdentifier<T> {
         return &self.allocation_identifier;
     }

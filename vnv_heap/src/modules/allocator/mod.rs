@@ -101,7 +101,6 @@ mod test {
             ($ptrs: ident) => {
                 heap1.deallocate($ptrs.0, $ptrs.2);
                 heap2.deallocate($ptrs.1, $ptrs.2);
-                drop($ptrs);
             };
         }
 

@@ -3,16 +3,12 @@ use crate::{
         allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
         object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
     },
-    vnv_ref::VNVRef,
     VNVHeap, VNVObject,
 };
 use core::hint::black_box;
 use serde::Serialize;
 
 use super::{Benchmark, ModuleOptions, Timer};
-
-const SMALLEST_OBJ_SIZE: usize = 0;
-type SmallestObjData = [u8; SMALLEST_OBJ_SIZE];
 
 #[derive(Serialize)]
 pub struct GetMinMaxBenchmarkOptions {
@@ -52,7 +48,7 @@ impl<
             resident_buffer_size,
             "whole buffer should be able to be dirty"
         );
-        let mut object = heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap();
+        let object = heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap();
 
         Self {
             _heap: heap,

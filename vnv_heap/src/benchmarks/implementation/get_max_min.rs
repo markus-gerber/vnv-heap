@@ -3,7 +3,6 @@ use crate::{
         allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
         object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
     },
-    vnv_ref::VNVRef,
     VNVHeap, VNVObject,
 };
 use core::hint::black_box;
