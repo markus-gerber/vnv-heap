@@ -31,7 +31,7 @@ impl<'a, 'b: 'a, A: AllocatorModule + 'static, N: NonResidentAllocatorModule, M:
     GetMinBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
 {
     pub fn new<S: PersistentStorageModule>(heap: &'a VNVHeap<'b, A, N, M, S>) -> Self {
-        let item = heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap();
+        let mut item = heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap();
         drop(item.get().unwrap());
 
         Self {

@@ -176,7 +176,6 @@ fn check_metadata(resident_list: &SharedResidentListRef<'static>, list: Vec<(*co
             assert!(item1.inner.dirty_status == item2.1.inner.dirty_status);
             assert_eq!(item1.inner.layout, item2.1.inner.layout);
             assert_eq!(item1.inner.offset, item2.1.inner.offset);
-            assert_eq!(item1.inner.ref_cnt, item2.1.inner.ref_cnt);
 
         } else {
             assert_eq!(item1.is_none(), item2.is_none(), "The lists have different sizes!");

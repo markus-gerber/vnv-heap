@@ -183,7 +183,7 @@ mod test {
     const ENABLE_PRINTS: bool = false;
 
     use crate::resident_object_manager::{
-        dirty_status::DirtyStatus,
+        resident_object_status::ResidentObjectStatus,
         resident_object_metadata::{ResidentObjectMetadata, ResidentObjectMetadataInner},
     };
     use std::{
@@ -206,7 +206,6 @@ mod test {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("ResidentObjectMetadataInner")
                 .field("is_data", &self.dirty_status.is_data_dirty())
-                .field("ref_cnt", &self.ref_cnt)
                 .field("offset", &self.offset)
                 .field("layout", &self.layout)
                 .finish()
@@ -222,7 +221,6 @@ mod test {
     impl PartialEq for ResidentObjectMetadataInner {
         fn eq(&self, other: &Self) -> bool {
             self.dirty_status == other.dirty_status
-                && self.ref_cnt == other.ref_cnt
                 && self.offset == other.offset
                 && self.layout == other.layout
         }
@@ -249,7 +247,7 @@ mod test {
     }
 
     fn get_meta(offset: usize, is_data_dirty: bool) -> ResidentObjectMetadata {
-        let mut dirty_status = DirtyStatus::new_metadata_dirty();
+        let mut dirty_status = ResidentObjectStatus::new_metadata_dirty();
         dirty_status.set_data_dirty(is_data_dirty);
 
         ResidentObjectMetadata {

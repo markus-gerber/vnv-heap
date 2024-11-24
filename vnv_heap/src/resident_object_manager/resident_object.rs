@@ -44,9 +44,8 @@ impl<T: Sized> ResidentObject<T> {
         dirty_size: &mut usize,
         unsafe_no_sync: bool,
     ) -> Result<(), ()> {
-        debug_assert_eq!(
-            delete_handle.get_element().inner.ref_cnt,
-            0,
+        debug_assert!(
+            !delete_handle.get_element().inner.dirty_status.is_in_use(),
             "no valid object"
         );
 

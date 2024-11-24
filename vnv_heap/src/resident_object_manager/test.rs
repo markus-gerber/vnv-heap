@@ -233,60 +233,6 @@ fn test_remain_resident() {
 
     check_resident!();
 
-    // second iteration, get another round of immutable references
-    for offset in offset_list.iter() {
-        if let Some((_, i)) = ref_offsets
-            .iter()
-            .zip(0..)
-            .find(|(cur_off, _)| *cur_off == offset)
-        {
-            unsafe {
-                let ptr = manager
-                    .get_ref(
-                        &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                        &mut storage,
-                    )
-                    .unwrap();
-                ref_ptrs[i + ref_offsets.len()] = ptr;
-            }
-        } else {
-            unsafe {
-                manager
-                    .require_resident(
-                        &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                        &mut storage,
-                    )
-                    .unwrap();
-            }
-        }
-
-        check_resident!();
-    }
-
-    // release first round of references
-    for i in 0..ref_offsets.len() {
-        unsafe {
-            manager.release_ref(
-                &AllocationIdentifier::<TestObj>::from_offset(ref_offsets[i]),
-            );
-        }
-    }
-
-    check_resident!();
-
-    // third iteration, make sure our objects still remain resident
-    for offset in offset_list.iter() {
-        unsafe {
-            manager
-                .require_resident(
-                    &AllocationIdentifier::<TestObj>::from_offset(*offset),
-                    &mut storage,
-                )
-                .unwrap();
-        }
-
-        check_resident!();
-    }
 
     // remove references
     for i in 0..ref_offsets.len() {

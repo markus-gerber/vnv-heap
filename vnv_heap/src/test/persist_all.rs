@@ -89,7 +89,7 @@ fn test_persist_all_simple() {
         >,
         check_states: &mut Vec<[u8; 10]>,
     ) {
-        for (object, check_state) in objects.iter().zip(check_states.iter()) {
+        for (object, check_state) in objects.iter_mut().zip(check_states.iter()) {
             let obj_ref = object.get().unwrap();
             assert_eq!(*obj_ref, *check_state)
         }

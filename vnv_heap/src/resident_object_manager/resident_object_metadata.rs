@@ -18,7 +18,7 @@ use crate::{
 };
 
 use super::{
-    calc_user_data_offset_dynamic, dirty_status::DirtyStatus, resident_list::DeleteHandle, ResidentObject, ResidentObjectMetadataBackup, SharedPersistLock
+    calc_user_data_offset_dynamic, resident_object_status::ResidentObjectStatus, resident_list::DeleteHandle, ResidentObject, ResidentObjectMetadataBackup, SharedPersistLock
 };
 
 const SYNCED_METADATA_DIRTY_SIZE: usize = {
@@ -29,7 +29,7 @@ const SYNCED_METADATA_DIRTY_SIZE: usize = {
     let obj = ResidentObjectMetadataBackup::new_unused();
 
     // ref cnt and next_resident_object are not saved
-    size(&obj.inner.ref_cnt) + size(&obj.next_resident_object)
+    size(&obj.inner.dirty_status) + size(&obj.next_resident_object)
 };
 
 const UNSYNCED_METADATA_DIRTY_SIZE: usize = size_of::<ResidentObjectMetadataBackup>();
@@ -45,11 +45,7 @@ pub(crate) struct ResidentObjectMetadata {
 #[derive(Clone, Copy)]
 pub(crate) struct ResidentObjectMetadataInner {
     /// What parts of this resident object are currently dirty?
-    pub(crate) dirty_status: DirtyStatus,
-
-    /// Counts the amount of references that are currently held
-    /// be the program
-    pub(crate) ref_cnt: usize,
+    pub(crate) dirty_status: ResidentObjectStatus,
 
     pub(crate) offset: usize,
 
@@ -67,8 +63,7 @@ pub(crate) struct ResidentObjectMetadataInner {
 impl ResidentObjectMetadataInner {
     pub(super) fn new<T: Sized>(offset: usize) -> Self {
         ResidentObjectMetadataInner {
-            dirty_status: DirtyStatus::new_metadata_dirty(),
-            ref_cnt: 0,
+            dirty_status: ResidentObjectStatus::new_metadata_dirty(),
             layout: Layout::new::<T>(),
             offset,
 
@@ -82,7 +77,6 @@ impl Default for ResidentObjectMetadataInner {
     fn default() -> Self {
         Self {
             dirty_status: Default::default(),
-            ref_cnt: Default::default(),
             offset: Default::default(),
             layout: Layout::new::<()>(),
             #[cfg(debug_assertions)]
@@ -213,9 +207,8 @@ impl ResidentObjectMetadata {
         allocator_module: &SharedPersistLock<*mut A>,
         dirty_size: &mut usize,
     ) -> Result<(), ()> {
-        debug_assert_eq!(
-            delete_handle.get_element().inner.ref_cnt,
-            0,
+        debug_assert!(
+            !delete_handle.get_element().inner.dirty_status.is_in_use(),
             "no valid object"
         );
 

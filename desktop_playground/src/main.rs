@@ -14,7 +14,7 @@ fn main() {
 
     let storage = FilePersistentStorageModule::new("test.data".to_string(), 4096).unwrap();
     let config = VNVConfig {
-        max_dirty_bytes: 100,
+        max_dirty_bytes: 200,
     };
     let mut buffer = [0u8; 512];
     let heap = LinkedListAllocatorModule::new();

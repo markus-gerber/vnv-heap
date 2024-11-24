@@ -44,7 +44,7 @@ impl<
         }
     }
 
-    pub fn get(&self) -> Result<VNVRef<'a, '_, '_, 'b, T, A, N, M>, ()> {
+    pub fn get(&mut self) -> Result<VNVRef<'a, '_, '_, 'b, T, A, N, M>, ()> {
         let mut heap = self.vnv_heap.borrow_mut();
         unsafe {
             let ptr: *const T = heap.get_ref(&self.allocation_identifier)?;

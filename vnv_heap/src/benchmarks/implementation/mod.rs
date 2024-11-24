@@ -81,7 +81,7 @@ macro_rules! for_obj_size {
         for_obj_size_impl!($index, $inner, 30);
 
         #[cfg(target_pointer_width = "64")]
-        for_obj_size_impl!($index, $inner, 27);
+        for_obj_size_impl!($index, $inner, 28);
     };
 }
 

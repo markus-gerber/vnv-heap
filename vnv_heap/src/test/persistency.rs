@@ -73,8 +73,6 @@ fn test_heap_persistency() {
     for (i, obj) in open_ref_obj.iter_mut().enumerate() {
         if i % 2 == 0 {
             open_refs.push(obj.get().unwrap());
-            open_refs.push(obj.get().unwrap());
-            open_refs.push(obj.get().unwrap());
         } else {
             open_muts.push(obj.get_mut().unwrap());
         }

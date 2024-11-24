@@ -1,7 +1,7 @@
 use core::ptr::slice_from_raw_parts_mut;
 use core::{marker::PhantomData, mem::size_of};
 
-use log::{debug, error, trace, warn};
+use log::{debug, trace, warn};
 use memoffset::offset_of;
 use resident_list::ResidentList;
 use resident_object_metadata::ResidentObjectMetadata;
@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-mod dirty_status;
+mod resident_object_status;
 mod persist;
 pub(crate) mod resident_list;
 pub(crate) mod resident_object;
@@ -311,7 +311,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule>
                 // element found
                 {
                     let element_ref = element.get_element();
-                    if element_ref.inner.ref_cnt != 0 {
+                    if element_ref.inner.dirty_status.is_in_use() {
                         return Err(());
                     }
                 }
@@ -463,9 +463,13 @@ impl<A: AllocatorModule, M: ObjectManagementModule>
             let meta_ref = &mut obj_ref.as_mut().unwrap().metadata;
 
             // should be ensured by the rust compiler
-            debug_assert_eq!(
-                meta_ref.inner.ref_cnt, 0,
-                "There should be no references to this object yet!"
+            debug_assert!(
+                !meta_ref.inner.dirty_status.is_in_use(),
+                "This object should not be in use yet!"
+            );
+            debug_assert!(
+                !meta_ref.inner.dirty_status.is_mutable_ref_active(),
+                "This object should not have any mutable references!"
             );
 
             if !meta_ref.inner.dirty_status.is_data_dirty()
@@ -532,8 +536,8 @@ impl<A: AllocatorModule, M: ObjectManagementModule>
             meta_ref.inner.dirty_status.set_data_dirty(true);
         }
 
-        meta_ref.inner.ref_cnt = usize::MAX;
-
+        meta_ref.inner.dirty_status.set_is_in_use(true);
+        meta_ref.inner.dirty_status.set_is_mutable_ref_active(true);
         self.check_integrity();
 
         Ok(&mut obj_ref.data)
@@ -553,23 +557,16 @@ impl<A: AllocatorModule, M: ObjectManagementModule>
         let obj_ref = self.require_resident(identifier, storage)?;
         let meta_ref = &mut obj_ref.metadata.inner;
 
-        debug_assert_ne!(
-            meta_ref.ref_cnt,
-            usize::MAX,
-            "There should be no mutable references to this object!"
+        debug_assert!(
+            !meta_ref.dirty_status.is_in_use(),
+            "This object should not be in use yet!"
+        );
+        debug_assert!(
+            !meta_ref.dirty_status.is_mutable_ref_active(),
+            "This object should not have any mutable references!"
         );
 
-        if meta_ref.ref_cnt >= usize::MAX - 1 {
-            // too many references?
-            error!(
-                "Cannot request ref for resident object: Too many references (current ref_cnt: {})",
-                meta_ref.ref_cnt
-            );
-            self.check_integrity();
-            return Err(());
-        }
-
-        meta_ref.ref_cnt += 1;
+        meta_ref.dirty_status.set_is_in_use(true);
 
         Ok(&mut obj_ref.data)
     }
@@ -580,9 +577,11 @@ impl<A: AllocatorModule, M: ObjectManagementModule>
         if let Some(meta_ptr) = self.find_element_mut(identifier) {
             let meta_ref = meta_ptr.as_mut().unwrap();
             let meta_ref = &mut meta_ref.inner;
-            debug_assert_eq!(meta_ref.ref_cnt, usize::MAX);
+            debug_assert!(meta_ref.dirty_status.is_in_use());
+            debug_assert!(meta_ref.dirty_status.is_mutable_ref_active());
 
-            meta_ref.ref_cnt = 0;
+            meta_ref.dirty_status.set_is_in_use(false);
+            meta_ref.dirty_status.set_is_mutable_ref_active(false);
         } else {
             // nothing to do, as references are not tracked for nonresident objects
             // should not happen anyway...
@@ -601,10 +600,10 @@ impl<A: AllocatorModule, M: ObjectManagementModule>
         if let Some(meta_ptr) = self.find_element_mut(identifier) {
             let meta_ref = meta_ptr.as_mut().unwrap();
             let meta_ref = &mut meta_ref.inner;
-            debug_assert_ne!(meta_ref.ref_cnt, 0);
-            debug_assert_ne!(meta_ref.ref_cnt, usize::MAX);
+            debug_assert!(meta_ref.dirty_status.is_in_use());
+            debug_assert!(!meta_ref.dirty_status.is_mutable_ref_active());
 
-            meta_ref.ref_cnt -= 1;
+            meta_ref.dirty_status.set_is_in_use(false);
         } else {
             // nothing to do, as references are not tracked for nonresident objects
             // should not happen anyway...

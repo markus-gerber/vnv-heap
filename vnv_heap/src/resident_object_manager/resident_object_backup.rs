@@ -2,7 +2,7 @@ use core::{alloc::Layout, sync::atomic::AtomicPtr};
 use memoffset::offset_of;
 
 use super::{
-    dirty_status::DirtyStatus,
+    resident_object_status::ResidentObjectStatus,
     resident_object_metadata::{ResidentObjectMetadata, ResidentObjectMetadataInner},
 };
 use crate::modules::persistent_storage::{persistent_storage_util, PersistentStorageModule};
@@ -21,11 +21,7 @@ pub(crate) struct ResidentObjectMetadataBackup {
 #[derive(Clone, Copy)]
 pub(crate) struct ResidentObjectMetadataBackupInner {
     /// What parts of this resident object are currently dirty?
-    pub(crate) dirty_status: DirtyStatus,
-
-    /// Counts the amount of references that are currently held
-    /// be the program
-    pub(crate) ref_cnt: usize,
+    pub(crate) dirty_status: ResidentObjectStatus,
 
     /// Points to the location in RAM where this metadata object is stored
     pub(crate) offset: usize,
@@ -36,8 +32,7 @@ pub(crate) struct ResidentObjectMetadataBackupInner {
 impl ResidentObjectMetadataBackupInner {
     const fn default() -> Self {
         Self {
-            dirty_status: DirtyStatus::new_metadata_dirty(),
-            ref_cnt: 0,
+            dirty_status: ResidentObjectStatus::new_metadata_dirty(),
             offset: 0,
             layout: Layout::new::<()>(),
         }
@@ -48,7 +43,6 @@ impl ResidentObjectMetadataBackupInner {
             dirty_status,
             layout,
             offset: _offset,
-            ref_cnt,
 
             #[cfg(debug_assertions)]
                 data_offset: _data_offset,
@@ -58,7 +52,6 @@ impl ResidentObjectMetadataBackupInner {
             dirty_status: dirty_status.clone(),
             layout: layout.clone(),
             offset: (value as *const ResidentObjectMetadataInner) as usize,
-            ref_cnt: ref_cnt.clone(),
         }
     }
 
@@ -67,14 +60,12 @@ impl ResidentObjectMetadataBackupInner {
             dirty_status,
             layout,
             offset: _offset,
-            ref_cnt,
         } = self;
 
         ResidentObjectMetadataInner {
             dirty_status: dirty_status,
             layout: layout,
             offset: storage_offset,
-            ref_cnt: ref_cnt,
 
             #[cfg(debug_assertions)]
             data_offset: usize::MAX,
@@ -115,7 +106,7 @@ impl ResidentObjectMetadataBackup {
 
     pub(crate) unsafe fn flush_dirty_status<S: PersistentStorageModule>(
         data_offset: usize,
-        dirty_status: &DirtyStatus,
+        dirty_status: &ResidentObjectStatus,
         storage: &mut S,
     ) -> Result<(), ()> {
         const DIRTY_STATUS_OFFSET: usize = offset_of!(ResidentObjectMetadataBackup, inner)

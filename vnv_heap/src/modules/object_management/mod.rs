@@ -94,7 +94,7 @@ impl<'a, 'b, 'c, S: PersistentStorageModule, A: AllocatorModule>
 {
     pub fn next<'d>(&'d mut self) -> Option<ResidentIterItem<'a, 'b, '_, '_, 'c, 'd, S, A>> {
         while let Some(mut item) = self.iter.next() {
-            if item.get_element().inner.ref_cnt == 0 {
+            if !item.get_element().inner.dirty_status.is_in_use() {
                 // object found that is not in use
 
                 unsafe {
@@ -148,7 +148,7 @@ pub struct DirtyIterItem<'a, 'b, 'c, 'd, 'e, 'f, A: AllocatorModule, S: Persiste
 impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '_, '_, '_, A, S> {
     #[inline]
     pub fn is_unused(&mut self) -> bool {
-        self.delete_handle.get_element().inner.ref_cnt == 0
+        !self.delete_handle.get_element().inner.dirty_status.is_in_use()
     }
 
     /// Unloads this object and returns the amount of additional dirty bytes that are free now
@@ -219,7 +219,8 @@ pub struct DirtyIter<'a, 'b, 'c, 'd, A: AllocatorModule, S: PersistentStorageMod
 impl<'a, 'b, 'c, A: AllocatorModule, S: PersistentStorageModule> DirtyIter<'a, 'b, '_, 'c, A, S> {
     pub fn next<'d>(&'d mut self) -> Option<DirtyIterItem<'a, 'b, '_, '_, 'c, 'd, A, S>> {
         while let Some(mut item) = self.iter.next() {
-            if item.get_element().inner.ref_cnt != usize::MAX {
+            let status = &item.get_element().inner.dirty_status;
+            if !status.is_in_use() || !status.is_mutable_ref_active() {
                 // object found that is not in use or only
                 // has some immutable references
 
