@@ -1,7 +1,7 @@
 use std::{array, vec};
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
 use vnv_heap::{VNVConfig, VNVHeap, modules::{nonresident_allocator::NonResidentBuddyAllocatorModule, allocator::LinkedListAllocatorModule, object_management::DefaultObjectManagementModule}};
-use spi_fram_storage::SpiFramStorageModule;
+use spi_fram_storage::MB85RS4MTFramStorageModule;
 
 pub fn test_heap_persistency() {
     type TestType = [u8; 10];
@@ -10,18 +10,18 @@ pub fn test_heap_persistency() {
         array::from_fn(|_| rand.next_u32() as u8)
     }
 
-    let storage = unsafe { SpiFramStorageModule::new() }.unwrap();
+    let storage = unsafe { MB85RS4MTFramStorageModule::new() }.unwrap();
     
     let config = VNVConfig {
-        max_dirty_bytes: 600
+        max_dirty_bytes: 1000
     };
     let mut buffer = [0u8; 1000];
     
     let heap: VNVHeap<
         LinkedListAllocatorModule,
-        NonResidentBuddyAllocatorModule<16>,
+        NonResidentBuddyAllocatorModule<19>,
         DefaultObjectManagementModule,
-        SpiFramStorageModule
+        MB85RS4MTFramStorageModule
     > = VNVHeap::new(&mut buffer, storage, LinkedListAllocatorModule::new(), config, |_, _| {}).unwrap();
 
     const SEED: u64 = 5446535461589659585;
@@ -49,7 +49,7 @@ pub fn test_heap_persistency() {
             if test_type == 0 {
                 // get mut and change data
                 let mut mut_ref = objects[i].get_mut().unwrap();
-                assert_eq!(*mut_ref, check_states[i]);
+                assert_eq!(*mut_ref, check_states[i], "test_type {}", test_type);
                 
                 let data = rand_data(&mut rand);
                 *mut_ref = data;
@@ -57,11 +57,11 @@ pub fn test_heap_persistency() {
             } else if test_type < 2 {
                 // get mut and dont change data
                 let mut_ref = objects[i].get_mut().unwrap();
-                assert_eq!(*mut_ref, check_states[i]);
+                assert_eq!(*mut_ref, check_states[i], "test_type {}", test_type);
             } else {
                 // get ref
                 let immut_ref = objects[i].get().unwrap();
-                assert_eq!(*immut_ref, check_states[i]);
+                assert_eq!(*immut_ref, check_states[i], "test_type {}", test_type);
             }
         };
     }

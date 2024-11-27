@@ -10,30 +10,34 @@ extern crate zephyr;
 extern crate zephyr_logger;
 extern crate zephyr_core;
 
-use mb85rs64v_spi_fram::MB85RS64VSpiFram;
+use vnv_heap::modules::persistent_storage::PersistentStorageModule;
+use spi_fram_storage::MB85RS4MTFramStorageModule;
 
-mod mb85rs64v_spi_fram;
 
 #[no_mangle]
 pub extern "C" fn rust_main() {
     zephyr_logger::init(log::LevelFilter::Info);
 
-    let ram = unsafe { MB85RS64VSpiFram::new() }.unwrap();
+    let mut ram = unsafe { MB85RS4MTFramStorageModule::new() }.unwrap();
 
-    const LEN: usize = 512;
+    const LEN: usize = 20000;
     let mut buffer = [0u8; LEN];
     let mut read_buffer = [0u8; LEN];
 
     for i in 0..buffer.len() {
         let x = (i * 10 + (i % 2) * 5) as u8;
         buffer[i] = x;
+
+        if i % (buffer.len() / (LEN / 100)) == 0 {
+            info!("{}/{}", i, buffer.len())
+        }
     }
 
-    info!("writing {} bytes", buffer.len());
-    ram.write(&mut buffer, 0).expect("write should be successful");
+    info!("writing {} bytes...", buffer.len());
+    ram.write(0, &buffer).expect("write should be successful");
 
-    info!("reading {} bytes", read_buffer.len());
-    ram.read(&mut read_buffer, 0).expect("read should be successful");
+    info!("reading {} bytes....", buffer.len());
+    ram.read(0, &mut read_buffer).expect("read should be successful");
 
     for i in 0..buffer.len() {
         assert_eq!(read_buffer[i], buffer[i]);

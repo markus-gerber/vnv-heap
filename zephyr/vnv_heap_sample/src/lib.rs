@@ -8,7 +8,7 @@ extern crate zephyr_core;
 extern crate zephyr_logger;
 extern crate zephyr_macros;
 
-use spi_fram_storage::SpiFramStorageModule;
+use spi_fram_storage::MB85RS4MTFramStorageModule;
 use vnv_heap::{
     modules::{
         allocator::LinkedListAllocatorModule,
@@ -22,7 +22,7 @@ use vnv_heap::{
 pub extern "C" fn rust_main() {
     zephyr_logger::init(log::LevelFilter::Trace);
 
-    let storage = unsafe { SpiFramStorageModule::new() }.unwrap();
+    let storage = unsafe { MB85RS4MTFramStorageModule::new() }.unwrap();
 
     let config = VNVConfig {
         max_dirty_bytes: 100,
@@ -31,9 +31,9 @@ pub extern "C" fn rust_main() {
 
     let heap: VNVHeap<
         LinkedListAllocatorModule,
-        NonResidentBuddyAllocatorModule<16>,
+        NonResidentBuddyAllocatorModule<19>,
         DefaultObjectManagementModule,
-        SpiFramStorageModule,
+        MB85RS4MTFramStorageModule,
     > = VNVHeap::new(
         &mut buffer,
         storage,

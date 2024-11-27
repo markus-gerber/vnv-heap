@@ -7,7 +7,7 @@ use std::{array, ptr::slice_from_raw_parts_mut};
 
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
 
-use spi_fram_storage::SpiFramStorageModule;
+use spi_fram_storage::MB85RS4MTFramStorageModule;
 use vnv_heap::{
     modules::{
         allocator::LinkedListAllocatorModule,
@@ -35,7 +35,7 @@ pub extern "C" fn rust_main() {
     }
 
     // configure vNVHeap
-    let storage = unsafe { SpiFramStorageModule::new() }.unwrap();
+    let storage = unsafe { MB85RS4MTFramStorageModule::new() }.unwrap();
 
     let config = VNVConfig {
         max_dirty_bytes: 600,
@@ -45,9 +45,9 @@ pub extern "C" fn rust_main() {
     // init vNVHeap
     let heap: VNVHeap<
         LinkedListAllocatorModule,
-        NonResidentBuddyAllocatorModule<16>,
+        NonResidentBuddyAllocatorModule<19>,
         DefaultObjectManagementModule,
-        SpiFramStorageModule,
+        MB85RS4MTFramStorageModule,
     > = VNVHeap::new(
         &mut buffer,
         storage,

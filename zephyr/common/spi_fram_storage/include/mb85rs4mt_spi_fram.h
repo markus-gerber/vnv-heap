@@ -7,14 +7,14 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
 
-#define MB85RS64V_MANUFACTURER_ID_CMD 0x9f
-#define MB85RS64V_WRITE_ENABLE_CMD 0x06
-#define MB85RS64V_READ_CMD 0x03
-#define MB85RS64V_WRITE_CMD 0x02
+#define MB85RS4MT_MANUFACTURER_ID_CMD 0x9f
+#define MB85RS4MT_WRITE_ENABLE_CMD 0x06
+#define MB85RS4MT_READ_CMD 0x03
+#define MB85RS4MT_WRITE_CMD 0x02
 
-struct spi_dt_spec mb85rs64v_init(int* error) {
+struct spi_dt_spec mb85rs4mt_init(int* error) {
 	struct spi_config spi_cfg = {
-		.frequency = 256000U,
+		.frequency = 20000000U,
 		.operation = SPI_WORD_SET(8),
 		.cs = SPI_CS_CONTROL_INIT(DT_NODELABEL(spidev), 10),
 	};
@@ -39,10 +39,10 @@ struct spi_dt_spec mb85rs64v_init(int* error) {
 	return spec;
 }
 
-static inline int mb85rs64v_access(const struct spi_dt_spec* device,
-			    uint8_t cmd, uint16_t addr, void *data, size_t len)
+static inline int mb85rs4mt_access(const struct spi_dt_spec* device,
+			    uint8_t cmd, uint32_t addr, void *data, size_t len)
 {
-	uint8_t access[3];
+	uint8_t access[4];
 	struct spi_buf bufs[] = {
 		{
 			.buf = access,
@@ -58,14 +58,15 @@ static inline int mb85rs64v_access(const struct spi_dt_spec* device,
 
 	access[0] = cmd;
 
-	if (cmd == MB85RS64V_WRITE_CMD || cmd == MB85RS64V_READ_CMD) {
-		access[1] = (addr >> 8) & 0xFF;
-		access[2] = addr & 0xFF;
+	if (cmd == MB85RS4MT_WRITE_CMD || cmd == MB85RS4MT_READ_CMD) {
+		access[1] = (addr >> (8 * 2)) & 0xFF;
+		access[2] = (addr >> (8 * 1)) & 0xFF;
+		access[3] = (addr >> (8 * 0)) & 0xFF;
 
-		bufs[0].len = 3;
+		bufs[0].len = 4;
 		tx.count = 2;
 
-		if (cmd == MB85RS64V_READ_CMD) {
+		if (cmd == MB85RS4MT_READ_CMD) {
 			struct spi_buf_set rx = {
 				.buffers = bufs,
 				.count = 2
@@ -82,11 +83,11 @@ static inline int mb85rs64v_access(const struct spi_dt_spec* device,
 }
 
 
-int mb85rs64v_validate_id(const struct spi_dt_spec* device)
+int mb85rs4mt_validate_id(const struct spi_dt_spec* device)
 {
 	uint8_t id[4];
 
-	uint8_t cmd = MB85RS64V_MANUFACTURER_ID_CMD;
+	uint8_t cmd = MB85RS4MT_MANUFACTURER_ID_CMD;
 	struct spi_buf bufs[] = {
 		{
 			.buf = &cmd,
@@ -121,32 +122,32 @@ int mb85rs64v_validate_id(const struct spi_dt_spec* device)
 		return -EIO;
 	}
 
-	if (id[2] != 0x03) {
+	if (id[2] != 0x48) { // in spec 0x49 is specified??
 		return -EIO;
 	}
 
-	if (id[3] != 0x02) {
+	if (id[3] != 0x03) {
 		return -EIO;
 	}
 
 	return 0;
 }
 
-int mb85rs64v_write_bytes(const struct spi_dt_spec* device,
-		       uint16_t addr, uint8_t *data, uint32_t num_bytes)
+int mb85rs4mt_write_bytes(const struct spi_dt_spec* device,
+		       uint32_t addr, const uint8_t *data, uint32_t num_bytes)
 {
 	int err;
 
 	/* disable write protect */
-	err = mb85rs64v_access(device,
-			       MB85RS64V_WRITE_ENABLE_CMD, 0, NULL, 0);
+	err = mb85rs4mt_access(device,
+			       MB85RS4MT_WRITE_ENABLE_CMD, 0, NULL, 0);
 	if (err) {
 		return -EIO;
 	}
 
 	/* write cmd */
-	err = mb85rs64v_access(device,
-			       MB85RS64V_WRITE_CMD, addr, data, num_bytes);
+	err = mb85rs4mt_access(device,
+			       MB85RS4MT_WRITE_CMD, addr, (uint8_t*) data, num_bytes);
 	if (err) {
 		return -EIO;
 	}
@@ -154,14 +155,14 @@ int mb85rs64v_write_bytes(const struct spi_dt_spec* device,
 	return 0;
 }
 
-int mb85rs64v_read_bytes(const struct spi_dt_spec* device,
-		      uint16_t addr, uint8_t *data, uint32_t num_bytes)
+int mb85rs4mt_read_bytes(const struct spi_dt_spec* device,
+		      uint32_t addr, uint8_t *data, uint32_t num_bytes)
 {
 	int err;
 
 	/* read cmd */
-	err = mb85rs64v_access(device,
-			       MB85RS64V_READ_CMD, addr, data, num_bytes);
+	err = mb85rs4mt_access(device,
+			       MB85RS4MT_READ_CMD, addr, data, num_bytes);
 	if (err) {
 		return -EIO;
 	}

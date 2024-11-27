@@ -9,7 +9,7 @@
 #include <stdatomic.h>
 
 #include "../../common/atomics/atomics.h"
-#include "../../common/spi_fram_storage/include/mb85rs64v_spi_fram.h"
+#include "../../common/spi_fram_storage/include/mb85rs4mt_spi_fram.h"
 
 extern void rust_main(void);
 

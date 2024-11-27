@@ -4,7 +4,7 @@ extern crate zephyr_logger;
 extern crate zephyr_macros;
 extern crate zephyr_sys;
 
-use spi_fram_storage::SpiFramStorageModule;
+use spi_fram_storage::MB85RS4MTFramStorageModule;
 use vnv_heap::benchmarks::{
     BenchmarkRunOptions, Timer, run_all_benchmarks, RunAllBenchmarkOptions
 };
@@ -24,13 +24,13 @@ pub extern "C" fn rust_main() {
     let mut time: i64 = unsafe { helper_k_uptime_get() };
 /*
     {
-        let layout_info = VNVHeap::<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, DefaultObjectManagementModule, SpiFramStorageModule>::get_layout_info();
+        let layout_info = VNVHeap::<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, DefaultObjectManagementModule, MB85RS4MTFramStorageModule>::get_layout_info();
         println!("layout_info: {:?}", layout_info);
     }
 */
     run_all_benchmarks::<
         ZephyrTimer,
-        SpiFramStorageModule,
+        MB85RS4MTFramStorageModule,
         _
     >(
         BenchmarkRunOptions {
@@ -115,6 +115,6 @@ impl Timer for ZephyrTimer {
     }
 }
 
-fn get_storage() -> SpiFramStorageModule {
-    unsafe { SpiFramStorageModule::new() }.unwrap()
+fn get_storage() -> MB85RS4MTFramStorageModule {
+    unsafe { MB85RS4MTFramStorageModule::new() }.unwrap()
 }

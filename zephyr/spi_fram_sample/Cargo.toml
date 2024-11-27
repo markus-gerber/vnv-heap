@@ -9,6 +9,8 @@ log = "0.4"
 zephyr = { path = "../zephyr-rust/rust/zephyr" }
 zephyr-macros = { path = "../zephyr-rust/rust/zephyr-macros" }
 zephyr-logger = { path = "../zephyr-rust/rust/zephyr-logger" }
+spi_fram_storage = { path = "../common/spi_fram_storage" }
+vnv_heap = { path = "../../vnv_heap", features = [] }
 libc = "0.2"
 
 [features]
