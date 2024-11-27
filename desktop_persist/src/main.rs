@@ -1,6 +1,6 @@
 use std::{
     array, mem,
-    ptr::{null_mut, slice_from_raw_parts_mut},
+    ptr::{null_mut, slice_from_raw_parts_mut}, time::Instant,
 };
 
 use env_logger::{Builder, Env};
@@ -15,7 +15,11 @@ use vnv_heap::{
     vnv_persist_all, VNVConfig, VNVHeap,
 };
 
+static mut PERSIST_TIMER: Option<DesktopTimer> = None;
+
+
 extern "C" fn signal_handler(_sig: libc::c_int) {
+    unsafe { PERSIST_TIMER = Some(DesktopTimer::start()) };
     unsafe { vnv_persist_all() };
 }
 
@@ -38,7 +42,7 @@ fn main() {
 
     let storage = FilePersistentStorageModule::new("/tmp/vnv_desktop_persist.data".to_string(), 4096 * 4).unwrap();
     let config = VNVConfig {
-        max_dirty_bytes: 2000,
+        max_dirty_bytes: 500,
     };
     let mut buffer = [0u8; 2000];
     let heap = LinkedListAllocatorModule::new();
@@ -49,6 +53,34 @@ fn main() {
         DefaultObjectManagementModule,
         FilePersistentStorageModule
     > = VNVHeap::new(&mut buffer, storage, heap, config, |base_ptr, size| {
+        let latency = unsafe { PERSIST_TIMER.take().unwrap().stop() };
+
+        {
+            let text = "persist finished in ";
+            unsafe { libc::write(libc::STDOUT_FILENO, text.as_ptr() as *const libc::c_void, text.len()) };
+
+            // convert latency to string
+            let mut curr = latency;
+            let mut buf = ['0'; 32];
+            let mut pos: usize = 32;
+            while curr != 0 {
+                pos -= 1;
+
+                buf[pos] =  char::from_digit(curr % 10, 10).unwrap();
+                curr /= 10;
+            }
+            if pos == 32 {
+                // special case: would not print any character otherwise.
+                pos -= 1;
+                buf[pos] = '0';
+            }
+
+            unsafe { libc::write(libc::STDOUT_FILENO, ((&buf[pos]) as *const char) as *const libc::c_void, 32 - pos) };
+
+            let text = "ns\n";
+            unsafe { libc::write(libc::STDOUT_FILENO, text.as_ptr() as *const libc::c_void, text.len()) };
+        }
+        
         let buffer = unsafe { slice_from_raw_parts_mut(base_ptr, size).as_mut() }.unwrap();
         buffer.fill(0);
 
@@ -163,5 +195,25 @@ fn main() {
         for _ in 0..1_000_000 {
             single_test!();
         }
+    }
+}
+
+
+struct DesktopTimer {
+    start_time: Instant,
+}
+
+impl DesktopTimer {
+
+    #[inline]
+    fn start() -> Self {
+        Self {
+            start_time: Instant::now(),
+        }
+    }
+
+    #[inline]
+    fn stop(self) -> u32 {
+        (Instant::now() - self.start_time).subsec_nanos()
     }
 }
