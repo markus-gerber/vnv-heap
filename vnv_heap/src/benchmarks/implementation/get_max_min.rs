@@ -72,7 +72,7 @@ impl<
             unsafe {
                 heap.get_inner()
                     .borrow_mut()
-                    .get_ref(new_obj.get_alloc_id())
+                    .get_ref(new_obj.get_alloc_id(), false)
                     .unwrap()
             };
             others.push(new_obj);

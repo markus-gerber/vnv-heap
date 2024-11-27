@@ -1,22 +1,18 @@
 use core::{alloc::Layout, ptr::NonNull};
-use memoffset::offset_of;
+use std::mem::size_of;
 
 use crate::{
     modules::{
         allocator::AllocatorModule,
-        persistent_storage::{
-            persistent_storage_util::write_storage_data, PersistentStorageModule,
-        },
+        persistent_storage::PersistentStorageModule,
     },
     shared_persist_lock::SharedPersistLock,
-    util::{repr_c_layout, round_up_to_nearest},
+    util::repr_c_layout,
 };
 
 use super::{
-    resident_list::DeleteHandle, resident_object_metadata::ResidentObjectMetadata,
-    ResidentObjectMetadataBackup,
+    partial_dirtiness_tracking::PartialDirtinessTrackingInfo, resident_list::DeleteHandle, resident_object_metadata::ResidentObjectMetadata
 };
-
 
 /// An object that is currently stored in RAM
 ///
@@ -24,8 +20,8 @@ use super::{
 /// FIELDS AS THESE ARE CRUCIAL FOR THIS IMPLEMENTATION!
 #[repr(C)]
 pub(crate) struct ResidentObject<T: Sized> {
-    pub(super) metadata: ResidentObjectMetadata,
-    pub(super) data: T,
+    pub(crate) metadata: ResidentObjectMetadata,
+    pub(crate) data: T,
 }
 
 impl<T: Sized> ResidentObject<T> {
@@ -33,8 +29,8 @@ impl<T: Sized> ResidentObject<T> {
     ///
     /// ### Safety
     ///
-    /// This is only safe to call if `delete_handle` controls an `ResidentObjectMetadata` that is managed by `allocator_module` and
-    /// the `ResidentObjectMetadata` is contained by a `ResidentObject`
+    /// This is only safe to call if `delete_handle` controls an `ResidentObjectMetadata` that is managed by
+    /// `allocator_module` and the `ResidentObjectMetadata` is contained by a `ResidentObject`
     ///
     /// Also there should not be any open references to the `ResidentObject` in any way!
     pub(crate) unsafe fn unload_resident_object<S: PersistentStorageModule, A: AllocatorModule>(
@@ -43,9 +39,10 @@ impl<T: Sized> ResidentObject<T> {
         allocator_module: &mut SharedPersistLock<*mut A>,
         dirty_size: &mut usize,
         unsafe_no_sync: bool,
+        use_partial_dirtiness_tracking: bool
     ) -> Result<(), ()> {
         debug_assert!(
-            !delete_handle.get_element().inner.dirty_status.is_in_use(),
+            !delete_handle.get_element().inner.status.is_in_use(),
             "no valid object"
         );
 
@@ -81,12 +78,12 @@ impl<T: Sized> ResidentObject<T> {
             }
 
             // now, as this item is not used anymore, deallocate it
-            resident_ptr.drop_in_place();
-            let obj_layout = Layout::new::<ResidentObject<T>>();
+            let (total_layout, obj_offset) = calc_resident_obj_layout_static::<T>(use_partial_dirtiness_tracking);
+            let base_ptr = (resident_ptr as *mut u8).sub(obj_offset);
             guard
                 .as_mut()
                 .unwrap()
-                .deallocate(NonNull::new(resident_ptr as *mut u8).unwrap(), obj_layout);
+                .deallocate(NonNull::new(base_ptr).unwrap(), total_layout);
 
             drop(guard);
         }
@@ -107,65 +104,60 @@ impl<T: Sized> ResidentObject<T> {
         &mut self,
         storage: &mut S,
     ) -> Result<usize, ()> {
-        if !self.metadata.inner.dirty_status.is_data_dirty() {
+        if !self.metadata.inner.status.is_data_dirty() {
             return Ok(0);
         }
 
-        let data_offset = calc_user_data_offset_static::<T>();
-        write_storage_data(storage, self.metadata.inner.offset + data_offset, &self.data)?;
+        self.metadata.persist_user_data_dynamic(storage)
+    }
+}
 
-        // everything is persisted, not dirty anymore
-        self.metadata.inner.dirty_status.set_data_dirty(false);
+pub(crate) fn calc_resident_obj_partial_dirtiness_buf_layout(data_size: usize) -> Layout {
+    let (_, byte_count) = PartialDirtinessTrackingInfo::calc_bit_and_byte_count(data_size);
+    
+    Layout::from_size_align(byte_count, 1).unwrap()
+}
 
-        if !self.metadata.inner.dirty_status.is_general_metadata_dirty() {
-            // you have to flush dirty status as well
-            ResidentObjectMetadataBackup::flush_dirty_status(
-                self.metadata.inner.offset,
-                &self.metadata.inner.dirty_status,
-                storage,
-            )
-            .unwrap();
-        }
+#[inline]
+pub(crate) fn calc_resident_obj_layout_static<T>(
+    use_partial_dirtiness_tracking: bool,
+) -> (Layout, usize) {
+    if use_partial_dirtiness_tracking {
+        let partial_buf = calc_resident_obj_partial_dirtiness_buf_layout(size_of::<T>());
+        let (res_layout, metadata_offset) = partial_buf.extend(Layout::new::<ResidentObject<T>>()).unwrap();
 
-        // set this again because of race conditions:
-        // if vnv_persist_all is called after first set_data_dirty and before flushing dirty status
-        self.metadata.inner.dirty_status.set_data_dirty(false);
-
-        Ok(self.metadata.inner.layout.size())
+        (res_layout.pad_to_align(), metadata_offset)
+    } else {
+        (Layout::new::<ResidentObject<T>>(), 0)
     }
 }
 
 #[inline]
-pub(crate) const fn calc_resident_obj_layout_static<T>() -> Layout {
-    Layout::new::<ResidentObject<T>>()
+pub(crate) fn calc_resident_obj_layout_dynamic(
+    data_layout: &Layout,
+    use_partial_dirtiness_tracking: bool,
+) -> (Layout, usize) {
+    if use_partial_dirtiness_tracking {
+        let (tmp_layout, _) = Layout::new::<ResidentObjectMetadata>().extend(data_layout.clone()).unwrap();
+
+        let partial_buf = calc_resident_obj_partial_dirtiness_buf_layout(data_layout.size());
+        let (tmp_layout, metadata_offset) = partial_buf.extend(tmp_layout).unwrap();
+
+        (tmp_layout.pad_to_align(), metadata_offset)
+    } else {
+        (repr_c_layout(&[Layout::new::<ResidentObjectMetadata>(), data_layout.clone()]).unwrap(), 0)
+    }
 }
 
-#[inline]
-pub(crate) fn calc_resident_obj_layout_dynamic(data_layout: &Layout) -> Layout {
-    // get layout of ResidentObject
-    repr_c_layout(&[Layout::new::<ResidentObjectMetadata>(), data_layout.clone()]).unwrap()
-}
-
-#[inline]
-pub(crate) fn calc_user_data_offset_static<T>() -> usize {
-    offset_of!(ResidentObject<T>, data)
-}
-
-#[inline]
-pub(crate) fn calc_user_data_offset_dynamic(layout: &Layout) -> usize {
-    let base_offset = offset_of!(ResidentObject<()>, data);
-    round_up_to_nearest(base_offset, layout.align())
-}
 
 #[cfg(test)]
 mod test {
     use core::alloc::Layout;
 
-    use memoffset::offset_of;
-
-    use crate::resident_object_manager::{calc_resident_obj_layout_static, calc_user_data_offset_dynamic, resident_object::{
-        calc_resident_obj_layout_dynamic, ResidentObject,
-    }};
+    use crate::resident_object_manager::{
+        calc_resident_obj_layout_static,
+        resident_object::calc_resident_obj_layout_dynamic,
+    };
 
     #[test]
     fn test_calc_resident_obj_layout() {
@@ -200,82 +192,42 @@ mod test {
             e: usize,
         }
         test_calc_resident_obj_layout_internal::<Test3>();
-    }
-
-
-    #[test]
-    fn test_calc_user_data_offset_dynamic() {
-        test_calc_user_data_offset_dynamic_internal::<()>();
-        test_calc_user_data_offset_dynamic_internal::<usize>();
-        test_calc_user_data_offset_dynamic_internal::<u8>();
-
-        struct Test1 {
-            _a: usize,
-            _b: bool,
-            _c: usize,
-            _d: bool,
-            _e: usize,
-        }
-        test_calc_user_data_offset_dynamic_internal::<Test1>();
-
-        #[repr(C)]
-        struct Test2 {
-            a: usize,
-            b: bool,
-            c: usize,
-            d: bool,
-            e: usize,
-        }
-        test_calc_user_data_offset_dynamic_internal::<Test2>();
-
-        #[repr(C, align(64))]
-        struct Test3 {
-            a: usize,
-            b: bool,
-            c: usize,
-            d: bool,
-            e: usize,
-        }
-        test_calc_user_data_offset_dynamic_internal::<Test3>();
 
         #[repr(C, align(8))]
         struct Test4 {
             a: usize,
         }
-        test_calc_user_data_offset_dynamic_internal::<Test4>();
+        test_calc_resident_obj_layout_internal::<Test4>();
 
         #[repr(C, align(16))]
         struct Test5 {
             a: usize,
         }
-        test_calc_user_data_offset_dynamic_internal::<Test5>();
+        test_calc_resident_obj_layout_internal::<Test5>();
 
         #[repr(C, align(32))]
         struct Test6 {
             a: usize,
         }
-        test_calc_user_data_offset_dynamic_internal::<Test6>();
+        test_calc_resident_obj_layout_internal::<Test6>();
 
         #[repr(C, align(64))]
         struct Test7 {
             a: usize,
         }
-        test_calc_user_data_offset_dynamic_internal::<Test7>();
+        test_calc_resident_obj_layout_internal::<Test7>();
+
     }
 
     fn test_calc_resident_obj_layout_internal<T: Sized>() {
         let layout = Layout::new::<T>();
         assert_eq!(
-            calc_resident_obj_layout_static::<T>(),
-            calc_resident_obj_layout_dynamic(&layout)
+            calc_resident_obj_layout_static::<T>(false),
+            calc_resident_obj_layout_dynamic(&layout, false)
         );
-    }
-
-    fn test_calc_user_data_offset_dynamic_internal<T: Sized>() {
-        let layout = Layout::new::<T>();
         assert_eq!(
-            offset_of!(ResidentObject<T>, data),
-            calc_user_data_offset_dynamic(&layout)
+            calc_resident_obj_layout_static::<T>(true),
+            calc_resident_obj_layout_dynamic(&layout, true)
         );
     }
 }

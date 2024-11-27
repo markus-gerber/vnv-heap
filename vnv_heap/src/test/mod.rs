@@ -48,5 +48,5 @@ fn get_test_heap(
     test_name: &str,
     resident_buffer: &mut [u8],
 ) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>> {
-    todo!("not implemented")
+    panic!("not implemented")
 }

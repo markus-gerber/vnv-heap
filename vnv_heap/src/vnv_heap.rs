@@ -14,14 +14,11 @@ use crate::{
     },
     persist_access_point::PersistAccessPoint,
     resident_object_manager::{
-        resident_list::ResidentList,
-        resident_object::{calc_resident_obj_layout_static, calc_user_data_offset_static},
-        resident_object_metadata::ResidentObjectMetadata,
-        ResidentObjectManager,
+        resident_list::ResidentList, resident_object_backup::{calc_backup_obj_layout_static, calc_backup_obj_user_data_offset}, resident_object_metadata::ResidentObjectMetadata, ResidentObjectManager
     },
     shared_persist_lock::SharedPersistLock,
     vnv_object::VNVObject,
-    VNVConfig,
+    VNVConfig, VNVList,
 };
 use core::{
     alloc::Layout, cell::RefCell, marker::PhantomData, mem::size_of, sync::atomic::AtomicBool,
@@ -250,9 +247,22 @@ impl<
         'a: 'b,
     {
         let mut inner = self.inner.borrow_mut();
-        let identifier = unsafe { inner.allocate(initial_value)? };
+        let identifier = unsafe { inner.allocate(initial_value, false)? };
 
         Ok(VNVObject::new(&self.inner, identifier))
+    }
+
+    pub fn allocate_list<'b, T: Sized + Copy + 'b, const SIZE: usize>(
+        &'b self,
+        initial_value: [T; SIZE],
+    ) -> Result<VNVList<'b, 'a, T, SIZE, A, N, M>, ()>
+    where
+        'a: 'b,
+    {
+        let mut inner = self.inner.borrow_mut();
+        let identifier = unsafe { inner.allocate(initial_value, true)? };
+
+        Ok(VNVList::new(&self.inner, identifier))
     }
 
     /// Returns the size which the `resident_buffer` has to be, so `usable_resident_buffer_size` bytes can be used effectively
@@ -307,19 +317,26 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
     pub(crate) unsafe fn allocate<T: Sized>(
         &mut self,
         initial_value: T,
+        use_partial_dirtiness_tracking: bool,
     ) -> Result<AllocationIdentifier<T>, ()> {
         trace!("Allocate new object with {} bytes", size_of::<T>());
 
-        let offset = self.non_resident_allocator.allocate(
-            calc_resident_obj_layout_static::<T>(),
-            &mut self.storage_reference,
-        )?;
+        let (backup_obj_layout, metadata_rel_offset) =
+            calc_backup_obj_layout_static::<T>(use_partial_dirtiness_tracking);
 
-        let initial_value = match self
-            .resident_object_manager
-            .try_to_allocate(initial_value, offset)
-        {
-            Ok(()) => return Ok(AllocationIdentifier::<T>::from_offset(offset)),
+        let base_offset = self
+            .non_resident_allocator
+            .allocate(backup_obj_layout, &mut self.storage_reference)?;
+        let metadata_offset = base_offset + metadata_rel_offset;
+
+
+        let initial_value = match self.resident_object_manager.try_to_allocate(
+            initial_value,
+            base_offset,
+            metadata_offset,
+            use_partial_dirtiness_tracking,
+        ) {
+            Ok(()) => return Ok(AllocationIdentifier::<T>::from_offset(metadata_offset)),
             Err(val) => {
                 // could not put this new object into memory
                 // write this object now onto persistent storage instead...
@@ -329,15 +346,16 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
 
         write_storage_data(
             &mut self.storage_reference,
-            offset + calc_user_data_offset_static::<T>(),
+            metadata_offset + calc_backup_obj_user_data_offset(),
             &initial_value,
         )?;
-        Ok(AllocationIdentifier::<T>::from_offset(offset))
+        Ok(AllocationIdentifier::<T>::from_offset(metadata_offset))
     }
 
     pub(crate) unsafe fn deallocate<T: Sized>(
         &mut self,
         identifier: &AllocationIdentifier<T>,
+        use_partial_dirtiness_tracking: bool,
     ) -> Result<(), ()> {
         trace!(
             "Deallocate object with {} bytes (offset {})",
@@ -345,11 +363,17 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
             identifier.offset
         );
 
-        self.resident_object_manager
-            .drop(identifier, &mut self.storage_reference)?;
+        self.resident_object_manager.drop(
+            identifier,
+            use_partial_dirtiness_tracking,
+            &mut self.storage_reference,
+        )?;
+
+        let (total_layout, object_offset) =
+            calc_backup_obj_layout_static::<T>(use_partial_dirtiness_tracking);
         self.non_resident_allocator.deallocate(
-            identifier.offset,
-            calc_resident_obj_layout_static::<T>(),
+            identifier.offset - object_offset,
+            total_layout,
             &mut self.storage_reference,
         )
     }
@@ -357,17 +381,36 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
     pub(crate) unsafe fn get_mut<T: Sized>(
         &mut self,
         identifier: &AllocationIdentifier<T>,
+        use_partial_dirtiness_tracking: bool,
     ) -> Result<*mut T, ()> {
-        self.resident_object_manager
-            .get_mut(identifier, &mut self.storage_reference)
+        self.resident_object_manager.get_mut(
+            identifier,
+            use_partial_dirtiness_tracking,
+            &mut self.storage_reference,
+        )
     }
 
     pub(crate) unsafe fn get_ref<T: Sized>(
         &mut self,
         identifier: &AllocationIdentifier<T>,
+        use_partial_dirtiness_tracking: bool,
     ) -> Result<*const T, ()> {
-        self.resident_object_manager
-            .get_ref(identifier, &mut self.storage_reference)
+        self.resident_object_manager.get_ref(
+            identifier,
+            use_partial_dirtiness_tracking,
+            &mut self.storage_reference,
+        )
+    }
+
+    pub(crate) unsafe fn get_partial_mut<T: Sized>(
+        &mut self,
+        identifier: &AllocationIdentifier<T>,
+    ) -> Result<(*mut ResidentObjectMetadata, *mut T), ()> {
+        self.resident_object_manager.get_partial_mut(identifier, &mut self.storage_reference)
+    }
+
+    pub(crate) unsafe fn release_partial_mut<T: Sized>(&mut self, meta_ptr: *mut ResidentObjectMetadata) {
+        self.resident_object_manager.release_partial_mut::<T>(meta_ptr)
     }
 
     pub(crate) unsafe fn release_mut<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) {
@@ -385,9 +428,13 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
     pub(crate) fn unload_object<T: Sized>(
         &mut self,
         identifier: &AllocationIdentifier<T>,
+        use_partial_dirtiness_tracking: bool,
     ) -> Result<(), ()> {
-        self.resident_object_manager
-            .unload_object(identifier, &mut self.storage_reference)
+        self.resident_object_manager.unload_object(
+            identifier,
+            &mut self.storage_reference,
+            use_partial_dirtiness_tracking,
+        )
     }
 
     #[cfg(feature = "benchmarks")]

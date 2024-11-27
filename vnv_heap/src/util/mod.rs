@@ -14,6 +14,11 @@ pub(crate) fn repr_c_layout(fields: &[Layout]) -> Result<Layout, LayoutError> {
 }
 
 #[inline]
-pub(crate) fn round_up_to_nearest(num: usize, multiple: usize) -> usize {
+pub(crate) const fn round_up_to_nearest(num: usize, multiple: usize) -> usize {
     ((num + multiple - 1) / multiple) * multiple
+}
+
+#[inline]
+pub(crate) const fn div_ceil(num: usize, div: usize) -> usize {
+    (num + div - 1) / div
 }

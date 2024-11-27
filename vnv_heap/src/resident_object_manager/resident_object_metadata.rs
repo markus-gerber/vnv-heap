@@ -8,31 +8,37 @@ use core::{
 use memoffset::offset_of;
 
 use crate::{
-    modules::{
-        allocator::AllocatorModule,
-        persistent_storage::{
-            persistent_storage_util::write_storage_data, PersistentStorageModule,
-        },
-    },
+    modules::{allocator::AllocatorModule, persistent_storage::PersistentStorageModule},
     resident_object_manager::calc_resident_obj_layout_dynamic,
 };
 
 use super::{
-    calc_user_data_offset_dynamic, resident_object_status::ResidentObjectStatus, resident_list::DeleteHandle, ResidentObject, ResidentObjectMetadataBackup, SharedPersistLock
+    calc_backup_obj_user_data_offset, partial_dirtiness_tracking::PartialDirtinessTrackingInfo, persist_general_metadata, resident_list::DeleteHandle, resident_object_status::ResidentObjectStatus, ResidentObject, SharedPersistLock, GENERAL_METADATA_BACKUP_SIZE, METADATA_EXCEPT_GENERAL_BACKUP_SIZE, TOTAL_METADATA_BACKUP_SIZE
 };
 
-const SYNCED_METADATA_DIRTY_SIZE: usize = {
-    const fn size<T>(_: *const T) -> usize {
-        size_of::<T>()
+const fn calc_dirty_metadata_dirty_byte_cnt(
+    enabled_partial_dirtiness_tracking: bool,
+    data_size: usize,
+) -> usize {
+    if enabled_partial_dirtiness_tracking {
+        TOTAL_METADATA_BACKUP_SIZE
+    } else {
+        let (_, byte_cnt) = PartialDirtinessTrackingInfo::calc_bit_and_byte_count(data_size);
+        TOTAL_METADATA_BACKUP_SIZE + byte_cnt
     }
+}
 
-    let obj = ResidentObjectMetadataBackup::new_unused();
-
-    // ref cnt and next_resident_object are not saved
-    size(&obj.inner.dirty_status) + size(&obj.next_resident_object)
-};
-
-const UNSYNCED_METADATA_DIRTY_SIZE: usize = size_of::<ResidentObjectMetadataBackup>();
+const fn calc_general_metadata_synced_dirty_byte_cnt(
+    enabled_partial_dirtiness_tracking: bool,
+    data_size: usize,
+) -> usize {
+    if enabled_partial_dirtiness_tracking {
+        METADATA_EXCEPT_GENERAL_BACKUP_SIZE
+    } else {
+        let (_, byte_cnt) = PartialDirtinessTrackingInfo::calc_bit_and_byte_count(data_size);
+        METADATA_EXCEPT_GENERAL_BACKUP_SIZE + byte_cnt
+    }
+}
 
 pub(crate) struct ResidentObjectMetadata {
     /// Actual metadata
@@ -45,7 +51,11 @@ pub(crate) struct ResidentObjectMetadata {
 #[derive(Clone, Copy)]
 pub(crate) struct ResidentObjectMetadataInner {
     /// What parts of this resident object are currently dirty?
-    pub(crate) dirty_status: ResidentObjectStatus,
+    pub(crate) status: ResidentObjectStatus,
+
+    /// Gives a nice interface for accessing partial dirtiness data
+    /// This data will not be persisted (as it is reconstructible from `status`).
+    pub(crate) partial_dirtiness_tracking_info: PartialDirtinessTrackingInfo,
 
     pub(crate) offset: usize,
 
@@ -61,11 +71,18 @@ pub(crate) struct ResidentObjectMetadataInner {
 }
 
 impl ResidentObjectMetadataInner {
-    pub(super) fn new<T: Sized>(offset: usize) -> Self {
+    pub(super) fn new<T: Sized>(offset: usize, partial_dirtiness_tracking: bool) -> Self {
+        let partial_dirtiness_tracking_info = if partial_dirtiness_tracking {
+            PartialDirtinessTrackingInfo::new_used::<T>()
+        } else {
+            PartialDirtinessTrackingInfo::new_unused()
+        };
+
         ResidentObjectMetadataInner {
-            dirty_status: ResidentObjectStatus::new_metadata_dirty(),
+            status: ResidentObjectStatus::new_metadata_dirty(partial_dirtiness_tracking),
             layout: Layout::new::<T>(),
             offset,
+            partial_dirtiness_tracking_info,
 
             #[cfg(debug_assertions)]
             data_offset: offset_of!(ResidentObject<T>, data),
@@ -76,9 +93,11 @@ impl ResidentObjectMetadataInner {
 impl Default for ResidentObjectMetadataInner {
     fn default() -> Self {
         Self {
-            dirty_status: Default::default(),
+            status: Default::default(),
             offset: Default::default(),
             layout: Layout::new::<()>(),
+            partial_dirtiness_tracking_info: PartialDirtinessTrackingInfo::new_unused(),
+
             #[cfg(debug_assertions)]
             data_offset: usize::MAX,
         }
@@ -86,20 +105,17 @@ impl Default for ResidentObjectMetadataInner {
 }
 
 impl ResidentObjectMetadata {
-    pub(super) fn new<T: Sized>(offset: usize) -> Self {
+    pub(super) fn new<T: Sized>(offset: usize, partial_dirtiness_tracking: bool) -> Self {
         ResidentObjectMetadata {
             next_resident_object: AtomicPtr::new(null_mut()),
-            inner: ResidentObjectMetadataInner::new::<T>(offset),
+            inner: ResidentObjectMetadataInner::new::<T>(offset, partial_dirtiness_tracking),
         }
     }
 
-    pub(crate) const fn fresh_object_dirty_size() -> usize {
-        UNSYNCED_METADATA_DIRTY_SIZE
-    }
-
-    /// Change in dirty size for `metadata_dirty=false` -> `metadata_dirty=true`
-    pub(crate) const fn metadata_dirty_transition_size() -> usize {
-        UNSYNCED_METADATA_DIRTY_SIZE - SYNCED_METADATA_DIRTY_SIZE
+    pub(crate) const fn fresh_object_dirty_size<T>(
+        enable_partial_dirtiness_tracking: bool,
+    ) -> usize {
+        calc_dirty_metadata_dirty_byte_cnt(enable_partial_dirtiness_tracking, size_of::<T>())
     }
 
     #[inline]
@@ -116,14 +132,27 @@ impl ResidentObjectMetadata {
 
     pub(crate) fn dirty_size(&self) -> usize {
         let mut cnt = 0;
-        if self.inner.dirty_status.is_data_dirty() {
-            cnt += self.inner.layout.size()
+        if self.inner.status.is_data_dirty() {
+            if !self.inner.status.is_partial_dirtiness_tracking_enabled() {
+                // whole object is dirty
+                cnt += self.inner.layout.size();
+            } else {
+                let wrapper =
+                    unsafe { self.inner.partial_dirtiness_tracking_info.get_wrapper(self) };
+                cnt += wrapper.get_dirty_size();
+            }
         }
 
-        if self.inner.dirty_status.is_general_metadata_dirty() {
-            cnt += UNSYNCED_METADATA_DIRTY_SIZE
+        if self.inner.status.is_general_metadata_dirty() {
+            cnt += calc_dirty_metadata_dirty_byte_cnt(
+                self.inner.status.is_partial_dirtiness_tracking_enabled(),
+                self.inner.layout.size(),
+            );
         } else {
-            cnt += SYNCED_METADATA_DIRTY_SIZE;
+            cnt += calc_general_metadata_synced_dirty_byte_cnt(
+                self.inner.status.is_partial_dirtiness_tracking_enabled(),
+                self.inner.layout.size(),
+            );
         }
 
         cnt
@@ -184,7 +213,7 @@ impl ResidentObjectMetadata {
         &mut self,
         storage: &mut S,
     ) -> Result<(), ()> {
-        let offset = self.inner.offset + calc_user_data_offset_dynamic(&self.inner.layout);
+        let offset = self.inner.offset + calc_backup_obj_user_data_offset();
         let range = self.dynamic_metadata_to_data_range_mut();
         storage.read(offset, range)
     }
@@ -208,7 +237,7 @@ impl ResidentObjectMetadata {
         dirty_size: &mut usize,
     ) -> Result<(), ()> {
         debug_assert!(
-            !delete_handle.get_element().inner.dirty_status.is_in_use(),
+            !delete_handle.get_element().inner.status.is_in_use(),
             "no valid object"
         );
 
@@ -231,17 +260,21 @@ impl ResidentObjectMetadata {
             // remove from resident object list
             let item_ref = delete_handle.delete();
 
+            let (total_layout, obj_offset) = calc_resident_obj_layout_dynamic(
+                &item_ref.inner.layout,
+                item_ref
+                    .inner
+                    .status
+                    .is_partial_dirtiness_tracking_enabled(),
+            );
+
             // now, as this item is not used anymore, deallocate it
             let resident_obj_ptr = unsafe { item_ref.to_resident_obj_ptr::<()>() } as *mut u8;
-            let resident_obj_ptr = NonNull::new(resident_obj_ptr).unwrap();
 
-            let resident_obj_layout = calc_resident_obj_layout_dynamic(&item_ref.inner.layout);
+            let base_ptr = resident_obj_ptr.sub(obj_offset);
+            let base_ptr = NonNull::new(base_ptr).unwrap();
 
-            resident_obj_ptr.as_ptr().drop_in_place();
-            guard
-                .as_mut()
-                .unwrap()
-                .deallocate(resident_obj_ptr, resident_obj_layout);
+            guard.as_mut().unwrap().deallocate(base_ptr, total_layout);
 
             drop(guard);
         }
@@ -263,29 +296,22 @@ impl ResidentObjectMetadata {
         &mut self,
         storage: &mut S,
     ) -> Result<usize, ()> {
-        if !self.inner.dirty_status.is_data_dirty() {
+        if !self.inner.status.is_data_dirty() {
             return Ok(0);
         }
 
-        self.write_user_data_dynamic(storage)?;
+        let size_persisted = self.write_user_data_dynamic(storage)?;
 
         // everything is persisted, not dirty anymore
-        self.inner.dirty_status.set_data_dirty(false);
+        self.inner.status.set_data_dirty(false);
 
-        if !self.inner.dirty_status.is_general_metadata_dirty() {
-            ResidentObjectMetadataBackup::flush_dirty_status(
-                self.inner.offset,
-                &self.inner.dirty_status,
-                storage,
-            )
-            .unwrap();
-        }
+        // does nothing if partial dirtiness tracking is not enabled
+        self.inner
+            .partial_dirtiness_tracking_info
+            .get_wrapper(self)
+            .set_all_blocks_synced();
 
-        // set this again because of race conditions:
-        // if vnv_persist_all is called after first set_data_dirty and before flushing dirty status
-        self.inner.dirty_status.set_data_dirty(false);
-
-        Ok(self.inner.layout.size())
+        Ok(size_persisted)
     }
 
     /// Writes the user data of this resident object if you don't know the type `T` of the inner data.
@@ -297,66 +323,57 @@ impl ResidentObjectMetadata {
     pub(crate) unsafe fn write_user_data_dynamic<S: PersistentStorageModule>(
         &self,
         storage: &mut S,
-    ) -> Result<(), ()> {
+    ) -> Result<usize, ()> {
         // persist data from dynamic data range (stored layout of T is used for that)
-        let data_range = self.dynamic_metadata_to_data_range();
-        let offset = self.inner.offset + calc_user_data_offset_dynamic(&self.inner.layout);
-        storage.write(offset, data_range)?;
-        Ok(())
+
+        let offset = self.inner.offset + calc_backup_obj_user_data_offset();
+
+        if !self.inner.status.is_partial_dirtiness_tracking_enabled() {
+            // sync whole object
+            let data_range = self.dynamic_metadata_to_data_range();
+            storage.write(offset, data_range)?;
+
+            debug_assert_eq!(data_range.len(), self.inner.layout.size());
+            Ok(data_range.len())
+        } else {
+            // sync object partially
+            let mut wrapper = self.inner.partial_dirtiness_tracking_info.get_wrapper(self);
+            let mut iter = wrapper.dirty_iter();
+            let mut synced_byte_count = 0;
+
+            while let Some(range) = iter.next() {
+                // persist this data range now
+                // this is efficient as the iter will always group together slices of dirty data
+
+                // however, this could still be improved by specifying the initial cost to trigger a write request
+                // so that the iterator returns a data range containing even with slices that are already persisted
+                // example: [BIG DIRTY][SMALL PERSISTED][BIG DIRTY], if initial cost > SMALL PERSISTED
+                // its worth to persist the whole data range with one write call
+                
+                let data_range = self.dynamic_metadata_to_data_range();
+                let slice = &data_range[range.clone()];
+                storage.write(offset + range.start, slice)?;
+
+                synced_byte_count += slice.len()
+            }
+            Ok(synced_byte_count)
+        }
     }
 
-    /// Persists this metadata and saves it to the `MetadataBackupList`.
-    ///
-    /// If it was previously saved to it, that slot will be updated, without accessing `backup_list`
-    pub(crate) fn persist_metadata<S: PersistentStorageModule>(
+    /// Persists the general metadata.
+    pub(crate) fn persist_general_metadata<S: PersistentStorageModule>(
         &mut self,
         storage: &mut S,
     ) -> Result<usize, ()> {
-        if !self.inner.dirty_status.is_general_metadata_dirty() {
+        if !self.inner.status.is_general_metadata_dirty() {
             return Ok(0);
         }
 
-        match self.write_metadata(storage, false, 0) {
-            Ok(()) => {}
-            Err(()) => {
-                return Err(());
-            }
-        };
+        persist_general_metadata(self, storage)?;
 
-        self.inner.dirty_status.set_general_metadata_dirty(false);
-        Ok(UNSYNCED_METADATA_DIRTY_SIZE - SYNCED_METADATA_DIRTY_SIZE)
+        self.inner.status.set_general_metadata_dirty(false);
+        Ok(GENERAL_METADATA_BACKUP_SIZE)
     }
-
-    pub(crate) fn write_metadata<S: PersistentStorageModule>(
-        &self,
-        storage: &mut S,
-        metadata_dirty: bool,
-        next_item_offset: usize,
-    ) -> Result<(), ()> {
-        let mut backup_data = ResidentObjectMetadataBackup::from_metadata(self, next_item_offset);
-        backup_data
-            .inner
-            .dirty_status
-            .set_general_metadata_dirty(metadata_dirty);
-        write_storage_data(storage, self.inner.offset, &backup_data)?;
-
-        Ok(())
-    }
-
-    pub(crate) fn write_next_ptr<S: PersistentStorageModule>(
-        &self,
-        storage: &mut S,
-        next_item_offset: usize,
-    ) -> Result<(), ()> {
-        unsafe {
-            ResidentObjectMetadataBackup::write_next_ptr(
-                self.inner.offset,
-                next_item_offset,
-                storage,
-            )
-        }
-    }
-
 }
 
 #[cfg(test)]
@@ -416,7 +433,7 @@ mod test {
 
     fn test_dynamic_metadata_to_data_range_internal<T: Default>() {
         let obj = ResidentObject {
-            metadata: ResidentObjectMetadata::new::<T>(0),
+            metadata: ResidentObjectMetadata::new::<T>(0, false),
             data: T::default(),
         };
         let original_ptr = (&obj.data) as *const T;

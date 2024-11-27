@@ -173,7 +173,7 @@ fn check_metadata(resident_list: &SharedResidentListRef<'static>, list: Vec<(*co
         if let (Some(item1), Some(item2)) = (item1, item2) {
             assert_eq!((item1 as *const ResidentObjectMetadata), item2.0);
             assert_eq!(item1.next_resident_object.load(Ordering::SeqCst), item2.1.next_resident_object.load(Ordering::SeqCst));
-            assert!(item1.inner.dirty_status == item2.1.inner.dirty_status);
+            assert!(item1.inner.status == item2.1.inner.status);
             assert_eq!(item1.inner.layout, item2.1.inner.layout);
             assert_eq!(item1.inner.offset, item2.1.inner.offset);
 

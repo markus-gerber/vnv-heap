@@ -14,7 +14,7 @@ use crate::{
         object_management::DefaultObjectManagementModule,
         persistent_storage::{test::get_test_storage, PersistentStorageModule},
     },
-    resident_object_manager::{calc_resident_obj_layout_static, calc_user_data_offset_static, resident_list::ResidentList}, shared_persist_lock::SharedPersistLock,
+    resident_object_manager::{calc_backup_obj_layout_static, calc_backup_obj_user_data_offset, resident_list::ResidentList}, shared_persist_lock::SharedPersistLock,
 };
 
 use super::ResidentObjectManager;
@@ -56,12 +56,13 @@ fn test_release_dirty_size() {
 
     let initial_data: TestObj = [0u8; 20];
     let offset_list: [usize; OBJ_COUNT] = array::from_fn(|_| {
+        let (layout, _) = calc_backup_obj_layout_static::<TestObj>(false);
         let offset = non_resident_alloc
-            .allocate(calc_resident_obj_layout_static::<TestObj>(), &mut storage)
+            .allocate(layout, &mut storage)
             .unwrap();
 
         // zero out space
-        storage.write(offset + calc_user_data_offset_static::<TestObj>(), &initial_data).unwrap();
+        storage.write(offset + calc_backup_obj_user_data_offset(), &initial_data).unwrap();
 
         offset
     });
@@ -72,6 +73,7 @@ fn test_release_dirty_size() {
                 manager
                     .get_ref(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
+                        false,
                         &mut storage,
                     )
                     .unwrap();
@@ -84,6 +86,7 @@ fn test_release_dirty_size() {
             manager
                 .drop(
                     &AllocationIdentifier::<TestObj>::from_offset(*offset),
+                    false,
                     &mut storage,
                 )
                 .unwrap();
@@ -92,6 +95,7 @@ fn test_release_dirty_size() {
                 manager
                     .get_mut(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
+                        false,
                         &mut storage,
                     )
                     .unwrap();
@@ -107,6 +111,7 @@ fn test_release_dirty_size() {
         manager
             .drop(
                 &AllocationIdentifier::<TestObj>::from_offset(offset),
+                false,
                 &mut storage,
             )
             .unwrap();
@@ -153,12 +158,13 @@ fn test_remain_resident() {
 
     let initial_data: TestObj = [0u8; 20];
     let offset_list: [usize; OBJ_COUNT] = array::from_fn(|_| {
+        let (layout, _) = calc_backup_obj_layout_static::<TestObj>(false);
         let offset = non_resident_alloc
-            .allocate(calc_resident_obj_layout_static::<TestObj>(), &mut storage)
+            .allocate(layout, &mut storage)
             .unwrap();
 
         // zero out space
-        storage.write(offset + calc_user_data_offset_static::<TestObj>(), &initial_data).unwrap();
+        storage.write(offset + calc_backup_obj_user_data_offset(), &initial_data).unwrap();
 
         offset
     });
@@ -200,6 +206,7 @@ fn test_remain_resident() {
                 let ptr = manager
                     .get_ref(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
+                        false,
                         &mut storage,
                     )
                     .unwrap();
@@ -214,6 +221,7 @@ fn test_remain_resident() {
                 let ptr = manager
                     .get_mut(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
+                        false,
                         &mut storage,
                     )
                     .unwrap();
@@ -224,6 +232,7 @@ fn test_remain_resident() {
                 manager
                     .require_resident(
                         &AllocationIdentifier::<TestObj>::from_offset(*offset),
+                        false,
                         &mut storage,
                     )
                     .unwrap();
@@ -257,6 +266,7 @@ fn test_remain_resident() {
         manager
             .drop(
                 &AllocationIdentifier::<TestObj>::from_offset(*offset),
+                false,
                 &mut storage,
             )
             .unwrap();

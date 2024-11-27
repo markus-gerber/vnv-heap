@@ -74,7 +74,7 @@ pub(crate) mod test {
     // implement for other test targets, also: change to right return type
     #[cfg(no_std)]
     pub(crate) fn get_test_storage(test_name: &str, size: usize) -> () {
-        todo!("not implemented")
+        panic!("not implemented")
     }
 
     fn gen_number(i: usize) -> u8 {

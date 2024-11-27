@@ -1,8 +1,9 @@
-use std::ptr::null_mut;
+use core::ptr::null_mut;
 
 use super::{
-    calc_resident_obj_layout_dynamic, resident_list::SharedResidentListRef,
-    resident_object_metadata::ResidentObjectMetadata, ResidentObjectMetadataBackup,
+    calc_resident_obj_layout_dynamic, persist_whole_metadata, resident_list::SharedResidentListRef,
+    resident_object_metadata::ResidentObjectMetadata, restore_metadata,
+    ResidentObjectMetadataBackup,
 };
 use crate::modules::{
     allocator::AllocatorModule,
@@ -28,7 +29,7 @@ pub(crate) fn persist(
         }
 
         // sync user data if needed
-        if item.inner.dirty_status.is_data_dirty() {
+        if item.inner.status.is_data_dirty() {
             unsafe { item.write_user_data_dynamic(storage_ref).unwrap() };
         }
 
@@ -42,23 +43,7 @@ pub(crate) fn persist(
             0
         };
 
-        if item.inner.dirty_status.is_general_metadata_dirty() {
-            // general metadata is dirty
-            // write whole metadata including next pointer to non volatile storage
-            item.write_metadata(
-                storage_ref,
-                item.inner.dirty_status.is_general_metadata_dirty(),
-                next_metadata_offset,
-            )
-            .unwrap();
-        } else {
-            // general metadata is not dirty
-            // however we still need to persist the next pointer
-            item.write_next_ptr(
-                storage_ref,
-                next_metadata_offset
-            ).unwrap()
-        }
+        persist_whole_metadata(item, next_metadata_offset, storage_ref).unwrap();
 
         curr = next;
     }
@@ -88,31 +73,36 @@ pub(crate) fn restore(
         let item: ResidentObjectMetadataBackup =
             unsafe { read_storage_data(storage_ref, curr_offset).unwrap() };
 
-        // location where this object should be allocated
-        let dest_ptr = item.inner.offset as *mut u8;
-
         // get layout of resident object
-        let resident_object_layout = calc_resident_obj_layout_dynamic(&item.inner.layout);
+        let data_layout = item.inner.layout;
+        let (total_layout, object_offset) = calc_resident_obj_layout_dynamic(
+            &data_layout,
+            item.inner.status.is_partial_dirtiness_tracking_enabled(),
+        );
+
+        // storage location of the metadata
+        let metadata_ptr = (item.inner.offset as *mut u8) as *mut ResidentObjectMetadata;
+        // base pointer of the resident object including dirtiness tracking buffer (if enabled)
+        let base_ptr = unsafe { (metadata_ptr as *mut u8).sub(object_offset) };
+
         unsafe {
-            heap.allocate_at(resident_object_layout, dest_ptr).unwrap();
+            heap.allocate_at(total_layout, base_ptr).unwrap();
         }
         // location of the next item stored
         let next_offset = item.next_resident_object;
 
-        // convert to resident object metadata and write to RAM
-        let metadata = item.to_metadata(curr_offset, null_mut());
-
-        let dest_ptr = dest_ptr as *mut ResidentObjectMetadata;
-        unsafe { dest_ptr.write(metadata) };
+        let meta_ref = unsafe {
+            restore_metadata(curr_offset, metadata_ptr, null_mut(), storage_ref).unwrap();
+            metadata_ptr.as_mut().unwrap()
+        };
 
         // load user data
-        let meta_ref = unsafe { dest_ptr.as_mut().unwrap() };
-        unsafe { meta_ref.load_user_data(storage_ref).unwrap() }
+        unsafe { meta_ref.load_user_data(storage_ref).unwrap() };
 
         // update next ptr of previous list item
         if let Some(drag) = drag_item {
             drag.next_resident_object
-                .store(dest_ptr, std::sync::atomic::Ordering::SeqCst);
+                .store(metadata_ptr, std::sync::atomic::Ordering::SeqCst);
         }
 
         drag_item = Some(meta_ref);

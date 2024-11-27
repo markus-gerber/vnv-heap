@@ -70,7 +70,7 @@ impl<S: PersistentStorageModule, A: AllocatorModule>
         self.delete_handle
             .get_element()
             .inner
-            .dirty_status
+            .status
             .is_data_dirty()
     }
 
@@ -79,7 +79,7 @@ impl<S: PersistentStorageModule, A: AllocatorModule>
         self.delete_handle
             .get_element()
             .inner
-            .dirty_status
+            .status
             .is_general_metadata_dirty()
     }
 }
@@ -94,7 +94,7 @@ impl<'a, 'b, 'c, S: PersistentStorageModule, A: AllocatorModule>
 {
     pub fn next<'d>(&'d mut self) -> Option<ResidentIterItem<'a, 'b, '_, '_, 'c, 'd, S, A>> {
         while let Some(mut item) = self.iter.next() {
-            if !item.get_element().inner.dirty_status.is_in_use() {
+            if !item.get_element().inner.status.is_in_use() {
                 // object found that is not in use
 
                 unsafe {
@@ -148,7 +148,7 @@ pub struct DirtyIterItem<'a, 'b, 'c, 'd, 'e, 'f, A: AllocatorModule, S: Persiste
 impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '_, '_, '_, A, S> {
     #[inline]
     pub fn is_unused(&mut self) -> bool {
-        !self.delete_handle.get_element().inner.dirty_status.is_in_use()
+        !self.delete_handle.get_element().inner.status.is_in_use()
     }
 
     /// Unloads this object and returns the amount of additional dirty bytes that are free now
@@ -169,7 +169,7 @@ impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '
 
         *self.arguments.resident_object_count -= 1;
 
-        Ok(prev - *self.arguments.remaining_dirty_size)
+        Ok(*self.arguments.remaining_dirty_size - prev)
     }
 
     #[inline]
@@ -184,8 +184,8 @@ impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '
     }
 
     #[inline]
-    pub fn sync_metadata(&mut self) -> Result<usize, ()> {
-        let dirty_size = self.delete_handle.get_element().persist_metadata(
+    pub fn sync_general_metadata(&mut self) -> Result<usize, ()> {
+        let dirty_size = self.delete_handle.get_element().persist_general_metadata(
             self.arguments.storage,
         )?;
         *self.arguments.remaining_dirty_size += dirty_size;
@@ -197,7 +197,7 @@ impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '
         self.delete_handle
             .get_element()
             .inner
-            .dirty_status
+            .status
             .is_data_dirty()
     }
 
@@ -206,7 +206,7 @@ impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '
         self.delete_handle
             .get_element()
             .inner
-            .dirty_status
+            .status
             .is_general_metadata_dirty()
     }
 }
@@ -219,7 +219,7 @@ pub struct DirtyIter<'a, 'b, 'c, 'd, A: AllocatorModule, S: PersistentStorageMod
 impl<'a, 'b, 'c, A: AllocatorModule, S: PersistentStorageModule> DirtyIter<'a, 'b, '_, 'c, A, S> {
     pub fn next<'d>(&'d mut self) -> Option<DirtyIterItem<'a, 'b, '_, '_, 'c, 'd, A, S>> {
         while let Some(mut item) = self.iter.next() {
-            let status = &item.get_element().inner.dirty_status;
+            let status = &item.get_element().inner.status;
             if !status.is_in_use() || !status.is_mutable_ref_active() {
                 // object found that is not in use or only
                 // has some immutable references

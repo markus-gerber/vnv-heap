@@ -205,7 +205,7 @@ mod test {
     impl Debug for ResidentObjectMetadataInner {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("ResidentObjectMetadataInner")
-                .field("is_data", &self.dirty_status.is_data_dirty())
+                .field("is_data", &self.status.is_data_dirty())
                 .field("offset", &self.offset)
                 .field("layout", &self.layout)
                 .finish()
@@ -220,7 +220,7 @@ mod test {
 
     impl PartialEq for ResidentObjectMetadataInner {
         fn eq(&self, other: &Self) -> bool {
-            self.dirty_status == other.dirty_status
+            self.status == other.status
                 && self.offset == other.offset
                 && self.layout == other.layout
         }
@@ -247,12 +247,12 @@ mod test {
     }
 
     fn get_meta(offset: usize, is_data_dirty: bool) -> ResidentObjectMetadata {
-        let mut dirty_status = ResidentObjectStatus::new_metadata_dirty();
+        let mut dirty_status = ResidentObjectStatus::new_metadata_dirty(false);
         dirty_status.set_data_dirty(is_data_dirty);
 
         ResidentObjectMetadata {
             inner: ResidentObjectMetadataInner {
-                dirty_status,
+                status: dirty_status,
                 offset,
                 ..Default::default()
             },
@@ -388,7 +388,7 @@ mod test {
                 let item = handle.get_element();
                 let stop = item.inner.offset == 0;
 
-                if item.inner.dirty_status.is_data_dirty() {
+                if item.inner.status.is_data_dirty() {
                     if ENABLE_PRINTS {
                         println!("delete {:?}", item);
                     }
@@ -410,7 +410,7 @@ mod test {
                             acc.0.push_back(item);
                             acc
                         } else {
-                            if !item.inner.dirty_status.is_data_dirty() {
+                            if !item.inner.status.is_data_dirty() {
                                 acc.0.push_back(item.clone())
                             }
                             if item.inner.offset == 0 {
