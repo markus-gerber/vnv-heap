@@ -2,7 +2,7 @@
 
 use super::PersistentStorageModule;
 use crate::shared_persist_lock::SharedPersistLock;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 pub(crate) struct SharedStorageReference<'a, 'b> {
     lock: SharedPersistLock<'a, *mut dyn PersistentStorageModule>,

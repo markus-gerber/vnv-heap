@@ -14,16 +14,22 @@ use crate::{
     },
     persist_access_point::PersistAccessPoint,
     resident_object_manager::{
-        resident_list::ResidentList, resident_object_backup::{calc_backup_obj_layout_static, calc_backup_obj_user_data_offset}, resident_object_metadata::ResidentObjectMetadata, ResidentObjectManager
+        resident_list::ResidentList,
+        resident_object_backup::{calc_backup_obj_layout_static, calc_backup_obj_user_data_offset},
+        resident_object_metadata::ResidentObjectMetadata,
+        ResidentObjectManager,
     },
     shared_persist_lock::SharedPersistLock,
     vnv_object::VNVObject,
     VNVConfig, VNVList,
 };
 use core::{
-    alloc::Layout, cell::RefCell, marker::PhantomData, mem::size_of, sync::atomic::AtomicBool,
+    alloc::Layout,
+    cell::RefCell,
+    marker::PhantomData,
+    mem::{size_of, ManuallyDrop},
+    sync::atomic::AtomicBool,
 };
-use std::mem::ManuallyDrop;
 
 static mut PERSIST_ACCESS_POINT: PersistAccessPoint = PersistAccessPoint::empty();
 
@@ -329,7 +335,6 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
             .allocate(backup_obj_layout, &mut self.storage_reference)?;
         let metadata_offset = base_offset + metadata_rel_offset;
 
-
         let initial_value = match self.resident_object_manager.try_to_allocate(
             initial_value,
             base_offset,
@@ -406,11 +411,30 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
         &mut self,
         identifier: &AllocationIdentifier<T>,
     ) -> Result<(*mut ResidentObjectMetadata, *mut T), ()> {
-        self.resident_object_manager.get_partial_mut(identifier, &mut self.storage_reference)
+        self.resident_object_manager
+            .get_partial_mut(identifier, &mut self.storage_reference)
     }
 
-    pub(crate) unsafe fn release_partial_mut<T: Sized>(&mut self, meta_ptr: *mut ResidentObjectMetadata) {
-        self.resident_object_manager.release_partial_mut::<T>(meta_ptr)
+    pub(crate) fn partial_mut_make_range_dirty(
+        &mut self,
+        meta_ptr: &mut ResidentObjectMetadata,
+        addr_offset: usize,
+        size: usize,
+    ) -> Result<(), ()> {
+        self.resident_object_manager.partial_mut_make_range_dirty(
+            meta_ptr,
+            addr_offset,
+            size,
+            &mut self.storage_reference,
+        )
+    }
+
+    pub(crate) unsafe fn release_partial_mut<T: Sized>(
+        &mut self,
+        meta_ptr: *mut ResidentObjectMetadata,
+    ) {
+        self.resident_object_manager
+            .release_partial_mut::<T>(meta_ptr)
     }
 
     pub(crate) unsafe fn release_mut<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) {

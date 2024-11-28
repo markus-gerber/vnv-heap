@@ -1,5 +1,4 @@
-use core::{cell::RefCell, ops::Deref};
-use std::mem::size_of;
+use core::{cell::RefCell, ops::Deref, mem::size_of};
 
 use crate::{
     modules::{
@@ -59,16 +58,18 @@ impl<
         M: ObjectManagementModule,
     > VNVListMutRef<'_, '_, '_, '_, T, SIZE, A, N, M>
 {
-    fn set(&mut self, index: usize, data: T) {
-        let mut wrapper = unsafe { self.meta_ref.inner.partial_dirtiness_tracking_info.get_wrapper(self.meta_ref) };
+    pub fn set(&mut self, index: usize, data: T) -> Result<(), ()> {
+        let mut vnv_heap = self.vnv_heap.borrow_mut();
         let offset = index * size_of::<T>();
 
-        wrapper.set_range_dirty(offset, size_of::<T>());
+        // try to make this range dirty
+        vnv_heap.partial_mut_make_range_dirty(self.meta_ref, offset, size_of::<T>())?;
 
         self.data_ref[index] = data;
+        Ok(())
     }
 
-    fn get(&self, index: usize) -> T {
+    pub fn get(&self, index: usize) -> T {
         self.data_ref[index]
     }
 }

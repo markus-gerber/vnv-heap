@@ -124,7 +124,7 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
         ) -> VNVHeap<
             'a,
             LinkedListAllocatorModule,
-            NonResidentBuddyAllocatorModule<16>,
+            NonResidentBuddyAllocatorModule<19>,
             DefaultObjectManagementModule,
             S2,
         > {
@@ -134,7 +134,7 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
 
             let heap: VNVHeap<
                 LinkedListAllocatorModule,
-                NonResidentBuddyAllocatorModule<16>,
+                NonResidentBuddyAllocatorModule<19>,
                 DefaultObjectManagementModule,
                 S2,
             > = VNVHeap::new(
@@ -233,7 +233,7 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                 let mut buf = [0u8; BUF_SIZE];
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
-                let bench: GetMinBenchmark<A, NonResidentBuddyAllocatorModule<16>, M, SIZE> =
+                let bench: GetMinBenchmark<A, NonResidentBuddyAllocatorModule<19>, M, SIZE> =
                     GetMinBenchmark::new(&heap);
                 bench.run_benchmark::<TIMER>(run_options);
             });
@@ -250,7 +250,7 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                 let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
                 let bench: GetMaxBenchmark<
                     A,
-                    NonResidentBuddyAllocatorModule<16>,
+                    NonResidentBuddyAllocatorModule<19>,
                     M,
                     SIZE,
                     BLOCKER_SIZE,
@@ -265,7 +265,7 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
                 let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
-                let bench: GetMaxMinBenchmark<A, NonResidentBuddyAllocatorModule<16>, M, S, SIZE> =
+                let bench: GetMaxMinBenchmark<A, NonResidentBuddyAllocatorModule<19>, M, S, SIZE> =
                     GetMaxMinBenchmark::new(&heap, start_res_size);
                 bench.run_benchmark::<TIMER>(run_options);
             });
@@ -277,7 +277,7 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
                 let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
-                let bench: GetMinMaxBenchmark<A, NonResidentBuddyAllocatorModule<16>, M, S, SIZE> =
+                let bench: GetMinMaxBenchmark<A, NonResidentBuddyAllocatorModule<19>, M, S, SIZE> =
                     GetMinMaxBenchmark::new(&heap, start_res_size);
                 bench.run_benchmark::<TIMER>(run_options);
             });

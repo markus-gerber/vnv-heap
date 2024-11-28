@@ -1,10 +1,15 @@
 use core::{cell::RefCell, marker::PhantomData};
 
 use crate::{
-    allocation_identifier::AllocationIdentifier, modules::{
+    allocation_identifier::AllocationIdentifier,
+    modules::{
         allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
         object_management::ObjectManagementModule,
-    }, vnv_heap::VNVHeapInner, vnv_list_mut_ref::VNVListMutRef, vnv_mut_ref::VNVMutRef, vnv_ref::VNVRef
+    },
+    vnv_heap::VNVHeapInner,
+    vnv_list_mut_ref::VNVListMutRef,
+    vnv_mut_ref::VNVMutRef,
+    vnv_ref::VNVRef,
 };
 
 pub struct VNVList<
@@ -57,7 +62,9 @@ impl<
 
     pub fn get_mut(&mut self) -> Result<VNVListMutRef<'a, '_, '_, 'b, T, SIZE, A, N, M>, ()> {
         let mut heap = self.vnv_heap.borrow_mut();
-        let (meta_ptr, data_ptr) = unsafe { heap.get_partial_mut::<[T; SIZE]>(&self.allocation_identifier)? };
+        let (meta_ptr, data_ptr) =
+            unsafe { heap.get_partial_mut::<[T; SIZE]>(&self.allocation_identifier)? };
+
         let meta_ref = unsafe { meta_ptr.as_mut().unwrap() };
         let data_ref = unsafe { data_ptr.as_mut().unwrap() };
         Ok(unsafe { VNVListMutRef::new(self.vnv_heap, data_ref, meta_ref) })

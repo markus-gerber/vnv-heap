@@ -12,6 +12,7 @@ use crate::{
 mod benchmarks;
 mod persist_all;
 mod persistency;
+mod unload;
 
 #[cfg(not(no_std))]
 fn get_test_heap<'a>(

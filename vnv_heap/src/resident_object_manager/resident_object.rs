@@ -1,5 +1,4 @@
-use core::{alloc::Layout, ptr::NonNull};
-use std::mem::size_of;
+use core::{alloc::Layout, ptr::NonNull, mem::size_of};
 
 use crate::{
     modules::{

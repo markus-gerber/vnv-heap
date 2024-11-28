@@ -2,7 +2,7 @@ use core::{
     array,
     ptr::{null, null_mut},
 };
-use std::sync::atomic::AtomicBool;
+use core::sync::atomic::AtomicBool;
 
 use try_lock::TryLock;
 

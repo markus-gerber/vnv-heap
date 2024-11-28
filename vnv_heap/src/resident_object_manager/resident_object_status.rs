@@ -29,6 +29,7 @@ macro_rules! generate_functions {
             self.is_set($bit)
         }
 
+        #[allow(unused)]
         #[inline]
         pub(crate) fn $set_name(&mut self, val: bool) {
             self.set($bit, val);

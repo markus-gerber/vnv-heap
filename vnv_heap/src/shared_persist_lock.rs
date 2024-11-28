@@ -1,8 +1,8 @@
 use core::{
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicBool, Ordering},
+    cell::UnsafeCell, mem::ManuallyDrop
 };
-use std::{cell::UnsafeCell, mem::ManuallyDrop};
 use try_lock::{Locked, TryLock};
 
 use crate::{persist_access_point::print_persist_debug, vnv_persist_all};

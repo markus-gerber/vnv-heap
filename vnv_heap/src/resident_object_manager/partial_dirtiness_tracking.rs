@@ -6,9 +6,9 @@ use core::{
     u8,
 };
 
-use static_assertions::{const_assert, const_assert_eq};
-use crate::util::div_ceil;
 use super::ResidentObjectMetadata;
+use crate::util::div_ceil;
+use static_assertions::{const_assert, const_assert_eq};
 
 /// This value indicates how big the blocks should be on which dirtiness is tracked
 /// You surely can change the value, but lower block sizes come with higher metadata costs (in RAM and on NV storage)
@@ -25,15 +25,15 @@ pub(crate) const PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE: usize = {
 pub(crate) const MAX_SUPPORTED_PARTIAL_DIRTY_OBJ_SIZE: usize = {
     // constraint: byte_offset (which is an u8) should not overflow
     // this will implicitly guarantee that byte_count does not overflow too (as always: byte_count <= byte_offset)
-    const MAX_SIZE: usize = PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 8 * MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE;
+    const MAX_SIZE: usize =
+        PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 8 * MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE;
     const_assert_eq!(MAX_SIZE % align_of::<ResidentObjectMetadata>(), 0);
 
     MAX_SIZE
 };
 
-pub(crate) const MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE: usize = {
-    u8::MAX as usize
-};
+/// How long can the `bit_list` be (in bytes)? This is limited because of `PartialDirtinessTrackingInfo::byte_count`
+pub(crate) const MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE: usize = u8::MAX as usize;
 
 /// Information on partial dirtiness tracking
 #[derive(Clone, Copy, PartialEq)]
@@ -101,7 +101,7 @@ impl PartialDirtinessTrackingInfo {
         &'a self,
         base_ptr: *const ResidentObjectMetadata,
     ) -> &'a mut [u8] {
-        let base_ptr = (base_ptr as *const u8) as usize + (self.byte_count as usize);
+        let base_ptr = (base_ptr as *const u8) as usize - (self.byte_count as usize);
 
         let slice_ptr = slice_from_raw_parts_mut(base_ptr as *mut u8, self.byte_count as usize);
         let slice = unsafe { slice_ptr.as_mut().unwrap() };
@@ -121,7 +121,6 @@ impl PartialDirtinessTrackingInfo {
             size_info_cache,
         }
     }
-
 }
 
 pub(crate) struct PartialDirtinessTrackingWrapper<'a> {
@@ -135,25 +134,32 @@ pub(crate) struct PartialDirtinessTrackingWrapper<'a> {
 
 impl<'a> PartialDirtinessTrackingWrapper<'a> {
     pub(crate) fn get_dirty_size(&self) -> usize {
-        self.get_dirty_block_cnt() * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
+        self.calc_dirty_size()
     }
 
-    fn get_dirty_block_cnt(&self) -> usize {
-        let mut dirty_block_cnt = 0;
-        for block in self.data_range.iter() {
-            let mut cpy = *block;
+    fn calc_dirty_size(&self) -> usize {
+        let mut dirty_size = 0;
+        for byte_index in 0..self.data_range.len() {
+            let mut cpy = self.data_range[byte_index];
+
             // could be more efficient with a lookup table
-            for _ in 0..8 {
+            for bit_index in 0..8 {
                 if cpy & 0x1 == 1 {
-                    dirty_block_cnt += 1
+                    if byte_index == self.data_range.len() - 1
+                        && bit_index == (self.size_info_cache.get_last_byte_bit_cnt() as usize) - 1
+                    {
+                        dirty_size += self.size_info_cache.get_last_block_size() as usize
+                    } else {
+                        dirty_size += PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
+                    }
                 }
                 cpy = cpy >> 1;
             }
         }
 
-        dirty_block_cnt
+        dirty_size
     }
-    
+
     pub(crate) fn set_all_blocks_synced(&mut self) {
         // reset is most performant
         self.reset();
@@ -187,17 +193,112 @@ impl<'a> PartialDirtinessTrackingWrapper<'a> {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn set_all_blocks_dirty(&mut self) {
         self.reset_and_set_all_blocks_dirty();
     }
 
-    pub(crate) fn set_range_dirty(&mut self, addr_offset: usize, size: usize) {
+    #[allow(unused)]
+    pub(crate) fn get_dirty_size_in_range(
+        &self,
+        addr_offset: usize,
+        size: usize,
+    ) -> usize {
+        self.get_dirty_status_in_range(addr_offset, size, true)
+    }
+
+    pub(crate) fn get_non_dirty_size_in_range(
+        &self,
+        addr_offset: usize,
+        size: usize,
+    ) -> usize {
+        self.get_dirty_status_in_range(addr_offset, size, false)
+    }
+
+    #[inline]
+    pub(crate) fn get_dirty_status_in_range(
+        &self,
+        addr_offset: usize,
+        size: usize,
+        dirty: bool
+    ) -> usize {
+        let mut res = 0;
         for i in 0..div_ceil(size, PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE) {
-            self.set_block_dirty(addr_offset + i * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE)
+            res += self.check_dirty_status_in_block(
+                addr_offset + i * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE,
+                dirty,
+            );
+        }
+        res
+    }
+
+    #[inline]
+    fn check_dirty_status_in_block(&self, addr_offset: usize, dirty: bool) -> usize {
+        let block_index = addr_offset / PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE;
+        let byte_index = block_index / 8;
+        let bit_index = block_index % 8;
+
+        debug_assert!(byte_index < self.data_range.len());
+
+        #[cfg(debug_assertions)]
+        if byte_index == self.data_range.len() - 1 {
+            debug_assert!(bit_index < self.size_info_cache.get_last_byte_bit_cnt() as usize);
+        }
+
+        let item_ref = &self.data_range[byte_index];
+        let bit_mask = 1 << (bit_index);
+        let is_dirty = (*item_ref & bit_mask) != 0;
+        
+        if !is_dirty && dirty {
+            return 0;
+        } else if is_dirty && !dirty {
+            return 0;
+        }
+
+        if byte_index == self.data_range.len() - 1
+            && bit_index == (self.size_info_cache.get_last_byte_bit_cnt() as usize) - 1
+        {
+            self.size_info_cache.get_last_block_size() as usize
+        } else {
+            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
         }
     }
 
-    fn set_block_dirty(&mut self, addr_offset: usize) {
+
+    pub(crate) fn set_range_dirty(
+        &mut self,
+        addr_offset: usize,
+        size: usize,
+    ) {
+        self.update_range_dirty(addr_offset, size, true);
+    }
+
+    #[allow(unused)]
+    pub(crate) fn unset_range_dirty(
+        &mut self,
+        addr_offset: usize,
+        size: usize,
+    ) {
+        self.update_range_dirty(addr_offset, size, false);
+    }
+
+    #[inline]
+    fn update_range_dirty(
+        &mut self,
+        addr_offset: usize,
+        size: usize,
+        dirty: bool,
+    ) {
+        for i in 0..div_ceil(size, PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE) {
+            self.update_block_dirty(
+                addr_offset + i * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE,
+                dirty,
+            )
+        }
+    }
+
+    #[inline]
+    fn update_block_dirty(&mut self, addr_offset: usize, dirty: bool) {
         let block_index = addr_offset / PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE;
         let byte_index = block_index / 8;
         let bit_index = block_index % 8;
@@ -211,7 +312,13 @@ impl<'a> PartialDirtinessTrackingWrapper<'a> {
 
         // find and update the item
         let item_ref = &mut self.data_range[byte_index];
-        *item_ref |= 1 << (bit_index);
+        let bit_mask = 1 << bit_index;
+
+        if dirty {
+            *item_ref |= bit_mask;
+        } else {
+            *item_ref &= !bit_mask;
+        }
     }
 
     /// Returns an iterator over all dirty block ranges
@@ -254,7 +361,7 @@ impl SyncDirtyIter<'_, '_> {
             if bit == 1 {
                 // yay we found a bit that is set!
 
-                /* 
+                /*
                 if self.update_status {
                     // unset current bit
                     self.wrapper_data.data_range[self.curr_byte_id] &= !(1 << self.curr_bit_id);
@@ -275,7 +382,7 @@ impl SyncDirtyIter<'_, '_> {
                 break;
             }
 
-            /* 
+            /*
             if self.update_status {
                 // unset current bit
                 self.wrapper_data.data_range[self.curr_byte_id] &= !(1 << self.curr_bit_id);
@@ -358,7 +465,10 @@ impl SizeInfoCache {
         Self { data: 0 }
     }
 
-    fn new(last_byte_bit_cnt: usize, last_block_size: usize) -> Self {
+    fn new(mut last_byte_bit_cnt: usize, last_block_size: usize) -> Self {
+        debug_assert!(last_byte_bit_cnt > 0);
+        last_byte_bit_cnt -= 1;
+
         // size checks
         debug_assert!(last_byte_bit_cnt < (1 << Self::LAST_BLOCK_SIZE_OFFSET));
         debug_assert!(last_block_size < Self::max_block_size());
@@ -374,7 +484,7 @@ impl SizeInfoCache {
 
     fn get_last_byte_bit_cnt(&self) -> u16 {
         debug_assert_eq!(Self::LAST_BYTE_BIT_CNT_OFFSET, 0);
-        self.data & Self::GET_LAST_BYTE_BIT_CNT_BITMASK
+        (self.data & Self::GET_LAST_BYTE_BIT_CNT_BITMASK) + 1
     }
 
     fn get_last_block_size(&self) -> u16 {
@@ -391,101 +501,101 @@ mod test {
     use super::{
         PartialDirtinessTrackingWrapper, SizeInfoCache, PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE,
     };
-/*
-    #[test]
-    fn test_partial_dirtiness_wrapper_iter() {
-        let mut data_range = [0u8; 3];
-        let mut obj = PartialDirtinessTrackingWrapper {
-            data_range: &mut data_range,
-            size_info_cache: SizeInfoCache::new(3, PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2),
-        };
+    /*
+        #[test]
+        fn test_partial_dirtiness_wrapper_iter() {
+            let mut data_range = [0u8; 3];
+            let mut obj = PartialDirtinessTrackingWrapper {
+                data_range: &mut data_range,
+                size_info_cache: SizeInfoCache::new(3, PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2),
+            };
 
-        obj.set_block_dirty(
-            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
-        );
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 7 + 0);
-        obj.set_block_dirty(
-            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 8 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 4,
-        );
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + 0);
-        obj.set_block_dirty(
-            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 4 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
-        );
-        obj.set_block_dirty(
-            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 17 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 8,
-        );
-        obj.set_block_dirty(
-            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 18 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 8,
-        );
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 15);
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 12);
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 11);
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 13);
+            obj.update_block_dirty(
+                PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
+            );
+            obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 7 + 0);
+            obj.update_block_dirty(
+                PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 8 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 4,
+            );
+            obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + 0);
+            obj.update_block_dirty(
+                PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 4 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
+            );
+            obj.update_block_dirty(
+                PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 17 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 8,
+            );
+            obj.update_block_dirty(
+                PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 18 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 8,
+            );
+            obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 15);
+            obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 12);
+            obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 11);
+            obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 13);
 
-        // bytes should look like this
-        // [0b10011000, 0b10011001, 0b00000110]
-        assert_eq!(obj.data_range, [0b10011000, 0b10111001, 0b00000110]);
-        let mut iter = obj.sync_dirty_iter(true);
-        assert_eq!(
-            iter.next(),
-            Some(
-                3 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE..5 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
-            )
-        );
-        assert_eq!(
-            iter.wrapper_data.data_range,
-            [0b10000000, 0b10111001, 0b00000110]
-        );
+            // bytes should look like this
+            // [0b10011000, 0b10011001, 0b00000110]
+            assert_eq!(obj.data_range, [0b10011000, 0b10111001, 0b00000110]);
+            let mut iter = obj.sync_dirty_iter(true);
+            assert_eq!(
+                iter.next(),
+                Some(
+                    3 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE..5 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
+                )
+            );
+            assert_eq!(
+                iter.wrapper_data.data_range,
+                [0b10000000, 0b10111001, 0b00000110]
+            );
 
-        assert_eq!(
-            iter.next(),
-            Some(
-                7 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE..9 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
-            )
-        );
-        assert_eq!(
-            iter.wrapper_data.data_range,
-            [0b00000000, 0b10111000, 0b00000110]
-        );
+            assert_eq!(
+                iter.next(),
+                Some(
+                    7 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE..9 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
+                )
+            );
+            assert_eq!(
+                iter.wrapper_data.data_range,
+                [0b00000000, 0b10111000, 0b00000110]
+            );
 
-        assert_eq!(
-            iter.next(),
-            Some(
-                11 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
-                    ..14 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
-            )
-        );
-        assert_eq!(
-            iter.wrapper_data.data_range,
-            [0b00000000, 0b10000000, 0b00000110]
-        );
+            assert_eq!(
+                iter.next(),
+                Some(
+                    11 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
+                        ..14 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
+                )
+            );
+            assert_eq!(
+                iter.wrapper_data.data_range,
+                [0b00000000, 0b10000000, 0b00000110]
+            );
 
-        assert_eq!(
-            iter.next(),
-            Some(
-                15 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
-                    ..16 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
-            )
-        );
-        assert_eq!(
-            iter.wrapper_data.data_range,
-            [0b00000000, 0b00000000, 0b00000110]
-        );
+            assert_eq!(
+                iter.next(),
+                Some(
+                    15 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
+                        ..16 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
+                )
+            );
+            assert_eq!(
+                iter.wrapper_data.data_range,
+                [0b00000000, 0b00000000, 0b00000110]
+            );
 
-        let end =
-            (18 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE) + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2;
-        assert_eq!(
-            iter.next(),
-            Some(17 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE..end)
-        );
-        assert_eq!(
-            iter.wrapper_data.data_range,
-            [0b00000000, 0b00000000, 0b00000000]
-        );
+            let end =
+                (18 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE) + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2;
+            assert_eq!(
+                iter.next(),
+                Some(17 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE..end)
+            );
+            assert_eq!(
+                iter.wrapper_data.data_range,
+                [0b00000000, 0b00000000, 0b00000000]
+            );
 
-        assert_eq!(iter.next(), None);
-    }
-*/
+            assert_eq!(iter.next(), None);
+        }
+    */
 
     #[test]
     fn test_partial_dirtiness_wrapper_iter_no_update() {
@@ -495,27 +605,32 @@ mod test {
             size_info_cache: SizeInfoCache::new(3, PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2),
         };
 
-        obj.set_block_dirty(
+        obj.update_block_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
+            true,
         );
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 7 + 0);
-        obj.set_block_dirty(
+        obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 7 + 0, true);
+        obj.update_block_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 8 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 4,
+            true,
         );
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + 0);
-        obj.set_block_dirty(
+        obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + 0, true);
+        obj.update_block_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 4 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
+            true,
         );
-        obj.set_block_dirty(
+        obj.update_block_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 17 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 8,
+            true,
         );
-        obj.set_block_dirty(
+        obj.update_block_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 18 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 8,
+            true,
         );
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 15);
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 12);
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 11);
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 13);
+        obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 15, true);
+        obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 12, true);
+        obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 11, true);
+        obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 13, true);
 
         // bytes should look like this
         // [0b10011000, 0b10011001, 0b00000110]
@@ -527,7 +642,10 @@ mod test {
                 3 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE..5 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
             )
         );
-        assert_eq!(iter.wrapper_data.data_range, [0b10011000, 0b10111001, 0b00000110]);
+        assert_eq!(
+            iter.wrapper_data.data_range,
+            [0b10011000, 0b10111001, 0b00000110]
+        );
 
         assert_eq!(
             iter.next(),
@@ -535,7 +653,10 @@ mod test {
                 7 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE..9 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
             )
         );
-        assert_eq!(iter.wrapper_data.data_range, [0b10011000, 0b10111001, 0b00000110]);
+        assert_eq!(
+            iter.wrapper_data.data_range,
+            [0b10011000, 0b10111001, 0b00000110]
+        );
 
         assert_eq!(
             iter.next(),
@@ -544,7 +665,10 @@ mod test {
                     ..14 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
             )
         );
-        assert_eq!(iter.wrapper_data.data_range, [0b10011000, 0b10111001, 0b00000110]);
+        assert_eq!(
+            iter.wrapper_data.data_range,
+            [0b10011000, 0b10111001, 0b00000110]
+        );
 
         assert_eq!(
             iter.next(),
@@ -553,7 +677,10 @@ mod test {
                     ..16 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE
             )
         );
-        assert_eq!(iter.wrapper_data.data_range, [0b10011000, 0b10111001, 0b00000110]);
+        assert_eq!(
+            iter.wrapper_data.data_range,
+            [0b10011000, 0b10111001, 0b00000110]
+        );
 
         let end =
             (18 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE) + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2;
@@ -561,7 +688,10 @@ mod test {
             iter.next(),
             Some(17 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE..end)
         );
-        assert_eq!(iter.wrapper_data.data_range, [0b10011000, 0b10111001, 0b00000110]);
+        assert_eq!(
+            iter.wrapper_data.data_range,
+            [0b10011000, 0b10111001, 0b00000110]
+        );
 
         assert_eq!(iter.next(), None);
 
@@ -570,86 +700,75 @@ mod test {
     }
 
     #[test]
-    fn test_partial_dirtiness_wrapper_set_range_dirty() {
+    fn test_partial_dirtiness_wrapper_update_range_dirty() {
         let mut data_range = [0u8; 3];
         let mut obj = PartialDirtinessTrackingWrapper {
             data_range: &mut data_range,
             size_info_cache: SizeInfoCache::new(3, PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE),
         };
 
-        obj.set_range_dirty(
+        obj.update_range_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
-            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2
+            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
+            true,
         );
 
-        assert_eq!(
-            obj.data_range,
-            [0b00001000, 0, 0]
-        );
+        assert_eq!(obj.data_range, [0b00001000, 0, 0]);
 
-        obj.set_range_dirty(
+        obj.update_range_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 7,
-            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2
+            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
+            true,
         );
 
-        assert_eq!(
-            obj.data_range,
-            [0b10001000, 0, 0]
-        );
+        assert_eq!(obj.data_range, [0b10001000, 0, 0]);
 
-        obj.set_range_dirty(
+        obj.update_range_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 6,
-            4 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2
+            4 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
+            true,
         );
 
-        assert_eq!(
-            obj.data_range,
-            [0b11001000, 0b00000111, 0]
-        );
+        assert_eq!(obj.data_range, [0b11001000, 0b00000111, 0]);
 
-        obj.set_range_dirty(
+        obj.update_range_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 6,
-            4 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE + (PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE - 1)
+            4 * PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE + (PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE - 1),
+            true,
         );
 
-        assert_eq!(
-            obj.data_range,
-            [0b11001000, 0b00000111, 0]
-        );
+        assert_eq!(obj.data_range, [0b11001000, 0b00000111, 0]);
 
-        obj.set_range_dirty(
-            PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 7,
-            1
-        );
+        obj.update_range_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 7, 1, true);
 
-        assert_eq!(
-            obj.data_range,
-            [0b11001000, 0b00000111, 0]
-        );
+        assert_eq!(obj.data_range, [0b11001000, 0b00000111, 0]);
     }
 
-
     #[test]
-    fn test_partial_dirtiness_wrapper_set_block_dirty() {
+    fn test_partial_dirtiness_wrapper_update_block_dirty() {
         let mut data_range = [0u8; 3];
         let mut obj = PartialDirtinessTrackingWrapper {
             data_range: &mut data_range,
             size_info_cache: SizeInfoCache::new(3, PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE),
         };
 
-        obj.set_block_dirty(
+        obj.update_block_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
+            true,
         );
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 7 + 0);
-        obj.set_block_dirty(
+        obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 7 + 0, true);
+        obj.update_block_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 8 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 4,
+            true,
         );
-        obj.set_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + 0);
-        obj.set_block_dirty(
+        obj.update_block_dirty(PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 3 + 0, true);
+        obj.update_block_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 4 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 2,
+            true,
         );
-        obj.set_block_dirty(
+        obj.update_block_dirty(
             PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE * 17 + PARTIAL_DIRTINESS_TACKING_BLOCK_SIZE / 8,
+            true,
         );
 
         drop(obj);
@@ -675,8 +794,8 @@ mod test {
     #[test]
     fn test_size_info_cache() {
         for bit_cnt in 0..(1 << 3) {
-            for block_size in 0..(1 << 13) {
-                test_size_info_cache_impl(bit_cnt, block_size);
+            for block_size in 1..(1 << 13) {
+                test_size_info_cache_impl(bit_cnt + 1, block_size);
             }
         }
     }

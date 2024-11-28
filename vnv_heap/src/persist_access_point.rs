@@ -1,8 +1,7 @@
 use core::{
     mem::transmute,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, Ordering, AtomicPtr},
 };
-use std::sync::atomic::AtomicPtr;
 use try_lock::TryLock;
 
 use crate::{

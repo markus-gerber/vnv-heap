@@ -1,11 +1,17 @@
-use core::{alloc::Layout, sync::atomic::AtomicPtr};
+use core::{
+    alloc::Layout,
+    mem::size_of,
+    ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
+    sync::atomic::AtomicPtr,
+};
 use static_assertions::const_assert_eq;
-use std::{mem::size_of, ptr::{slice_from_raw_parts, slice_from_raw_parts_mut}};
 
 use self::persistent_storage_util::read_storage_data;
 
 use super::{
-    partial_dirtiness_tracking::PartialDirtinessTrackingInfo, resident_object_metadata::{ResidentObjectMetadata, ResidentObjectMetadataInner}, resident_object_status::ResidentObjectStatus
+    partial_dirtiness_tracking::PartialDirtinessTrackingInfo,
+    resident_object_metadata::{ResidentObjectMetadata, ResidentObjectMetadataInner},
+    resident_object_status::ResidentObjectStatus,
 };
 use crate::{
     modules::persistent_storage::{persistent_storage_util, PersistentStorageModule},
@@ -13,26 +19,41 @@ use crate::{
 };
 
 pub(crate) const TOTAL_METADATA_BACKUP_SIZE: usize = {
-    const_assert_eq!(size_of::<ResidentObjectMetadataBackup>(), GENERAL_METADATA_BACKUP_SIZE + METADATA_EXCEPT_GENERAL_BACKUP_SIZE);
+    const_assert_eq!(
+        size_of::<ResidentObjectMetadataBackup>(),
+        GENERAL_METADATA_BACKUP_SIZE + METADATA_EXCEPT_GENERAL_BACKUP_SIZE
+    );
 
     size_of::<ResidentObjectMetadataBackup>()
 };
 
 pub(crate) const GENERAL_METADATA_BACKUP_SIZE: usize = size_of::<usize>() + size_of::<Layout>();
 
-pub(crate) const METADATA_EXCEPT_GENERAL_BACKUP_SIZE: usize = size_of::<usize>() + size_of::<ResidentObjectStatus>();
+pub(crate) const METADATA_EXCEPT_GENERAL_BACKUP_SIZE: usize =
+    size_of::<usize>() + size_of::<ResidentObjectStatus>();
 
-pub(crate) const fn calc_backup_obj_layout_static<T>(use_partial_dirtiness_tracking: bool) -> (Layout, usize) {
+pub(crate) const fn calc_backup_obj_layout_static<T>(
+    use_partial_dirtiness_tracking: bool,
+) -> (Layout, usize) {
     let dirtiness_buf_size = if use_partial_dirtiness_tracking {
         let (_, byte_count) = PartialDirtinessTrackingInfo::calc_bit_and_byte_count(size_of::<T>());
-    
+
         byte_count
     } else {
         0
     };
 
-    assert!(Layout::from_size_align(dirtiness_buf_size + TOTAL_METADATA_BACKUP_SIZE + size_of::<T>(), 1).is_ok());
-    let layout = unsafe { Layout::from_size_align_unchecked(dirtiness_buf_size + TOTAL_METADATA_BACKUP_SIZE + size_of::<T>(), 1) };
+    assert!(Layout::from_size_align(
+        dirtiness_buf_size + TOTAL_METADATA_BACKUP_SIZE + size_of::<T>(),
+        1
+    )
+    .is_ok());
+    let layout = unsafe {
+        Layout::from_size_align_unchecked(
+            dirtiness_buf_size + TOTAL_METADATA_BACKUP_SIZE + size_of::<T>(),
+            1,
+        )
+    };
 
     (layout, dirtiness_buf_size)
 }
@@ -42,13 +63,12 @@ pub(crate) const fn calc_backup_obj_user_data_offset() -> usize {
     TOTAL_METADATA_BACKUP_SIZE
 }
 
-
 /// Metadata of resident objects that will be saved
 /// to non volatile storage, so that program can recover
 /// after a power failure
-/// 
+///
 /// IMPORTANT: DO NOT REORDER THE FIELDS OF THIS STRUCT AS IT IS CRUCIAL TO THE CURRENT IMPLEMENTATION
-/// 
+///
 /// ALSO NOTE: ONLY REMOVE/ADD FIELDS WITH UPDATING:
 /// TOTAL_METADATA_BACKUP_SIZE, GENERAL_METADATA_BACKUP_SIZE and METADATA_EXCEPT_GENERAL_BACKUP_SIZE
 #[repr(C, packed(1))]
@@ -74,7 +94,6 @@ pub(crate) struct ResidentObjectMetadataBackupInner {
 }
 
 impl ResidentObjectMetadataBackupInner {
-
     fn from(value: &ResidentObjectMetadataInner) -> Self {
         let ResidentObjectMetadataInner {
             status: dirty_status,
@@ -119,10 +138,7 @@ impl ResidentObjectMetadataBackupInner {
 }
 
 impl ResidentObjectMetadataBackup {
-    fn from_metadata(
-        metadata: &ResidentObjectMetadata,
-        next_item_offset: usize,
-    ) -> Self {
+    fn from_metadata(metadata: &ResidentObjectMetadata, next_item_offset: usize) -> Self {
         let obj = ResidentObjectMetadataBackup {
             inner: ResidentObjectMetadataBackupInner::from(&metadata.inner),
             next_resident_object: next_item_offset,
@@ -150,17 +166,23 @@ pub(crate) fn persist_general_metadata<S: PersistentStorageModule>(
 ) -> Result<(), ()> {
     // step 1: create metadata backup
     let metadata_backup = ResidentObjectMetadataBackup::from_metadata(metadata, 0);
-    
+
     // step 2: create slice from the backup object
     let slice_start = ((&metadata_backup) as *const ResidentObjectMetadataBackup) as *const u8;
     let slice_start = unsafe { slice_start.add(METADATA_EXCEPT_GENERAL_BACKUP_SIZE) };
-    
-    let slice = unsafe { slice_from_raw_parts(slice_start, GENERAL_METADATA_BACKUP_SIZE).as_ref().unwrap() };
+
+    let slice = unsafe {
+        slice_from_raw_parts(slice_start, GENERAL_METADATA_BACKUP_SIZE)
+            .as_ref()
+            .unwrap()
+    };
 
     // step 3: write the slice to storage
-    storage.write(metadata.inner.offset + METADATA_EXCEPT_GENERAL_BACKUP_SIZE, slice)
+    storage.write(
+        metadata.inner.offset + METADATA_EXCEPT_GENERAL_BACKUP_SIZE,
+        slice,
+    )
 }
-
 
 /// Persists metadata including dirty bit list (if partial dirtiness tracking is enabled)
 #[inline]
@@ -193,7 +215,10 @@ pub(crate) fn persist_whole_metadata<S: PersistentStorageModule>(
             .unwrap()
     };
 
-    let origin_slice = metadata.inner.partial_dirtiness_tracking_info.get_dirty_buf_slice(metadata);
+    let origin_slice = metadata
+        .inner
+        .partial_dirtiness_tracking_info
+        .get_dirty_buf_slice(metadata);
     let origin_slice = origin_slice.as_ref();
 
     dirty_buf_backup_slice.copy_from_slice(&origin_slice);
@@ -205,16 +230,20 @@ pub(crate) fn persist_whole_metadata<S: PersistentStorageModule>(
         dirty_buf_bytes + size_of::<ResidentObjectMetadataBackup>()
     } else {
         // general metadata was already per
-        dirty_buf_bytes + size_of::<ResidentObjectMetadataBackup>() - GENERAL_METADATA_BACKUP_SIZE        
+        dirty_buf_bytes + size_of::<ResidentObjectMetadataBackup>() - GENERAL_METADATA_BACKUP_SIZE
     };
 
-    let slice = unsafe { slice_from_raw_parts(dirty_buf_backup_start_ptr, res_slice_length).as_ref().unwrap() };
+    let slice = unsafe {
+        slice_from_raw_parts(dirty_buf_backup_start_ptr, res_slice_length)
+            .as_ref()
+            .unwrap()
+    };
 
     storage.write(metadata.inner.offset - dirty_buf_bytes, slice)
 }
 
 /// Restores metadata including dirty bit list (if partial dirtiness tracking is enabled)
-/// 
+///
 /// **Safety**:
 /// - A valid metadata object has to be stored at `offset`
 /// - Enough space has to be allocated before `dest_ptr` to fit the partial dirtiness tacking buffer
@@ -234,10 +263,17 @@ pub(crate) unsafe fn restore_metadata<S: PersistentStorageModule>(
     let dest_ref = dest_ptr.as_mut().unwrap();
 
     // step 2: restore partial dirtiness tracking buffer (if it exists)
-    if dest_ref.inner.status.is_partial_dirtiness_tracking_enabled() {
+    if dest_ref
+        .inner
+        .status
+        .is_partial_dirtiness_tracking_enabled()
+    {
         let byte_cnt = dest_ref.inner.partial_dirtiness_tracking_info.byte_count as usize;
 
-        let dest_slice = dest_ref.inner.partial_dirtiness_tracking_info.get_dirty_buf_slice(dest_ptr);
+        let dest_slice = dest_ref
+            .inner
+            .partial_dirtiness_tracking_info
+            .get_dirty_buf_slice(dest_ptr);
         storage.read(dest_ref.inner.offset - byte_cnt, dest_slice)?;
     }
 
@@ -307,19 +343,20 @@ mod test {
             a: usize,
         }
         test_backup_obj_layout_internal::<Test7>();
-
     }
 
     fn test_backup_obj_layout_internal<T>() {
         let user_data_offset = calc_backup_obj_user_data_offset();
         let (layout, metadata_offset) = calc_backup_obj_layout_static::<T>(false);
-        
+
         assert_eq!(user_data_offset + size_of::<T>(), layout.size());
         assert_eq!(metadata_offset, 0);
 
         let (layout, metadata_offset) = calc_backup_obj_layout_static::<T>(true);
-        
-        assert_eq!(metadata_offset + user_data_offset + size_of::<T>(), layout.size());
-    }
 
+        assert_eq!(
+            metadata_offset + user_data_offset + size_of::<T>(),
+            layout.size()
+        );
+    }
 }

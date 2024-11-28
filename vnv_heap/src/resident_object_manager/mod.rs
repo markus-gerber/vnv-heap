@@ -1,6 +1,5 @@
 use core::ptr::slice_from_raw_parts_mut;
 use core::{marker::PhantomData, mem::size_of};
-use std::alloc::Layout;
 
 use log::{debug, trace, warn};
 use memoffset::offset_of;
@@ -17,7 +16,7 @@ use crate::{
     modules::{allocator::AllocatorModule, persistent_storage::PersistentStorageModule},
 };
 
-mod partial_dirtiness_tracking;
+pub(crate) mod partial_dirtiness_tracking;
 mod persist;
 pub(crate) mod resident_list;
 pub(crate) mod resident_object;
@@ -318,6 +317,8 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         storage: &mut S,
         user_partial_dirtiness_tracking: bool,
     ) -> Result<(), ()> {
+        self.check_integrity();
+
         let mut iter = self.resident_list.iter_mut();
         while let Some(mut element) = iter.next() {
             if element.get_element().inner.offset == alloc_id.offset {
@@ -346,6 +347,8 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
             }
         }
 
+        self.check_integrity();
+
         return Ok(());
     }
 
@@ -358,7 +361,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
     ) -> Result<(), T> {
         debug_assert_eq!(
             use_partial_dirtiness_tracking,
-            (storage_base_offset - storage_metadata_offset) != 0
+            (storage_metadata_offset - storage_base_offset) != 0
         );
 
         let (resident_obj_layout, resident_metadata_rel_offset) =
@@ -583,6 +586,66 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         Ok((&mut obj_ref.metadata, &mut obj_ref.data))
     }
 
+    pub(crate) fn partial_mut_make_range_dirty<S: PersistentStorageModule>(
+        &mut self,
+        meta_ref: &mut ResidentObjectMetadata,
+        addr_offset: usize,
+        size: usize,
+        storage: &mut S,
+    ) -> Result<(), ()> {
+        self.check_integrity();
+
+        // some important checks
+        debug_assert!(meta_ref
+            .inner
+            .status
+            .is_partial_dirtiness_tracking_enabled());
+        debug_assert!(meta_ref.inner.status.is_in_use());
+        debug_assert!(meta_ref.inner.status.is_mutable_ref_active());
+
+        let mut wrapper = unsafe {
+            meta_ref
+                .inner
+                .partial_dirtiness_tracking_info
+                .get_wrapper(meta_ref)
+        };
+        let dirty_size = wrapper.get_non_dirty_size_in_range(addr_offset, size);
+
+        if dirty_size > self.remaining_dirty_size {
+            // remaining dirty size is too small to make this data region dirty
+            // try to sync enough dirty data now
+            let bytes_to_sync = dirty_size - self.remaining_dirty_size;
+
+            unsafe {
+                sync_dirty_data::<A, S, M>(
+                    &mut self.remaining_dirty_size,
+                    self.resident_list,
+                    &mut self.object_manager,
+                    bytes_to_sync,
+                    storage,
+                    &self.heap,
+                    &mut self.resident_object_count,
+                )?;
+            }
+        }
+
+        debug_assert!(
+            self.remaining_dirty_size >= dirty_size,
+            "{} >= {}",
+            self.remaining_dirty_size,
+            dirty_size
+        );
+        self.remaining_dirty_size -= dirty_size;
+
+        // yay, we can make all bytes in the range dirty
+        wrapper.set_range_dirty(addr_offset, size);
+        meta_ref.inner.status.set_data_dirty(true);
+
+        self.check_integrity();
+
+        Ok(())
+    }
+
     pub(crate) unsafe fn release_partial_mut<T: Sized>(
         &mut self,
         meta_ptr: *mut ResidentObjectMetadata,
@@ -710,9 +773,10 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         assert_eq!(
             dirty_size + self.remaining_dirty_size,
             self._initial_dirty_size,
-            "did not match initial dirty size: curr_dirty_size: {}, remaining_dirty_size: {}",
+            "did not match initial dirty size: curr_dirty_size: {}, remaining_dirty_size: {}, initial_dirty_size: {}",
             dirty_size,
-            self.remaining_dirty_size
+            self.remaining_dirty_size,
+            self._initial_dirty_size
         );
     }
 

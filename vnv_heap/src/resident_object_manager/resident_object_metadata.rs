@@ -9,18 +9,21 @@ use memoffset::offset_of;
 
 use crate::{
     modules::{allocator::AllocatorModule, persistent_storage::PersistentStorageModule},
-    resident_object_manager::calc_resident_obj_layout_dynamic,
+    resident_object_manager::calc_resident_obj_layout_dynamic, util::round_up_to_nearest,
 };
 
 use super::{
-    calc_backup_obj_user_data_offset, partial_dirtiness_tracking::PartialDirtinessTrackingInfo, persist_general_metadata, resident_list::DeleteHandle, resident_object_status::ResidentObjectStatus, ResidentObject, SharedPersistLock, GENERAL_METADATA_BACKUP_SIZE, METADATA_EXCEPT_GENERAL_BACKUP_SIZE, TOTAL_METADATA_BACKUP_SIZE
+    calc_backup_obj_user_data_offset, partial_dirtiness_tracking::PartialDirtinessTrackingInfo,
+    persist_general_metadata, resident_list::DeleteHandle,
+    resident_object_status::ResidentObjectStatus, ResidentObject, SharedPersistLock,
+    GENERAL_METADATA_BACKUP_SIZE, METADATA_EXCEPT_GENERAL_BACKUP_SIZE, TOTAL_METADATA_BACKUP_SIZE,
 };
 
 const fn calc_dirty_metadata_dirty_byte_cnt(
     enabled_partial_dirtiness_tracking: bool,
     data_size: usize,
 ) -> usize {
-    if enabled_partial_dirtiness_tracking {
+    if !enabled_partial_dirtiness_tracking {
         TOTAL_METADATA_BACKUP_SIZE
     } else {
         let (_, byte_cnt) = PartialDirtinessTrackingInfo::calc_bit_and_byte_count(data_size);
@@ -32,7 +35,7 @@ const fn calc_general_metadata_synced_dirty_byte_cnt(
     enabled_partial_dirtiness_tracking: bool,
     data_size: usize,
 ) -> usize {
-    if enabled_partial_dirtiness_tracking {
+    if !enabled_partial_dirtiness_tracking {
         METADATA_EXCEPT_GENERAL_BACKUP_SIZE
     } else {
         let (_, byte_cnt) = PartialDirtinessTrackingInfo::calc_bit_and_byte_count(data_size);
@@ -177,7 +180,9 @@ impl ResidentObjectMetadata {
                 debug_assert_eq!(
                     ((self as *const ResidentObjectMetadata) as *const u8).add(self.inner.data_offset),
                     base_ptr,
-                    "Results in an error if the formula for manually getting the address of the data is wrong"
+                    "Results in an error if the formula for manually getting the address of the data is wrong (data_offset: {} vs {})",
+                    self.inner.data_offset,
+                    round_up_to_nearest(size_of::<ResidentObjectMetadata>(), self.inner.layout.align())
                 );
             }
         }
@@ -349,7 +354,7 @@ impl ResidentObjectMetadata {
                 // so that the iterator returns a data range containing even with slices that are already persisted
                 // example: [BIG DIRTY][SMALL PERSISTED][BIG DIRTY], if initial cost > SMALL PERSISTED
                 // its worth to persist the whole data range with one write call
-                
+
                 let data_range = self.dynamic_metadata_to_data_range();
                 let slice = &data_range[range.clone()];
                 storage.write(offset + range.start, slice)?;
