@@ -17,8 +17,6 @@ pub(crate) struct ResidentItemListArguments<'a, 'b, S: PersistentStorageModule, 
 
     pub(crate) allocator: &'a SharedPersistLock<'b, *mut A>,
 
-    pub(crate) resident_object_count: &'a mut usize,
-
     pub(crate) remaining_dirty_size: &'a mut usize,
 }
 
@@ -42,8 +40,6 @@ impl<S: PersistentStorageModule, A: AllocatorModule>
                 self.arguments.remaining_dirty_size,
             )
         }?;
-
-        *self.arguments.resident_object_count -= 1;
 
         {
             // unwrap is okay here because there are no other threads concurrently accessing it
@@ -136,7 +132,6 @@ pub(crate) struct DirtyItemListArguments<'a, 'b, A: AllocatorModule, S: Persiste
     pub(crate) storage: &'a mut S,
     pub(crate) remaining_dirty_size: &'a mut usize,
     pub(crate) allocator: &'a SharedPersistLock<'b, *mut A>,
-    pub(crate) resident_object_count: &'a mut usize,
 }
 
 pub struct DirtyIterItem<'a, 'b, 'c, 'd, 'e, 'f, A: AllocatorModule, S: PersistentStorageModule> {
@@ -166,8 +161,6 @@ impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '
                 self.arguments.remaining_dirty_size,
             )
         }?;
-
-        *self.arguments.resident_object_count -= 1;
 
         Ok(*self.arguments.remaining_dirty_size - prev)
     }

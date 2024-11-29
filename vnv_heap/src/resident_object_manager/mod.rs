@@ -35,9 +35,6 @@ pub(crate) struct ResidentObjectManager<'a: 'b, 'b, A: AllocatorModule, M: Objec
     /// In memory heap for resident objects and their metadata
     pub(crate) heap: SharedPersistLock<'b, *mut A>,
 
-    /// How many objects are currently resident?
-    pub(crate) resident_object_count: usize,
-
     /// How many bytes can still be made dirty without
     /// violating users requirements
     pub(crate) remaining_dirty_size: usize,
@@ -108,7 +105,6 @@ impl<'a, 'b, A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManage
         let instance = ResidentObjectManager {
             resident_list,
             heap,
-            resident_object_count: 0,
             remaining_dirty_size: max_dirty_size,
             object_manager: M::new(),
             _resident_buffer: PhantomData,
@@ -161,7 +157,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                     let mut args = ResidentItemListArguments {
                         allocator: &self.heap,
                         remaining_dirty_size: &mut self.remaining_dirty_size,
-                        resident_object_count: &mut self.resident_object_count,
                         storage,
                     };
 
@@ -223,7 +218,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                 required_bytes,
                 storage,
                 &self.heap,
-                &mut self.resident_object_count,
             )?;
 
             // reallocate
@@ -307,7 +301,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
             .as_mut()
             .unwrap();
 
-        self.resident_object_count += 1;
         Ok(obj_ref)
     }
 
@@ -341,7 +334,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                     )
                     .expect("unloading should succeed")
                 };
-                self.resident_object_count -= 1;
 
                 break;
             }
@@ -421,7 +413,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         }
 
         drop(guard);
-        self.resident_object_count += 1;
 
         Ok(())
     }
@@ -462,8 +453,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                         use_partial_dirtiness_tracking,
                     )?
                 }
-
-                self.resident_object_count -= 1;
 
                 self.check_integrity();
                 return Ok(());
@@ -536,7 +525,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                 bytes_to_sync,
                 storage,
                 &self.heap,
-                &mut self.resident_object_count,
             )?;
         }
 
@@ -624,7 +612,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                     bytes_to_sync,
                     storage,
                     &self.heap,
-                    &mut self.resident_object_count,
                 )?;
             }
         }
@@ -736,6 +723,10 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         self.check_integrity();
     }
 
+    pub(crate) fn count_resident_objects(&self) -> usize {
+        self.resident_list.iter().count() 
+    }
+
     /// Finds an object in the resident list
     ///
     /// ### Safety
@@ -760,16 +751,13 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
     #[cfg(debug_assertions)]
     fn check_integrity(&self) {
         // check if resident_object_count and remaining_dirty_size are correct
-        let mut obj_cnt = 0;
         let mut dirty_size = 0;
 
         let mut iter = self.resident_list.iter();
         while let Some(item) = iter.next() {
-            obj_cnt += 1;
             dirty_size += item.dirty_size();
         }
 
-        assert_eq!(obj_cnt, self.resident_object_count);
         assert_eq!(
             dirty_size + self.remaining_dirty_size,
             self._initial_dirty_size,
@@ -818,7 +806,6 @@ unsafe fn sync_dirty_data<
     required_bytes: usize,
     storage: &'a mut S,
     allocator: &'a SharedPersistLock<'b, *mut A>,
-    resident_object_count: &'a mut usize,
 ) -> Result<(), ()> {
     if required_bytes == 0 {
         return Ok(());
@@ -830,7 +817,6 @@ unsafe fn sync_dirty_data<
         remaining_dirty_size,
         storage: storage,
         allocator,
-        resident_object_count,
     };
 
     let dirty_list = DirtyItemList {

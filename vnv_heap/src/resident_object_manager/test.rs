@@ -272,6 +272,6 @@ fn test_remain_resident() {
             .unwrap();
     }
 
-    assert_eq!(manager.resident_object_count, 0);
+    assert_eq!(manager.count_resident_objects(), 0);
     assert!(manager.resident_list.is_empty());
 }

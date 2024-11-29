@@ -287,6 +287,12 @@ impl<
             cutoff_layout: Layout::new::<ResidentBufPersistentStorage<A, S>>(),
         }
     }
+
+    pub fn count_resident_objects<T: Sized>(&self) -> usize {
+        let inner = self.inner.borrow();
+        inner.count_resident_objects()
+    }
+
 }
 
 impl<
@@ -447,6 +453,10 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
 
     pub(crate) fn is_resident<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) -> bool {
         self.resident_object_manager.is_resident(identifier)
+    }
+
+    pub(crate) fn count_resident_objects(&self) -> usize {
+        self.resident_object_manager.count_resident_objects()
     }
 
     pub(crate) fn unload_object<T: Sized>(
