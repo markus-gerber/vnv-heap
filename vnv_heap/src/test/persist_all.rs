@@ -35,7 +35,7 @@ fn test_persist_all_simple() {
         "test_persist_all_simple",
         8 * 4096,
         &mut buffer,
-        800,
+        1200,
         |base_ptr, size| {
             let buffer = unsafe { slice_from_raw_parts_mut(base_ptr, size).as_mut() }.unwrap();
             buffer.fill(0);
@@ -90,9 +90,11 @@ fn test_persist_all_simple() {
     ) {
         let data = rand_data(rand);
 
-        let mut obj_ref = objects[id].get_mut().unwrap();
-        *obj_ref = data.clone();
-        drop(obj_ref);
+        {
+            let mut obj_ref = objects[id].get_mut().unwrap();
+            *obj_ref = data.clone();
+            drop(obj_ref);    
+        }
 
         check_states[id] = data;
     }

@@ -77,6 +77,11 @@ impl<
         heap.is_resident(&self.allocation_identifier)
     }
 
+    pub fn is_data_dirty(&self) -> bool {
+        let mut heap = self.vnv_heap.borrow_mut();
+        heap.is_data_dirty(&self.allocation_identifier)
+    }
+
     pub fn unload(&mut self) -> Result<(), ()> {
         let mut heap = self.vnv_heap.borrow_mut();
         heap.unload_object(&self.allocation_identifier, false)

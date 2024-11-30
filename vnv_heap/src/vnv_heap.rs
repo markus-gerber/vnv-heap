@@ -455,6 +455,10 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
         self.resident_object_manager.is_resident(identifier)
     }
 
+    pub(crate) fn is_data_dirty<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) -> bool {
+        self.resident_object_manager.is_data_dirty(identifier)
+    }
+
     pub(crate) fn count_resident_objects(&self) -> usize {
         self.resident_object_manager.count_resident_objects()
     }
@@ -469,6 +473,12 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
             &mut self.storage_reference,
             use_partial_dirtiness_tracking,
         )
+    }
+    
+    #[cfg(feature = "benchmarks")]
+    #[allow(unused)]
+    pub(crate) fn get_remaining_dirty_size(&self) -> usize {
+        self.resident_object_manager.get_remaining_dirty_size()
     }
 
     #[cfg(feature = "benchmarks")]

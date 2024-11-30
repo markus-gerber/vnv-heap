@@ -12,11 +12,16 @@ use crate::{
     resident_object_manager::calc_resident_obj_layout_dynamic, util::round_up_to_nearest,
 };
 
+#[cfg(feature = "enable_general_metadata_runtime_persist")]
+use super::{
+    persist_general_metadata, GENERAL_METADATA_BACKUP_SIZE, METADATA_EXCEPT_GENERAL_BACKUP_SIZE
+};
+
 use super::{
     calc_backup_obj_user_data_offset, partial_dirtiness_tracking::PartialDirtinessTrackingInfo,
-    persist_general_metadata, resident_list::DeleteHandle,
+    resident_list::DeleteHandle,
     resident_object_status::ResidentObjectStatus, ResidentObject, SharedPersistLock,
-    GENERAL_METADATA_BACKUP_SIZE, METADATA_EXCEPT_GENERAL_BACKUP_SIZE, TOTAL_METADATA_BACKUP_SIZE,
+    TOTAL_METADATA_BACKUP_SIZE,
 };
 
 const fn calc_dirty_metadata_dirty_byte_cnt(
@@ -31,6 +36,7 @@ const fn calc_dirty_metadata_dirty_byte_cnt(
     }
 }
 
+#[cfg(feature = "enable_general_metadata_runtime_persist")]
 const fn calc_general_metadata_synced_dirty_byte_cnt(
     enabled_partial_dirtiness_tracking: bool,
     data_size: usize,
@@ -146,13 +152,24 @@ impl ResidentObjectMetadata {
             }
         }
 
-        if self.inner.status.is_general_metadata_dirty() {
+        #[cfg(feature = "enable_general_metadata_runtime_persist")]
+        {
+            if self.inner.status.is_general_metadata_dirty() {
+                cnt += calc_dirty_metadata_dirty_byte_cnt(
+                    self.inner.status.is_partial_dirtiness_tracking_enabled(),
+                    self.inner.layout.size(),
+                );
+            } else {
+                cnt += calc_general_metadata_synced_dirty_byte_cnt(
+                    self.inner.status.is_partial_dirtiness_tracking_enabled(),
+                    self.inner.layout.size(),
+                );
+            }
+        }
+
+        #[cfg(not(feature = "enable_general_metadata_runtime_persist"))]
+        {
             cnt += calc_dirty_metadata_dirty_byte_cnt(
-                self.inner.status.is_partial_dirtiness_tracking_enabled(),
-                self.inner.layout.size(),
-            );
-        } else {
-            cnt += calc_general_metadata_synced_dirty_byte_cnt(
                 self.inner.status.is_partial_dirtiness_tracking_enabled(),
                 self.inner.layout.size(),
             );
@@ -371,6 +388,7 @@ impl ResidentObjectMetadata {
     }
 
     /// Persists the general metadata.
+    #[cfg(feature = "enable_general_metadata_runtime_persist")]
     pub(crate) fn persist_general_metadata<S: PersistentStorageModule>(
         &mut self,
         storage: &mut S,

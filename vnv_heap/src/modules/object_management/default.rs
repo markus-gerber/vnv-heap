@@ -29,12 +29,15 @@ impl ObjectManagementModule for DefaultObjectManagementModule {
             }
         }
 
-        let mut iter = dirty_item_list.iter();
-        while let Some(mut item) = iter.next() {
-            if item.is_metadata_dirty() {
-                curr += item.sync_general_metadata().unwrap_or_default();
-                if curr >= required_bytes {
-                    return Ok(());
+        #[cfg(feature = "enable_general_metadata_runtime_persist")]
+        {
+            let mut iter = dirty_item_list.iter();
+            while let Some(mut item) = iter.next() {
+                if item.is_metadata_dirty() {
+                    curr += item.sync_general_metadata().unwrap_or_default();
+                    if curr >= required_bytes {
+                        return Ok(());
+                    }
                 }
             }
         }

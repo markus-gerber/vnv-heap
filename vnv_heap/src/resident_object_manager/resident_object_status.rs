@@ -76,6 +76,8 @@ impl ResidentObjectStatus {
         set_is_mutable_ref_active
     );
     generate_functions!(DATA_DIRTY, is_data_dirty, set_data_dirty);
+
+    #[cfg(feature = "enable_general_metadata_runtime_persist")]
     generate_functions!(
         GENERAL_METADATA_DIRTY,
         is_general_metadata_dirty,

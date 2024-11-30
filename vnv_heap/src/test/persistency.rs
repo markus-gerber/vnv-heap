@@ -12,7 +12,7 @@ fn test_heap_persistency() {
     }
 
     let mut buffer = [0u8; 2000];
-    let heap = get_test_heap("test_heap_persistency", 4 * 4096, &mut buffer, 1000, |_, _| {});
+    let heap = get_test_heap("test_heap_persistency", 4 * 4096, &mut buffer, 1200, |_, _| {});
     const SEED: u64 = 5446535461589659585;
     const OBJECT_COUNT: usize = 100;
 

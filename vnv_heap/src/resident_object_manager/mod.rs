@@ -479,6 +479,15 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         unsafe { self.find_element_mut(identifier).is_some() }
     }
 
+    pub(crate) fn is_data_dirty<T>(&mut self, identifier: &AllocationIdentifier<T>) -> bool {
+        let element = unsafe { self.find_element_mut(identifier) };
+        if let Some(element) = element {
+            unsafe { element.as_mut().unwrap().inner.status.is_data_dirty() }
+        } else {
+            false
+        }
+    }
+
     pub(crate) unsafe fn get_mut<T: Sized, S: PersistentStorageModule>(
         &mut self,
         identifier: &AllocationIdentifier<T>,
@@ -532,6 +541,8 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         let meta_ref = &mut obj_ref.metadata;
 
         if !meta_ref.inner.status.is_data_dirty() {
+            assert!(self.remaining_dirty_size >= meta_ref.inner.layout.size());
+
             // make dirty
             self.remaining_dirty_size -= meta_ref.inner.layout.size();
             meta_ref.inner.status.set_data_dirty(true);

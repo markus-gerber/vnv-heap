@@ -71,6 +71,7 @@ impl<S: PersistentStorageModule, A: AllocatorModule>
     }
 
     #[inline]
+    #[cfg(feature = "enable_general_metadata_runtime_persist")]
     pub fn is_metadata_dirty(&mut self) -> bool {
         self.delete_handle
             .get_element()
@@ -177,6 +178,7 @@ impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '
     }
 
     #[inline]
+    #[cfg(feature = "enable_general_metadata_runtime_persist")]
     pub fn sync_general_metadata(&mut self) -> Result<usize, ()> {
         let dirty_size = self.delete_handle.get_element().persist_general_metadata(
             self.arguments.storage,
@@ -195,6 +197,7 @@ impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '
     }
 
     #[inline]
+    #[cfg(feature = "enable_general_metadata_runtime_persist")]
     pub fn is_metadata_dirty(&mut self) -> bool {
         self.delete_handle
             .get_element()

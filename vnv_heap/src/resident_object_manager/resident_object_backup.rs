@@ -4,7 +4,7 @@ use core::{
     ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
     sync::atomic::AtomicPtr,
 };
-use static_assertions::const_assert_eq;
+
 
 use self::persistent_storage_util::read_storage_data;
 
@@ -19,16 +19,21 @@ use crate::{
 };
 
 pub(crate) const TOTAL_METADATA_BACKUP_SIZE: usize = {
-    const_assert_eq!(
-        size_of::<ResidentObjectMetadataBackup>(),
-        GENERAL_METADATA_BACKUP_SIZE + METADATA_EXCEPT_GENERAL_BACKUP_SIZE
-    );
+    #[cfg(feature = "enable_general_metadata_runtime_persist")]
+    {
+        use static_assertions::const_assert_eq;
+        const_assert_eq!(
+            size_of::<ResidentObjectMetadataBackup>(),
+            GENERAL_METADATA_BACKUP_SIZE + METADATA_EXCEPT_GENERAL_BACKUP_SIZE
+        );               
+    }
 
     size_of::<ResidentObjectMetadataBackup>()
 };
 
 pub(crate) const GENERAL_METADATA_BACKUP_SIZE: usize = size_of::<usize>() + size_of::<Layout>();
 
+#[cfg(feature = "enable_general_metadata_runtime_persist")]
 pub(crate) const METADATA_EXCEPT_GENERAL_BACKUP_SIZE: usize =
     size_of::<usize>() + size_of::<ResidentObjectStatus>();
 
@@ -160,6 +165,7 @@ impl ResidentObjectMetadataBackup {
 }
 
 /// Persists metadata including dirty bit list (if partial dirtiness tracking is enabled)
+#[cfg(feature = "enable_general_metadata_runtime_persist")]
 pub(crate) fn persist_general_metadata<S: PersistentStorageModule>(
     metadata: &ResidentObjectMetadata,
     storage: &mut S,
@@ -223,13 +229,20 @@ pub(crate) fn persist_whole_metadata<S: PersistentStorageModule>(
 
     dirty_buf_backup_slice.copy_from_slice(&origin_slice);
 
+    
+    #[cfg(not(feature = "enable_general_metadata_runtime_persist"))]
+    let general_metadata_dirty = true;
+
+    #[cfg(feature = "enable_general_metadata_runtime_persist")]
+    let general_metadata_dirty = metadata.inner.status.is_general_metadata_dirty();        
+
     // step 3: figure out which slice to write
-    let res_slice_length = if metadata.inner.status.is_general_metadata_dirty() {
+    let res_slice_length = if general_metadata_dirty {
         // general metadata is dirty
         // persist it too
         dirty_buf_bytes + size_of::<ResidentObjectMetadataBackup>()
     } else {
-        // general metadata was already per
+        // general metadata was already persisted
         dirty_buf_bytes + size_of::<ResidentObjectMetadataBackup>() - GENERAL_METADATA_BACKUP_SIZE
     };
 
