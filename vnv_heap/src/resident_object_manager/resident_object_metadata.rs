@@ -176,14 +176,19 @@ impl ResidentObjectMetadata {
         #[cfg(debug_assertions)]
         {
             // check that data offset was not disabled
-            if self.inner.data_offset != usize::MAX {
-                debug_assert_eq!(
-                    ((self as *const ResidentObjectMetadata) as *const u8).add(self.inner.data_offset),
-                    base_ptr,
-                    "Results in an error if the formula for manually getting the address of the data is wrong (data_offset: {} vs {})",
-                    self.inner.data_offset,
-                    round_up_to_nearest(size_of::<ResidentObjectMetadata>(), self.inner.layout.align())
-                );
+            // we have to check it that way because of race conditions with the persist and restore routine
+            // (its not perfect that way, but at least better, then changing the ordering of the two conditions)
+            if ((self as *const ResidentObjectMetadata) as *const u8).add(self.inner.data_offset) != base_ptr {
+                if self.inner.data_offset != usize::MAX {
+                    debug_assert!(
+                        false,
+                        "{} != {}. Results in an error if the formula for manually getting the address of the data is wrong (data_offset: {} vs {})",
+                        ((self as *const ResidentObjectMetadata) as *const u8).add(self.inner.data_offset) as usize,
+                        base_ptr as usize,
+                        self.inner.data_offset,
+                        round_up_to_nearest(size_of::<ResidentObjectMetadata>(), self.inner.layout.align())
+                    );
+                }
             }
         }
 
