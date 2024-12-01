@@ -47,7 +47,7 @@ pub(crate) struct PartialDirtinessTrackingInfo {
 }
 
 impl PartialDirtinessTrackingInfo {
-    pub(crate) fn new_unused() -> Self {
+    pub(crate) const fn new_unused() -> Self {
         Self {
             byte_count: 0,
             size_info_cache: SizeInfoCache::new_unused(),
@@ -461,7 +461,7 @@ impl SizeInfoCache {
     const LAST_BLOCK_SIZE_OFFSET: u16 = 3;
     const GET_LAST_BYTE_BIT_CNT_BITMASK: u16 = ((1 << Self::LAST_BLOCK_SIZE_OFFSET) - 1);
 
-    fn new_unused() -> Self {
+    const fn new_unused() -> Self {
         Self { data: 0 }
     }
 

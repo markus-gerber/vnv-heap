@@ -25,7 +25,7 @@ use crate::{
     VNVConfig,
 };
 
-pub use super::*;
+use super::*;
 
 const RESIDENT_CUTOFF_SIZE: usize = {
     if size_of::<usize>() == 8 {
@@ -85,7 +85,7 @@ macro_rules! for_obj_size {
     };
 }
 
-pub(super) struct ImplementationBenchmarkRunner;
+pub(crate) struct ImplementationBenchmarkRunner;
 
 impl BenchmarkRunner for ImplementationBenchmarkRunner {
     fn get_iteration_count(options: &RunAllBenchmarkOptions) -> usize {
@@ -102,11 +102,12 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
 
         iteration_count
     }
-    fn run<TIMER: Timer, S: PersistentStorageModule + 'static, F: Fn() -> S, G: FnMut()>(
+    fn run<TIMER: Timer, TRIGGER: PersistTrigger, S: PersistentStorageModule + 'static, F: Fn() -> S, G: FnMut()>(
         run_options: &mut BenchmarkRunOptions,
         options: &RunAllBenchmarkOptions,
         get_storage: &F,
         handle_curr_iteration: &mut G,
+        _get_ticks: GetCurrentTicks,
     ) {
         type A = LinkedListAllocatorModule;
         type M = DefaultObjectManagementModule;

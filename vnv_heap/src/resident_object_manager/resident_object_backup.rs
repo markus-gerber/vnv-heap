@@ -5,7 +5,6 @@ use core::{
     sync::atomic::AtomicPtr,
 };
 
-
 use self::persistent_storage_util::read_storage_data;
 
 use super::{
@@ -25,7 +24,7 @@ pub(crate) const TOTAL_METADATA_BACKUP_SIZE: usize = {
         const_assert_eq!(
             size_of::<ResidentObjectMetadataBackup>(),
             GENERAL_METADATA_BACKUP_SIZE + METADATA_EXCEPT_GENERAL_BACKUP_SIZE
-        );               
+        );
     }
 
     size_of::<ResidentObjectMetadataBackup>()
@@ -191,11 +190,19 @@ pub(crate) fn persist_general_metadata<S: PersistentStorageModule>(
 }
 
 /// Persists metadata including dirty bit list (if partial dirtiness tracking is enabled)
+///
+/// # Safety
+///
+/// If unsafe_include_data_inplace is set, the metadata and data will be written in **one** write call
+/// This is done by overwriting the metadata with its packed representation
+///
+/// **Important**: This function will not restore the original state of the metadata!
 #[inline]
-pub(crate) fn persist_whole_metadata<S: PersistentStorageModule>(
-    metadata: &ResidentObjectMetadata,
+pub(crate) unsafe fn persist_whole_metadata<S: PersistentStorageModule>(
+    metadata: *mut ResidentObjectMetadata,
     next_object_offset: usize,
     storage: &mut S,
+    unsafe_include_data_inplace: bool,
 ) -> Result<(), ()> {
     const SIZE: usize =
         MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE + size_of::<ResidentObjectMetadataBackup>();
@@ -203,38 +210,76 @@ pub(crate) fn persist_whole_metadata<S: PersistentStorageModule>(
 
     // step 1: copy metadata backup into buffer
     let base_ptr = (&mut buffer[0]) as *mut u8;
-    let metadata_backup_ptr = unsafe { base_ptr.add(MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE) }
-        as *mut ResidentObjectMetadataBackup;
 
-    let metadata_backup = ResidentObjectMetadataBackup::from_metadata(metadata, next_object_offset);
-    unsafe { metadata_backup_ptr.write(metadata_backup) };
+    let (
+        origin_slice,
+        dirty_buf_backup_slice,
+        dirty_buf_bytes,
+        dirty_buf_backup_start_ptr,
+        dest_offset,
+        data_range_start,
+        data_range_len,
+        general_metadata_dirty
+    ) = {
+        // important: use this reference of metadata only in this scope
+        let metadata = metadata.as_mut().unwrap();
 
-    // step 2: copy partial dirtiness tracking buffer
-    // this will do nothing if partial dirtiness tracking is not enabled
-    let dirty_buf_bytes = metadata.inner.partial_dirtiness_tracking_info.byte_count as usize;
-    assert!(dirty_buf_bytes <= MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE);
-    let dirty_buf_backup_start_ptr =
-        unsafe { (metadata_backup_ptr as *mut u8).sub(dirty_buf_bytes) };
-    let dirty_buf_backup_slice = unsafe {
-        slice_from_raw_parts_mut(dirty_buf_backup_start_ptr, dirty_buf_bytes)
-            .as_mut()
-            .unwrap()
+        let metadata_backup_ptr = unsafe { base_ptr.add(MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE) }
+            as *mut ResidentObjectMetadataBackup;
+
+        let metadata_backup =
+            ResidentObjectMetadataBackup::from_metadata(metadata, next_object_offset);
+        unsafe { metadata_backup_ptr.write_unaligned(metadata_backup) };
+
+        // step 2: copy partial dirtiness tracking buffer
+        // this will do nothing if partial dirtiness tracking is not enabled
+        let dirty_buf_bytes = metadata.inner.partial_dirtiness_tracking_info.byte_count as usize;
+        assert!(dirty_buf_bytes <= MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE);
+        let dirty_buf_backup_start_ptr =
+            unsafe { (metadata_backup_ptr as *mut u8).sub(dirty_buf_bytes) };
+        let dirty_buf_backup_slice = unsafe {
+            slice_from_raw_parts_mut(dirty_buf_backup_start_ptr, dirty_buf_bytes)
+                .as_mut()
+                .unwrap()
+        };
+
+        let data_range = metadata.dynamic_metadata_to_data_range_mut();
+        let data_range_len = data_range.len();
+        let data_range = (data_range as *mut [u8]) as *mut u8;
+
+        let origin_slice = metadata
+            .inner
+            .partial_dirtiness_tracking_info
+            .get_dirty_buf_slice(metadata);
+
+        #[cfg(feature = "enable_general_metadata_runtime_persist")]
+        let general_metadata_dirty = metadata.inner.status.is_general_metadata_dirty();
+
+        #[cfg(not(feature = "enable_general_metadata_runtime_persist"))]
+        let general_metadata_dirty = true;
+
+        #[cfg(feature = "enable_general_metadata_runtime_persist")]
+        if !general_metadata_dirty {
+            assert!(!unsafe_include_data_inplace);
+        }
+
+        (
+            origin_slice,
+            dirty_buf_backup_slice,
+            dirty_buf_bytes,
+            dirty_buf_backup_start_ptr,
+            metadata.inner.offset,
+            data_range,
+            data_range_len,
+            general_metadata_dirty
+        )
+
+        // metadata reference is dropped here
     };
 
-    let origin_slice = metadata
-        .inner
-        .partial_dirtiness_tracking_info
-        .get_dirty_buf_slice(metadata);
     let origin_slice = origin_slice.as_ref();
 
     dirty_buf_backup_slice.copy_from_slice(&origin_slice);
-
-    
-    #[cfg(not(feature = "enable_general_metadata_runtime_persist"))]
-    let general_metadata_dirty = true;
-
-    #[cfg(feature = "enable_general_metadata_runtime_persist")]
-    let general_metadata_dirty = metadata.inner.status.is_general_metadata_dirty();        
 
     // step 3: figure out which slice to write
     let res_slice_length = if general_metadata_dirty {
@@ -252,8 +297,60 @@ pub(crate) fn persist_whole_metadata<S: PersistentStorageModule>(
             .unwrap()
     };
 
-    storage.write(metadata.inner.offset - dirty_buf_bytes, slice)
+    let dest_offset = dest_offset - dirty_buf_bytes;
+
+    if !unsafe_include_data_inplace {
+        storage.write(dest_offset, slice)
+    } else {
+        // step 4: extra step to combine the metadata and the user data into one storage write call
+        // to do that we copy the metadata backup to the ram buffer right before the data
+        // !this will destroy data!
+
+        let start_ptr = data_range_start.sub(slice.len());
+        let new_slice = slice_from_raw_parts_mut(start_ptr, slice.len() + data_range_len).as_mut().unwrap();
+
+        for i in 0..slice.len() {
+            new_slice[i] = slice[i];
+        }
+
+        storage.write(dest_offset, new_slice)
+    }
 }
+
+/*
+
+        let offset = self.inner.offset + calc_backup_obj_user_data_offset();
+
+        if !self.inner.status.is_partial_dirtiness_tracking_enabled() {
+            // sync whole object
+            let data_range = self.dynamic_metadata_to_data_range();
+            storage.write(offset, data_range)?;
+
+            debug_assert_eq!(data_range.len(), self.inner.layout.size());
+            Ok(data_range.len())
+        } else {
+            // sync object partially
+            let mut wrapper = self.inner.partial_dirtiness_tracking_info.get_wrapper(self);
+            let mut iter = wrapper.dirty_iter();
+            let mut synced_byte_count = 0;
+
+            while let Some(range) = iter.next() {
+                // persist this data range now
+                // this is efficient as the iter will always group together slices of dirty data
+
+                // however, this could still be improved by specifying the initial cost to trigger a write request
+                // so that the iterator returns a data range containing even with slices that are already persisted
+                // example: [BIG DIRTY][SMALL PERSISTED][BIG DIRTY], if initial cost > SMALL PERSISTED
+                // its worth to persist the whole data range with one write call
+
+                let data_range = self.dynamic_metadata_to_data_range();
+                let slice = &data_range[range.clone()];
+                storage.write(offset + range.start, slice)?;
+
+                synced_byte_count += slice.len()
+            }
+            Ok(synced_byte_count)
+        } */
 
 /// Restores metadata including dirty bit list (if partial dirtiness tracking is enabled)
 ///

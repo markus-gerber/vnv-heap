@@ -7,7 +7,6 @@ cargo build & run & test:
   script:
     - cargo build --verbose
     - cargo test --verbose
-    - cargo test --features enable_general_metadata_runtime_persist --verbose
     - cd counter_example
     - cargo run
     - cd ..

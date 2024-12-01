@@ -4,11 +4,11 @@ mod persistent_storage_write;
 pub use persistent_storage_read::*;
 pub use persistent_storage_write::*;
 
-pub use super::*;
+use super::*;
 
 const STEP_SIZE: usize = 32;
 const MIN_OBJ_SIZE: usize = 0;
-const MAX_OBJ_SIZE: usize = 1024;
+const MAX_OBJ_SIZE: usize = 8 * 1024;
 
 const STEP_COUNT: usize = (MAX_OBJ_SIZE - MIN_OBJ_SIZE) / STEP_SIZE + 1;
 
@@ -25,11 +25,11 @@ macro_rules! for_obj_size_impl {
 
 macro_rules! for_obj_size {
     ($index: ident, $inner: expr) => {
-        for_obj_size_impl!($index, $inner, 33);
+        for_obj_size_impl!($index, $inner, 257);
     };
 }
 
-pub(super) struct StorageBenchmarkRunner;
+pub(crate) struct StorageBenchmarkRunner;
 
 impl BenchmarkRunner for StorageBenchmarkRunner {
     fn get_iteration_count(options: &RunAllBenchmarkOptions) -> usize {
@@ -45,6 +45,7 @@ impl BenchmarkRunner for StorageBenchmarkRunner {
 
     fn run<
         TIMER: Timer,
+        TRIGGER: PersistTrigger,
         S: PersistentStorageModule + 'static,
         F: Fn() -> S,
         G: FnMut()
@@ -52,7 +53,8 @@ impl BenchmarkRunner for StorageBenchmarkRunner {
         run_options: &mut BenchmarkRunOptions,
         options: &RunAllBenchmarkOptions,
         get_storage: &F,
-        handle_curr_iteration: &mut G
+        handle_curr_iteration: &mut G,
+        _get_ticks: GetCurrentTicks,
     ) {
         if options.run_persistent_storage_benchmarks {
             for_obj_size!(I, {
@@ -76,7 +78,7 @@ impl BenchmarkRunner for StorageBenchmarkRunner {
         if options.run_long_persistent_storage_benchmarks {
             {
                 handle_curr_iteration();
-                const SIZE: usize = 4096 * 2;
+                const SIZE: usize = 4096 * 4;
                 let mut storage_module = get_storage();
 
                 let bench: PersistentStorageReadBenchmark<S, SIZE> = PersistentStorageReadBenchmark::new(&mut storage_module);
@@ -85,7 +87,7 @@ impl BenchmarkRunner for StorageBenchmarkRunner {
         
             {
                 handle_curr_iteration();
-                const SIZE: usize = 4096 * 2;
+                const SIZE: usize = 4096 * 4;
                 let mut storage_module = get_storage();
 
                 let bench: PersistentStorageWriteBenchmark<S, SIZE> = PersistentStorageWriteBenchmark::new(&mut storage_module);

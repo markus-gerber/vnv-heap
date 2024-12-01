@@ -6,8 +6,9 @@ extern crate zephyr_sys;
 
 use spi_fram_storage::MB85RS4MTFramStorageModule;
 use vnv_heap::benchmarks::{
-    BenchmarkRunOptions, Timer, run_all_benchmarks, RunAllBenchmarkOptions
+    PersistTrigger, BenchmarkRunOptions, Timer, run_all_benchmarks, RunAllBenchmarkOptions
 };
+use core::mem::MaybeUninit;
 
 extern "C" {
     pub fn helper_k_cycle_get_32() -> u32;
@@ -30,6 +31,7 @@ pub extern "C" fn rust_main() {
 */
     run_all_benchmarks::<
         ZephyrTimer,
+        ZephyrPersistTrigger,
         MB85RS4MTFramStorageModule,
         _
     >(
@@ -39,13 +41,14 @@ pub extern "C" fn rust_main() {
             repetitions: 10,
             result_buffer: &mut [0; 10],
         },
-        /*RunAllBenchmarkOptions {
-            run_deallocate_benchmarks: true,
+        RunAllBenchmarkOptions {
+            run_persist_latency_worst_case: true,
         //    run_persistent_storage_benchmarks: true,
             ..Default::default()
-        },*/
-        RunAllBenchmarkOptions::all(),
-        get_storage
+        },
+        //RunAllBenchmarkOptions::all(),
+        get_storage,
+        || { unsafe { helper_k_cycle_get_32() }}
     );
 
     time = unsafe { helper_k_uptime_get() } - time; 
@@ -114,6 +117,63 @@ impl Timer for ZephyrTimer {
         delta
     }
 }
+
+
+static mut PERSIST_FUNCTION: Option<fn()> = None;
+
+extern "C" fn persist_trigger_wrapper(_timer_id: *mut zephyr_sys::raw::k_timer) {
+    unsafe {
+        let irq_key = helper_irq_lock();
+        Cache_Invalidate_ICache_All();
+
+        (PERSIST_FUNCTION.unwrap())();
+
+        helper_irq_unlock(irq_key);
+    }
+}
+
+struct ZephyrPersistTrigger {
+    timer: zephyr_sys::raw::k_timer
+}
+
+impl PersistTrigger for ZephyrPersistTrigger {
+    fn new(function: fn()) -> Self {
+        unsafe {
+            if PERSIST_FUNCTION.is_some() {
+                panic!("concurrency is not allowed!");
+            }
+            PERSIST_FUNCTION = Some(function);
+        };
+
+        // c-like initialization of timer struct
+        let mut timer: MaybeUninit<zephyr_sys::raw::k_timer> = MaybeUninit::uninit();
+        unsafe {
+            zephyr_sys::raw::k_timer_init(timer.as_mut_ptr(), Some(persist_trigger_wrapper), None);
+        }
+
+        Self {
+            timer: unsafe { timer.assume_init() }
+        }
+    }
+
+    fn start_persist_trigger(&mut self) {
+        // note: if the benchmark freezes you may want to update these timers
+        unsafe {
+            zephyr_sys::raw::z_impl_k_timer_start(&mut self.timer, zephyr_sys::raw::k_timeout_t { 
+                ticks: (helper_sys_clock_hw_cycles_per_sec() as i64) / 10_000_000
+            }, zephyr_sys::raw::k_timeout_t {
+                ticks: (helper_sys_clock_hw_cycles_per_sec() as i64) / 10_000_000
+            });
+        }
+    }
+
+    fn stop_persist_trigger(&mut self) {
+        unsafe {
+            zephyr_sys::raw::z_impl_k_timer_stop(&mut self.timer);
+        }
+    }
+}
+
 
 fn get_storage() -> MB85RS4MTFramStorageModule {
     unsafe { MB85RS4MTFramStorageModule::new() }.unwrap()

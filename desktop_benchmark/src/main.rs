@@ -2,8 +2,7 @@ use std::time::Instant;
 
 use vnv_heap::{
     benchmarks::{
-        run_all_benchmarks,
-        BenchmarkRunOptions,
+        run_all_benchmarks, BenchmarkRunOptions, DummyPersistTrigger,
         RunAllBenchmarkOptions, Timer,
     },
     modules::persistent_storage::FilePersistentStorageModule,
@@ -14,7 +13,6 @@ struct DesktopTimer {
 }
 
 impl Timer for DesktopTimer {
-
     fn get_ticks_per_ms() -> u32 {
         1000
     }
@@ -40,11 +38,7 @@ fn main() {
         .format_module_path(false)
         .init();*/
 
-    run_all_benchmarks::<
-        DesktopTimer,
-        FilePersistentStorageModule,
-        _
-    >(
+    run_all_benchmarks::<DesktopTimer, DummyPersistTrigger, FilePersistentStorageModule, _>(
         BenchmarkRunOptions {
             cold_start: 0,
             machine_name: "desktop",
@@ -57,8 +51,12 @@ fn main() {
             run_long_persistent_storage_benchmarks: true,
             ..Default::default()
         }*/
-        RunAllBenchmarkOptions::all(),
+        RunAllBenchmarkOptions {
+            run_persist_latency_worst_case: true,
+            ..Default::default()
+        },
         get_storage,
+        || 0,
     );
 }
 

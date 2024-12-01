@@ -114,7 +114,7 @@ impl Default for ResidentObjectMetadataInner {
 }
 
 impl ResidentObjectMetadata {
-    pub(super) fn new<T: Sized>(offset: usize, partial_dirtiness_tracking: bool) -> Self {
+    pub(crate) fn new<T: Sized>(offset: usize, partial_dirtiness_tracking: bool) -> Self {
         ResidentObjectMetadata {
             next_resident_object: AtomicPtr::new(null_mut()),
             inner: ResidentObjectMetadataInner::new::<T>(offset, partial_dirtiness_tracking),
@@ -216,7 +216,7 @@ impl ResidentObjectMetadata {
     ///
     /// This call is only safe to call if this ResidentObjectMetadataInner lives inside a ResidentObjectMetadata and a ResidentObject instance.
     #[inline]
-    unsafe fn dynamic_metadata_to_data_range(&self) -> &[u8] {
+    pub(crate) unsafe fn dynamic_metadata_to_data_range(&self) -> &[u8] {
         let base_ptr = self.dynamic_metadata_to_data_range_internal();
 
         slice_from_raw_parts(base_ptr, self.inner.layout.size())
@@ -228,7 +228,7 @@ impl ResidentObjectMetadata {
     ///
     /// This call is only safe to call if this ResidentObjectMetadataInner lives inside a ResidentObjectMetadata and a ResidentObject instance.
     #[inline]
-    unsafe fn dynamic_metadata_to_data_range_mut(&mut self) -> &mut [u8] {
+    pub(crate) unsafe fn dynamic_metadata_to_data_range_mut(&mut self) -> &mut [u8] {
         let base_ptr = self.dynamic_metadata_to_data_range_internal() as *mut u8;
 
         slice_from_raw_parts_mut(base_ptr, self.inner.layout.size())

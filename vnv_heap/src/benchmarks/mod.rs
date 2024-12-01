@@ -3,15 +3,17 @@ use core::{any::type_name, mem::size_of};
 #[cfg(not(test))]
 use std::io::stdout;
 
+use persist_latency::PersistLatencyRunner;
 use serde::Serialize;
 
-mod baseline;
-mod implementation;
-mod storage;
+mod persist_latency;
+pub use persist_latency::*;
 
-use baseline::*;
-use implementation::*;
-use storage::*;
+mod microbenchmarks;
+use microbenchmarks::*;
+
+pub(crate) mod baseline;
+
 
 use crate::{
     modules::{
@@ -28,6 +30,7 @@ pub struct RunAllBenchmarkOptions {
     pub run_baseline_get_benchmarks: bool,
     pub run_persistent_storage_benchmarks: bool,
     pub run_long_persistent_storage_benchmarks: bool,
+    pub run_persist_latency_worst_case: bool
 }
 
 impl Default for RunAllBenchmarkOptions {
@@ -41,6 +44,8 @@ impl Default for RunAllBenchmarkOptions {
             run_baseline_get_benchmarks: false,
             run_persistent_storage_benchmarks: false,
             run_long_persistent_storage_benchmarks: false,
+
+            run_persist_latency_worst_case: false,
         }
     }
 }
@@ -56,18 +61,34 @@ impl RunAllBenchmarkOptions {
             run_baseline_get_benchmarks: true,
             run_persistent_storage_benchmarks: true,
             run_long_persistent_storage_benchmarks: true,
+            run_persist_latency_worst_case: true
+        }
+    }
+    pub fn microbenchmarks() -> Self {
+        Self {
+            run_allocate_benchmarks: true,
+            run_deallocate_benchmarks: true,
+            run_get_benchmarks: true,
+            run_baseline_allocate_benchmarks: true,
+            run_baseline_deallocate_benchmarks: true,
+            run_baseline_get_benchmarks: true,
+            run_persistent_storage_benchmarks: true,
+            run_long_persistent_storage_benchmarks: true,
+            ..Default::default()
         }
     }
 }
 
 pub fn run_all_benchmarks<
     TIMER: Timer,
+    TRIGGER: PersistTrigger,
     S: PersistentStorageModule + 'static,
     F: Fn() -> S
 >(
     mut run_options: BenchmarkRunOptions,
     options: RunAllBenchmarkOptions,
     get_storage: F,
+    get_ticks: GetCurrentTicks,
 ) {
     let mut curr_iteration = 0usize;
     let mut iteration_count = 0;
@@ -82,14 +103,16 @@ pub fn run_all_benchmarks<
     iteration_count += ImplementationBenchmarkRunner::get_iteration_count(&options);
     iteration_count += BaselineBenchmarkRunner::get_iteration_count(&options);
     iteration_count += StorageBenchmarkRunner::get_iteration_count(&options);
+    iteration_count += PersistLatencyRunner::get_iteration_count(&options);
     let mut handle_it = || {
         handle_curr_iteration(&mut curr_iteration, iteration_count);
     };
 
     // run benchmarks
-    ImplementationBenchmarkRunner::run::<TIMER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it);
-    BaselineBenchmarkRunner::run::<TIMER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it);
-    StorageBenchmarkRunner::run::<TIMER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it);
+    ImplementationBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    BaselineBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    StorageBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    PersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     println!("")
     
 }
@@ -99,14 +122,16 @@ pub(self) trait BenchmarkRunner {
 
     fn run<
         TIMER: Timer,
+        TRIGGER: PersistTrigger,
         S: PersistentStorageModule + 'static,
         F: Fn() -> S,
-        G: FnMut()
+        G: FnMut(),
     >(
         run_options: &mut BenchmarkRunOptions,
         options: &RunAllBenchmarkOptions,
         get_storage: &F,
-        handle_curr_iteration: &mut G
+        handle_curr_iteration: &mut G,
+        get_ticks: GetCurrentTicks,
     );
 
 }

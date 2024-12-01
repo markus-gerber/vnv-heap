@@ -42,7 +42,7 @@ fn main() {
 
     let storage = FilePersistentStorageModule::new("/tmp/vnv_desktop_persist.data".to_string(), 4096 * 4).unwrap();
     let config = VNVConfig {
-        max_dirty_bytes: 500,
+        max_dirty_bytes: 1500,
     };
     let mut buffer = [0u8; 2000];
     let heap = LinkedListAllocatorModule::new();

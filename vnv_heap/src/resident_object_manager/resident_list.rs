@@ -95,6 +95,10 @@ impl SharedResidentListRef<'_> {
             list: PhantomData,
         }
     }
+
+    pub(crate) fn get_head(&self) -> *const AtomicPtr<ResidentObjectMetadata> {
+        self.head
+    }
 }
 
 /// An iterator over the linked list
