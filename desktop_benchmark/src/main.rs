@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{thread, time::Instant};
 
 use vnv_heap::{
     benchmarks::{
@@ -38,23 +38,30 @@ fn main() {
         .format_module_path(false)
         .init();*/
 
-    run_all_benchmarks::<DesktopTimer, DummyPersistTrigger, FilePersistentStorageModule, _>(
-        BenchmarkRunOptions {
-            cold_start: 0,
-            machine_name: "desktop",
-            repetitions: 5,
-            result_buffer: &mut [0; 5],
-        },
-        //RunAllBenchmarkOptions::default(),
-        /*RunAllBenchmarkOptions {
-            run_persistent_storage_benchmarks: true,
-            run_long_persistent_storage_benchmarks: true,
-            ..Default::default()
-        }*/
-        RunAllBenchmarkOptions::microbenchmarks(),
-        get_storage,
-        || 0,
-    );
+    // avoid stack overflow
+    let builder = thread::Builder::new().stack_size(20 * 1024 * 1024);
+        let handler = builder.spawn(|| {
+            run_all_benchmarks::<DesktopTimer, DummyPersistTrigger, FilePersistentStorageModule, _>(
+                BenchmarkRunOptions {
+                    cold_start: 0,
+                    machine_name: "desktop",
+                    repetitions: 5,
+                    result_buffer: &mut [0; 5],
+                },
+                //RunAllBenchmarkOptions::default(),
+                /*RunAllBenchmarkOptions {
+                    run_persistent_storage_benchmarks: true,
+                    run_long_persistent_storage_benchmarks: true,
+                    ..Default::default()
+                }*/
+                RunAllBenchmarkOptions::microbenchmarks(),
+                get_storage,
+                || 0,
+            );
+        
+
+    }).unwrap();
+    handler.join().unwrap();
 }
 
 fn get_storage() -> FilePersistentStorageModule {

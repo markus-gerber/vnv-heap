@@ -165,7 +165,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                         resident_list: &mut self.resident_list,
                     };
 
-                    println!("require resident: onload others");
                     if let Ok(()) = self.object_manager.unload_objects(&total_layout, list) {
                         debug!(
                             "-> Success! Made Enough objects resident to allocate {} bytes in RAM",
@@ -212,7 +211,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
             // sync some data now by using object manager
             let required_bytes = dirty_size - self.remaining_dirty_size;
 
-            println!("require resident: sync others");
             sync_dirty_data::<A, S, M>(
                 &mut self.remaining_dirty_size,
                 self.resident_list,
@@ -738,6 +736,12 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
 
     pub(crate) fn count_resident_objects(&self) -> usize {
         self.resident_list.iter().count() 
+    }
+
+    #[cfg(feature = "benchmarks")]
+    #[allow(unused)]
+    pub(crate) fn get_resident_list(&self) -> &ResidentList {
+        &self.resident_list
     }
 
     /// Finds an object in the resident list

@@ -5,6 +5,7 @@
 // mod deallocate_max;
 // mod deallocate_min;
 mod get_max;
+mod get_max_2;
 mod get_max_min;
 mod get_min;
 mod get_min_max;
@@ -16,13 +17,13 @@ mod get_min_max;
 // pub use deallocate_max::*;
 // pub use deallocate_min::*;
 pub use get_max::*;
+pub use get_max_2::*;
 pub use get_max_min::*;
 pub use get_min::*;
 pub use get_min_max::*;
 
 use crate::{
-    calc_resident_buf_cutoff_size, modules::object_management::DefaultObjectManagementModule,
-    VNVConfig,
+    calc_resident_buf_cutoff_size, modules::object_management::DefaultObjectManagementModule, resident_object_manager::resident_object_metadata::ResidentObjectMetadata, VNVConfig
 };
 
 use super::*;
@@ -41,33 +42,66 @@ const RESIDENT_CUTOFF_SIZE: usize = {
 
 // NOTE: if you change one of these three variables
 // you also have to update the value in the for_obj_size macro!
-const BUF_SIZE: usize = 1024;
-const STEP_SIZE: usize = 32;
-const MIN_OBJ_SIZE: usize = 0;
+const BUF_SIZE: usize = 1 * 1024 + RESIDENT_CUTOFF_SIZE;
+const STEP_SIZE: usize = 16;
+const MIN_OBJ_SIZE: usize = 8;
+const MIN_OBJ_SIZE_RANGE: usize = 16;
 
 // additional cost of linked list allocator (holes)
-const ADDITIONAL_ALLOCATOR_COST: usize = 16;
+const ADDITIONAL_ALLOCATOR_COST: usize = 2 * size_of::<usize>();
 
-const MAX_OBJ_SIZE: usize = {
-    const BIG_OBJ: usize = get_total_resident_size::<[u8; BUF_SIZE]>();
-    const METADATA: usize = BIG_OBJ - BUF_SIZE;
+const MAX_OBJ_SIZE_RANGE: usize = {
+    const METADATA: usize = size_of::<ResidentObjectMetadata>();
 
     const MAX_SIZE: usize = BUF_SIZE - METADATA - RESIDENT_CUTOFF_SIZE - ADDITIONAL_ALLOCATOR_COST;
 
     // ensure max size is multiple of step size
     (MAX_SIZE / STEP_SIZE) * STEP_SIZE
 };
+const MAX_OBJ_SIZE: usize = {
+    const METADATA: usize = size_of::<ResidentObjectMetadata>();
+    const MAX_SIZE: usize = BUF_SIZE - METADATA - RESIDENT_CUTOFF_SIZE;
 
-const STEP_COUNT: usize = (MAX_OBJ_SIZE - MIN_OBJ_SIZE) / STEP_SIZE + 1;
+    if MAX_SIZE % ADDITIONAL_ALLOCATOR_COST == 0 {
+        MAX_SIZE
+    } else {
+        const MAX_SIZE: usize = BUF_SIZE - METADATA - RESIDENT_CUTOFF_SIZE - ADDITIONAL_ALLOCATOR_COST;
+        if MAX_SIZE < MAX_OBJ_SIZE_RANGE {
+            MAX_OBJ_SIZE_RANGE
+        } else {
+            MAX_SIZE
+        }
+    }
+};
+
+
+const STEP_COUNT: usize = (MAX_OBJ_SIZE_RANGE - MIN_OBJ_SIZE_RANGE) / STEP_SIZE + 1;
 
 macro_rules! for_obj_size_impl {
     ($index: ident, $inner: expr, $value: expr) => {
-        static_assertions::const_assert_eq!($value, STEP_COUNT);
-        seq_macro::seq!($index in 0..$value {
-            {
+        {
+            static_assertions::const_assert_eq!($value, STEP_COUNT);
+            if MIN_OBJ_SIZE != MIN_OBJ_SIZE_RANGE {
+                const $index: usize = MIN_OBJ_SIZE;
                 $inner
             }
-        });
+
+            seq_macro::seq!(I in 0..$value {
+                {
+                    const $index: usize = {
+                        let tmp = I * STEP_SIZE + MIN_OBJ_SIZE_RANGE;
+                        assert!(tmp % size_of::<usize>() == 0);
+                        tmp
+                    };
+                    $inner
+                }
+            });
+
+            if MAX_OBJ_SIZE != MAX_OBJ_SIZE_RANGE {
+                const $index: usize = MAX_OBJ_SIZE;
+                $inner
+            }
+        }
     };
 }
 
@@ -78,10 +112,10 @@ macro_rules! for_obj_size {
         // because of the size of the metadata
         // STEP_COUNT has a different value for different target platforms!
         #[cfg(target_pointer_width = "32")]
-        for_obj_size_impl!($index, $inner, 30);
+        for_obj_size_impl!($index, $inner, 62);
 
         #[cfg(target_pointer_width = "64")]
-        for_obj_size_impl!($index, $inner, 28);
+        for_obj_size_impl!($index, $inner, 60);
     };
 }
 
@@ -92,12 +126,30 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
         let mut iteration_count = 0;
         if options.run_allocate_benchmarks {
             // iteration_count += 3 * STEP_COUNT;
+            // if MIN_OBJ_SIZE != MIN_OBJ_SIZE_RANGE {
+            //     iteration_count += 1;
+            // }
+            // if MAX_OBJ_SIZE != MAX_OBJ_SIZE_RANGE {
+            //     iteration_count += 1;
+            // }
         }
         if options.run_deallocate_benchmarks {
             // iteration_count += 3 * STEP_COUNT;
+            // if MIN_OBJ_SIZE != MIN_OBJ_SIZE_RANGE {
+            //     iteration_count += 1;
+            // }
+            // if MAX_OBJ_SIZE != MAX_OBJ_SIZE_RANGE {
+            //     iteration_count += 1;
+            // }
         }
         if options.run_get_benchmarks {
-            iteration_count += 4 * STEP_COUNT;
+            iteration_count += 5 * STEP_COUNT;
+            if MIN_OBJ_SIZE != MIN_OBJ_SIZE_RANGE {
+                iteration_count += 1;
+            }
+            if MAX_OBJ_SIZE != MAX_OBJ_SIZE_RANGE {
+                iteration_count += 1;
+            }
         }
 
         iteration_count
@@ -152,18 +204,16 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
 
         // allocate benchmarks
         if options.run_allocate_benchmarks {
-            // for_obj_size!(I, {
+            // for_obj_size!(SIZE, {
             //     handle_curr_iteration();
-            //     const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
             //     let mut buf = [0u8; BUF_SIZE];
             //     let res_size = buf.len();
             //     let heap = get_bench_heap(&mut buf, res_size, get_storage());
             //     let bench: AllocateMinBenchmark<A, M, S, SIZE> = AllocateMinBenchmark::new(&heap);
             //     bench.run_benchmark::<TIMER>(run_options);
             // });
-            // for_obj_size!(I, {
+            // for_obj_size!(SIZE, {
             //     handle_curr_iteration();
-            //     const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
             //     const METADATA_SIZE: usize = get_resident_size::<()>();
             //     const BLOCKER_SIZE: usize = BUF_SIZE - METADATA_SIZE - RESIDENT_CUTOFF_SIZE;
 
@@ -173,9 +223,8 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
             //     let bench = AllocateCase1Benchmark::<A, M, S, SIZE, BLOCKER_SIZE>::new(&mut heap);
             //     bench.run_benchmark::<TIMER>(run_options);
             // });
-            // for_obj_size!(I, {
+            // for_obj_size!(SIZE, {
             //     handle_curr_iteration();
-            //     const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
             //     const METADATA_SIZE: usize = get_resident_size::<()>();
             //     const BLOCKER_SIZE: usize = BUF_SIZE - METADATA_SIZE - RESIDENT_CUTOFF_SIZE;
 
@@ -188,9 +237,8 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
         }
         // deallocate benchmarks
         if options.run_deallocate_benchmarks {
-            // for_obj_size!(I, {
+            // for_obj_size!(SIZE, {
             //     handle_curr_iteration();
-            //     const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
             //     let mut buf = [0u8; BUF_SIZE];
             //     let res_size = buf.len();
             //     let heap = get_bench_heap(&mut buf, res_size, get_storage());
@@ -198,9 +246,8 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
             //         DeallocateMinBenchmark::new(&heap);
             //     bench.run_benchmark::<TIMER>(run_options);
             // });
-            // for_obj_size!(I, {
+            // for_obj_size!(SIZE, {
             //     handle_curr_iteration();
-            //     const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
             //     let mut buf = [0u8; BUF_SIZE];
             //     let res_size = buf.len();
             //     let heap = get_bench_heap(&mut buf, res_size, get_storage());
@@ -208,9 +255,8 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
             //         DeallocateCase1Benchmark::new(&heap);
             //     bench.run_benchmark::<TIMER>(run_options);
             // });
-            // for_obj_size!(I, {
+            // for_obj_size!(SIZE, {
             //     handle_curr_iteration();
-            //     const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
             //     const METADATA_SIZE: usize = get_resident_size::<()>();
             //     const BLOCKER_SIZE: usize = BUF_SIZE - METADATA_SIZE - RESIDENT_CUTOFF_SIZE;
 
@@ -228,9 +274,8 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
 
         // get reference benchmarks
         if options.run_get_benchmarks {
-            for_obj_size!(I, {
+            for_obj_size!(SIZE, {
                 handle_curr_iteration();
-                const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
                 let mut buf = [0u8; BUF_SIZE];
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
@@ -238,10 +283,9 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                     GetMinBenchmark::new(&heap);
                 bench.run_benchmark::<TIMER>(run_options);
             });
-            for_obj_size!(I, {
+            for_obj_size!(SIZE, {
                 handle_curr_iteration();
 
-                const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
                 const METADATA_SIZE: usize = get_resident_size::<()>();
                 const BLOCKER_SIZE: usize = BUF_SIZE - METADATA_SIZE - RESIDENT_CUTOFF_SIZE;
 
@@ -258,9 +302,28 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                 > = GetMaxBenchmark::new(&heap, start_res_size);
                 bench.run_benchmark::<TIMER>(run_options);
             });
-            for_obj_size!(I, {
+            for_obj_size!(SIZE, {
                 handle_curr_iteration();
-                const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
+
+                const RES: (usize, usize) = calc_obj_cnt_and_rem_size_get_max(SIZE, BUF_SIZE - RESIDENT_CUTOFF_SIZE);
+                const BLOCKER_CNT: usize = RES.0;
+                const REM_SIZE: usize = RES.1;
+
+                let mut buf = [0u8; BUF_SIZE];
+                let res_size = buf.len();
+                let heap = get_bench_heap(&mut buf, res_size, get_storage());
+                let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
+                let bench: GetMax2Benchmark<
+                    A,
+                    NonResidentBuddyAllocatorModule<19>,
+                    M,
+                    SIZE,
+                    REM_SIZE
+                > = GetMax2Benchmark::new(&heap, start_res_size, BLOCKER_CNT);
+                bench.run_benchmark::<TIMER>(run_options);
+            });
+            for_obj_size!(SIZE, {
+                handle_curr_iteration();
 
                 let mut buf = [0u8; BUF_SIZE];
                 let res_size = buf.len();
@@ -270,9 +333,8 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                     GetMaxMinBenchmark::new(&heap, start_res_size);
                 bench.run_benchmark::<TIMER>(run_options);
             });
-            for_obj_size!(I, {
+            for_obj_size!(SIZE, {
                 handle_curr_iteration();
-                const SIZE: usize = I * STEP_SIZE + MIN_OBJ_SIZE;
 
                 let mut buf = [0u8; BUF_SIZE];
                 let res_size = buf.len();

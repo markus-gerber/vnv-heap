@@ -18,7 +18,7 @@ pub(crate) mod baseline;
 use crate::{
     modules::{
         allocator::{AllocatorModule, LinkedListAllocatorModule}, nonresident_allocator::{NonResidentAllocatorModule, NonResidentBuddyAllocatorModule}, persistent_storage::PersistentStorageModule
-    }, resident_object_manager::get_total_resident_size, VNVHeap
+    }, VNVHeap
 };
 
 pub struct RunAllBenchmarkOptions {
@@ -164,8 +164,6 @@ pub trait Benchmark<O: Serialize> {
             let res = self.execute::<T>();
             options.result_buffer[i] = res;
         }
-
-        
         
         print!("[BENCH-INFO] ");
 

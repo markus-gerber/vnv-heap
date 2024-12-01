@@ -1,4 +1,5 @@
 use core::{cell::RefCell, marker::PhantomData};
+use std::cell::RefMut;
 
 use crate::{
     allocation_identifier::AllocationIdentifier,
@@ -90,6 +91,11 @@ impl<
     #[allow(unused)]
     pub(crate) fn get_alloc_id(&self) -> &AllocationIdentifier<T> {
         return &self.allocation_identifier;
+    }
+
+    #[allow(unused)]
+    pub(crate) fn get_heap<'c>(&'c self) -> RefMut<'c, VNVHeapInner<'b, A, N, M>> {
+        self.vnv_heap.borrow_mut()
     }
 }
 

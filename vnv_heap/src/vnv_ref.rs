@@ -46,6 +46,11 @@ impl<
             data_ref,
         }
     }
+
+    #[allow(unused)]
+    pub(crate) fn get_obj_ptr(&self) -> *const T {
+        self.data_ref
+    }
 }
 
 impl<T: Sized, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementModule> Deref
