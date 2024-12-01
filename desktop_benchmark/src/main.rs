@@ -51,10 +51,7 @@ fn main() {
             run_long_persistent_storage_benchmarks: true,
             ..Default::default()
         }*/
-        RunAllBenchmarkOptions {
-            run_persist_latency_worst_case: true,
-            ..Default::default()
-        },
+        RunAllBenchmarkOptions::microbenchmarks(),
         get_storage,
         || 0,
     );
