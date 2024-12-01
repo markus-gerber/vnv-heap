@@ -2,8 +2,7 @@ use log::trace;
 use try_lock::TryLock;
 
 use crate::{
-    allocation_identifier::AllocationIdentifier,
-    modules::{
+    allocation_identifier::AllocationIdentifier, modules::{
         allocator::AllocatorModule,
         nonresident_allocator::NonResidentAllocatorModule,
         object_management::ObjectManagementModule,
@@ -11,17 +10,12 @@ use crate::{
             persistent_storage_util::write_storage_data, PersistentStorageModule,
             SharedStorageReference,
         },
-    },
-    persist_access_point::PersistAccessPoint,
-    resident_object_manager::{
+    }, persist_access_point::PersistAccessPoint, resident_object_manager::{
         resident_list::ResidentList,
         resident_object_backup::{calc_backup_obj_layout_static, calc_backup_obj_user_data_offset},
         resident_object_metadata::ResidentObjectMetadata,
         ResidentObjectManager,
-    },
-    shared_persist_lock::SharedPersistLock,
-    vnv_object::VNVObject,
-    VNVConfig, VNVArray,
+    }, shared_persist_lock::SharedPersistLock, vnv_list::VNVList, vnv_object::VNVObject, VNVArray, VNVConfig
 };
 use core::{
     alloc::Layout,
@@ -270,6 +264,15 @@ impl<
         let identifier = unsafe { inner.allocate(initial_value, true)? };
 
         Ok(VNVArray::new(&self.inner, identifier))
+    }
+
+    pub fn new_list<'b, T: Sized + Clone>(
+        &'b self,
+    ) -> VNVList<'b, 'a, T, A, N, M>
+    where
+        'a: 'b,
+    {
+        VNVList::new(&self.inner)
     }
 
     /// Returns the size which the `resident_buffer` has to be, so `usable_resident_buffer_size` bytes can be used effectively

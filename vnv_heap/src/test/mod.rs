@@ -15,7 +15,7 @@ mod persistency;
 mod unload;
 
 #[cfg(not(no_std))]
-fn get_test_heap<'a>(
+pub(crate) fn get_test_heap<'a>(
     test_name: &str,
     size: usize,
     resident_buffer: &'a mut [u8],
@@ -45,7 +45,7 @@ fn get_test_heap<'a>(
 }
 
 #[cfg(no_std)]
-fn get_test_heap(
+pub(crate) fn get_test_heap(
     test_name: &str,
     resident_buffer: &mut [u8],
 ) -> VNVHeap<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>> {
