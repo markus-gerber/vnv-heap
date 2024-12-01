@@ -12,7 +12,7 @@ use crate::{
         object_management::DefaultObjectManagementModule,
     },
     test::get_test_heap,
-    vnv_persist_all, VNVList, VNVObject,
+    vnv_persist_all, VNVArray, VNVObject,
 };
 
 #[test]
@@ -69,7 +69,7 @@ fn test_persist_all_simple() {
         () => {
             let data = rand_data2(&mut rand);
 
-            lists.push(heap.allocate_list(data.clone()).unwrap());
+            lists.push(heap.allocate_pd_array(data.clone()).unwrap());
             check_states_lists.push(data);
             resident.push(false);
         };
@@ -109,7 +109,7 @@ fn test_persist_all_simple() {
             >,
         >,
         lists: &mut Vec<
-            VNVList<
+            VNVArray<
                 u8,
                 200,
                 LinkedListAllocatorModule,
@@ -141,7 +141,7 @@ fn test_persist_all_simple() {
             >,
         >,
         lists: &mut Vec<
-            VNVList<
+            VNVArray<
                 u8,
                 200,
                 LinkedListAllocatorModule,

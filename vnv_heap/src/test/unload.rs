@@ -23,7 +23,7 @@ fn test_heap_unload_vnv_list() {
     let mut check_state= rand_obj.clone();
     let start_dirty_size = heap.get_inner().borrow_mut().get_resident_object_manager().remaining_dirty_size;
 
-    let mut list = heap.allocate_list(rand_obj).unwrap();
+    let mut list = heap.allocate_pd_array(rand_obj).unwrap();
 
     list.unload().unwrap();
     {

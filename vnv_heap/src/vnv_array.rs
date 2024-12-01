@@ -7,12 +7,12 @@ use crate::{
         object_management::ObjectManagementModule,
     },
     vnv_heap::VNVHeapInner,
-    vnv_list_mut_ref::VNVListMutRef,
+    vnv_array_mut_ref::VNVArrayMutRef,
     vnv_mut_ref::VNVMutRef,
     vnv_ref::VNVRef,
 };
 
-pub struct VNVList<
+pub struct VNVArray<
     'a,
     'b: 'a,
     T: Sized + Copy,
@@ -34,13 +34,13 @@ impl<
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
-    > VNVList<'a, 'b, T, SIZE, A, N, M>
+    > VNVArray<'a, 'b, T, SIZE, A, N, M>
 {
     pub(crate) fn new(
         vnv_heap: &'a RefCell<VNVHeapInner<'b, A, N, M>>,
         identifier: AllocationIdentifier<[T; SIZE]>,
     ) -> Self {
-        VNVList {
+        VNVArray {
             vnv_heap,
             allocation_identifier: identifier,
             phantom_data: PhantomData,
@@ -60,14 +60,14 @@ impl<
         }
     }
 
-    pub fn get_mut(&mut self) -> Result<VNVListMutRef<'a, '_, '_, 'b, T, SIZE, A, N, M>, ()> {
+    pub fn get_mut(&mut self) -> Result<VNVArrayMutRef<'a, '_, '_, 'b, T, SIZE, A, N, M>, ()> {
         let mut heap = self.vnv_heap.borrow_mut();
         let (meta_ptr, data_ptr) =
             unsafe { heap.get_partial_mut::<[T; SIZE]>(&self.allocation_identifier)? };
 
         let meta_ref = unsafe { meta_ptr.as_mut().unwrap() };
         let data_ref = unsafe { data_ptr.as_mut().unwrap() };
-        Ok(unsafe { VNVListMutRef::new(self.vnv_heap, data_ref, meta_ref) })
+        Ok(unsafe { VNVArrayMutRef::new(self.vnv_heap, data_ref, meta_ref) })
     }
 
     pub fn get_mut_whole_arr(
@@ -107,7 +107,7 @@ impl<
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
-    > Drop for VNVList<'_, '_, T, SIZE, A, N, M>
+    > Drop for VNVArray<'_, '_, T, SIZE, A, N, M>
 {
     fn drop(&mut self) {
         let mut obj = self.vnv_heap.borrow_mut();

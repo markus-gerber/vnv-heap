@@ -21,7 +21,7 @@ use crate::{
     },
     shared_persist_lock::SharedPersistLock,
     vnv_object::VNVObject,
-    VNVConfig, VNVList,
+    VNVConfig, VNVArray,
 };
 use core::{
     alloc::Layout,
@@ -258,17 +258,18 @@ impl<
         Ok(VNVObject::new(&self.inner, identifier))
     }
 
-    pub fn allocate_list<'b, T: Sized + Copy + 'b, const SIZE: usize>(
+    /// pd = partial dirty
+    pub fn allocate_pd_array<'b, T: Sized + Copy + 'b, const SIZE: usize>(
         &'b self,
         initial_value: [T; SIZE],
-    ) -> Result<VNVList<'b, 'a, T, SIZE, A, N, M>, ()>
+    ) -> Result<VNVArray<'b, 'a, T, SIZE, A, N, M>, ()>
     where
         'a: 'b,
     {
         let mut inner = self.inner.borrow_mut();
         let identifier = unsafe { inner.allocate(initial_value, true)? };
 
-        Ok(VNVList::new(&self.inner, identifier))
+        Ok(VNVArray::new(&self.inner, identifier))
     }
 
     /// Returns the size which the `resident_buffer` has to be, so `usable_resident_buffer_size` bytes can be used effectively

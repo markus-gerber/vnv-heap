@@ -4,8 +4,8 @@ mod persist_access_point;
 mod shared_persist_lock;
 mod vnv_config;
 mod vnv_heap;
-mod vnv_list;
-mod vnv_list_mut_ref;
+mod vnv_array;
+mod vnv_array_mut_ref;
 mod vnv_mut_ref;
 mod vnv_object;
 mod vnv_ref;
@@ -19,6 +19,6 @@ pub mod benchmarks;
 
 pub use crate::vnv_heap::*;
 pub use crate::vnv_object::VNVObject;
-pub use crate::vnv_list::VNVList;
+pub use crate::vnv_array::VNVArray;
 pub use vnv_config::VNVConfig;
 pub mod modules;

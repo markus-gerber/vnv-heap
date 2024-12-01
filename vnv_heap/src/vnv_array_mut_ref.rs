@@ -9,7 +9,7 @@ use crate::{
     vnv_heap::VNVHeapInner,
 };
 
-pub struct VNVListMutRef<
+pub struct VNVArrayMutRef<
     'a,
     'b,
     'c,
@@ -35,14 +35,14 @@ impl<
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
-    > VNVListMutRef<'a, 'b, 'c, 'd, T, SIZE, A, N, M>
+    > VNVArrayMutRef<'a, 'b, 'c, 'd, T, SIZE, A, N, M>
 {
     pub(crate) unsafe fn new(
         vnv_heap: &'a RefCell<VNVHeapInner<'d, A, N, M>>,
         data_ref: &'b mut [T; SIZE],
         meta_ref: &'c mut ResidentObjectMetadata,
     ) -> Self {
-        VNVListMutRef {
+        VNVArrayMutRef {
             vnv_heap,
             data_ref,
             meta_ref,
@@ -56,7 +56,7 @@ impl<
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
-    > VNVListMutRef<'_, '_, '_, '_, T, SIZE, A, N, M>
+    > VNVArrayMutRef<'_, '_, '_, '_, T, SIZE, A, N, M>
 {
     pub fn set(&mut self, index: usize, data: T) -> Result<(), ()> {
         let mut vnv_heap = self.vnv_heap.borrow_mut();
@@ -80,7 +80,7 @@ impl<
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
-    > Deref for VNVListMutRef<'_, '_, '_, '_, T, SIZE, A, N, M>
+    > Deref for VNVArrayMutRef<'_, '_, '_, '_, T, SIZE, A, N, M>
 {
     type Target = [T; SIZE];
 
@@ -95,7 +95,7 @@ impl<
         A: AllocatorModule,
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
-    > Drop for VNVListMutRef<'_, '_, '_, '_, T, SIZE, A, N, M>
+    > Drop for VNVArrayMutRef<'_, '_, '_, '_, T, SIZE, A, N, M>
 {
     fn drop(&mut self) {
         unsafe {
