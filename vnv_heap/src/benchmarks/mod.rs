@@ -102,9 +102,9 @@ pub fn run_all_benchmarks<
         *curr_iteration += 1;
     }
 
-    // iteration_count += ImplementationBenchmarkRunner::get_iteration_count(&options);
-    // iteration_count += BaselineBenchmarkRunner::get_iteration_count(&options);
-    // iteration_count += StorageBenchmarkRunner::get_iteration_count(&options);
+    iteration_count += ImplementationBenchmarkRunner::get_iteration_count(&options);
+    iteration_count += BaselineBenchmarkRunner::get_iteration_count(&options);
+    iteration_count += StorageBenchmarkRunner::get_iteration_count(&options);
     iteration_count += DirtySizePersistLatencyRunner::get_iteration_count(&options);
     iteration_count += BufferSizePersistLatencyRunner::get_iteration_count(&options);
     let mut handle_it = || {
@@ -112,9 +112,9 @@ pub fn run_all_benchmarks<
     };
 
     // run benchmarks
-    // ImplementationBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
-    // BaselineBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
-    // StorageBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    ImplementationBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    BaselineBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    StorageBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     DirtySizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     BufferSizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     println!("")
