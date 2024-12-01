@@ -342,7 +342,10 @@ pub struct WorstCasePersistLatencyBenchmarkOptions {
     buffer_size: usize,
     rem_object_size: usize,
     object_cnt: usize,
-    remaining_dirty_size: usize
+    remaining_dirty_size: usize,
+    objects_dirty: usize,
+    rem_object_dirty: bool,
+    cutoff_size: usize
 }
 
 pub(super) struct WorstCasePersistLatencyBenchmark<
@@ -374,7 +377,9 @@ pub(super) struct WorstCasePersistLatencyBenchmark<
         >,
     >,
     benchmark_name: &'static str,
-    remaining_dirty_size: usize
+    remaining_dirty_size: usize,
+    objects_dirty: usize,
+    rem_object_dirty: bool,
 }
 
 impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJECT_SIZE: usize>
@@ -464,7 +469,9 @@ impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJEC
             objects,
             _rem_object: rem_object,
             benchmark_name,
-            remaining_dirty_size: rem_dirty
+            remaining_dirty_size: rem_dirty,
+            objects_dirty: dirty_normal_objects,
+            rem_object_dirty: is_rem_dirty
         }
     }
 }
@@ -483,7 +490,10 @@ impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJEC
             dirty_size: self.dirty_size,
             object_cnt: self.objects.len(),
             rem_object_size: REM_OBJECT_SIZE,
-            remaining_dirty_size: self.remaining_dirty_size
+            remaining_dirty_size: self.remaining_dirty_size,
+            objects_dirty: self.objects_dirty,
+            rem_object_dirty: self.rem_object_dirty,
+            cutoff_size: CUTOFF_SIZE
         }
     }
 
