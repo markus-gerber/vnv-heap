@@ -143,6 +143,19 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
         if rem_dirty_size >= size_of::<usize>() {
             dirty_obj_cnt += 1;
         } else {
+            let rem_space = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
+            if rem_space < size_of::<usize>() && rem_space != 0 {
+                obj_cnt -= 1;
+            } else if rem_space < 2 * size_of::<usize>() && rem_space != 0 {
+                obj_cnt -= 1;
+                rem_size = rem_space + size_of::<usize>();
+
+                if rem_dirty_size >= rem_space {
+                    rem_dirty = true;
+                } else {
+                    rem_dirty = false;
+                }
+            }
             final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
             return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
         }
@@ -153,8 +166,6 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
         final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
         return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
     }
-
-    assert!(does_fit(dirty_size, buf_size, obj_cnt, rem_size));
 
     // merge objects into one bigger rem obj
     obj_cnt -= 1;
@@ -280,7 +291,7 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_latency(
     let mut obj_cnt = 0;
     let mut dirty_obj_cnt = 0;
     let mut rem_size = 0;
-    let rem_dirty = false;
+    let mut rem_dirty = false;
 
     // try to create as much objects as possible
     while obj_cnt < max_obj_cnt {
@@ -320,20 +331,40 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_latency(
         if rem_dirty_size >= size_of::<usize>() {
             dirty_obj_cnt += 1;
         } else {
+            let rem_space = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
+            if rem_space < 2 * size_of::<usize>() && rem_space != 0 {
+                obj_cnt -= 1;
+                dirty_obj_cnt -= 1;
+                rem_size = rem_space + size_of::<usize>();
+
+                if rem_dirty_size >= rem_space {
+                    rem_dirty = true;
+                } else {
+                    rem_dirty = false;
+                }
+            }
+
             final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
             return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
         }
     }
 
-    let rem_dirty_size = remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
-    if rem_dirty_size < size_of::<usize>() {
-        final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
-        return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+    let rem_space = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
+    if rem_space < 2 * size_of::<usize>() && rem_space != 0 {
+        obj_cnt -= 1;
+        dirty_obj_cnt -= 1;
+        rem_size = rem_space + size_of::<usize>();
+
+        if rem_dirty_size >= rem_space {
+            rem_dirty = true;
+        } else {
+            rem_dirty = false;
+        }
     }
+
 
     final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
     return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
-
 }
 
 #[derive(Serialize)]

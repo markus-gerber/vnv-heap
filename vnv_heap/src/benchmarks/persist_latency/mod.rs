@@ -1,6 +1,12 @@
-mod runner;
+// dirty size runner
+mod dsize_runner;
+
+// buffer size runner
+mod bsize_runner;
+
 mod worst_case;
-pub(super) use runner::*;
+pub(super) use dsize_runner::*;
+pub(super) use bsize_runner::*;
 
 use std::sync::atomic::AtomicBool;
 

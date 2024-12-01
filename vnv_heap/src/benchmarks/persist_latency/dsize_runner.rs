@@ -69,12 +69,12 @@ macro_rules! for_dirty_size {
     };
 }
 
-pub(crate) struct PersistLatencyRunner;
+pub(crate) struct DirtySizePersistLatencyRunner;
 
-impl BenchmarkRunner for PersistLatencyRunner {
+impl BenchmarkRunner for DirtySizePersistLatencyRunner {
     fn get_iteration_count(options: &RunAllBenchmarkOptions) -> usize {
         let mut iteration_count = 0;
-        if options.run_persist_latency_worst_case {
+        if options.run_dirty_size_persist_latency {
             if MIN_DIRTY_SIZE != MIN_DIRTY_SIZE_ROUNDED {
                 iteration_count += 2;
             }
@@ -123,7 +123,7 @@ impl BenchmarkRunner for PersistLatencyRunner {
             }
         }
     
-        if options.run_persist_latency_worst_case {
+        if options.run_dirty_size_persist_latency {
             #[cfg(feature = "enable_general_metadata_runtime_persist")]
             panic!("enable_general_metadata_runtime_persist is not supported!");
 
@@ -153,7 +153,7 @@ impl BenchmarkRunner for PersistLatencyRunner {
                     BUF_SIZE,
                     RESIDENT_CUTOFF_SIZE,
                     REM_OBJ_SIZE,
-                > = WorstCasePersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "worst_case_persist_latency");
+                > = WorstCasePersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "worst_case_persist_latency_dirty_size");
                 bench.run_benchmark::<TIMER, TRIGGER>(run_options, get_ticks, &mut trigger);
             });
 
@@ -181,7 +181,7 @@ impl BenchmarkRunner for PersistLatencyRunner {
                     BUF_SIZE,
                     RESIDENT_CUTOFF_SIZE,
                     REM_OBJ_SIZE,
-                > = WorstCasePersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "max_dirty_persist_latency");
+                > = WorstCasePersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "max_dirty_persist_latency_dirty_size");
                 bench.run_benchmark::<TIMER, TRIGGER>(run_options, get_ticks, &mut trigger);
             });
         }

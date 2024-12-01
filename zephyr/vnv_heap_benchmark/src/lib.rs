@@ -42,7 +42,8 @@ pub extern "C" fn rust_main() {
             result_buffer: &mut [0; 10],
         },
         RunAllBenchmarkOptions {
-            run_persist_latency_worst_case: true,
+            run_dirty_size_persist_latency: true,
+            run_buffer_size_persist_latency: true,
         //    run_persistent_storage_benchmarks: true,
             ..Default::default()
         },
@@ -171,6 +172,14 @@ impl PersistTrigger for ZephyrPersistTrigger {
         unsafe {
             zephyr_sys::raw::z_impl_k_timer_stop(&mut self.timer);
         }
+    }
+}
+
+impl Drop for ZephyrPersistTrigger {
+    fn drop(&mut self) {
+        unsafe {
+            PERSIST_FUNCTION = None;
+        };
     }
 }
 

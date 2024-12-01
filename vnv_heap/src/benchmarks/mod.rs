@@ -3,7 +3,7 @@ use core::{any::type_name, mem::size_of};
 #[cfg(not(test))]
 use std::io::stdout;
 
-use persist_latency::PersistLatencyRunner;
+use persist_latency::DirtySizePersistLatencyRunner;
 use serde::Serialize;
 
 mod persist_latency;
@@ -30,7 +30,8 @@ pub struct RunAllBenchmarkOptions {
     pub run_baseline_get_benchmarks: bool,
     pub run_persistent_storage_benchmarks: bool,
     pub run_long_persistent_storage_benchmarks: bool,
-    pub run_persist_latency_worst_case: bool
+    pub run_dirty_size_persist_latency: bool,
+    pub run_buffer_size_persist_latency: bool
 }
 
 impl Default for RunAllBenchmarkOptions {
@@ -44,8 +45,8 @@ impl Default for RunAllBenchmarkOptions {
             run_baseline_get_benchmarks: false,
             run_persistent_storage_benchmarks: false,
             run_long_persistent_storage_benchmarks: false,
-
-            run_persist_latency_worst_case: false,
+            run_dirty_size_persist_latency: false,
+            run_buffer_size_persist_latency: false
         }
     }
 }
@@ -61,7 +62,8 @@ impl RunAllBenchmarkOptions {
             run_baseline_get_benchmarks: true,
             run_persistent_storage_benchmarks: true,
             run_long_persistent_storage_benchmarks: true,
-            run_persist_latency_worst_case: true
+            run_dirty_size_persist_latency: true,
+            run_buffer_size_persist_latency: true
         }
     }
     pub fn microbenchmarks() -> Self {
@@ -100,21 +102,23 @@ pub fn run_all_benchmarks<
         *curr_iteration += 1;
     }
 
-    iteration_count += ImplementationBenchmarkRunner::get_iteration_count(&options);
-    iteration_count += BaselineBenchmarkRunner::get_iteration_count(&options);
-    iteration_count += StorageBenchmarkRunner::get_iteration_count(&options);
-    iteration_count += PersistLatencyRunner::get_iteration_count(&options);
+    // iteration_count += ImplementationBenchmarkRunner::get_iteration_count(&options);
+    // iteration_count += BaselineBenchmarkRunner::get_iteration_count(&options);
+    // iteration_count += StorageBenchmarkRunner::get_iteration_count(&options);
+    iteration_count += DirtySizePersistLatencyRunner::get_iteration_count(&options);
+    iteration_count += BufferSizePersistLatencyRunner::get_iteration_count(&options);
     let mut handle_it = || {
         handle_curr_iteration(&mut curr_iteration, iteration_count);
     };
 
     // run benchmarks
-    ImplementationBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
-    BaselineBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
-    StorageBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
-    PersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    // ImplementationBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    // BaselineBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    // StorageBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    DirtySizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    BufferSizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     println!("")
-    
+
 }
 
 pub(self) trait BenchmarkRunner {
