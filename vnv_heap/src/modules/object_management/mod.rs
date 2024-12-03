@@ -69,16 +69,6 @@ impl<S: PersistentStorageModule, A: AllocatorModule>
             .status
             .is_data_dirty()
     }
-
-    #[inline]
-    #[cfg(feature = "enable_general_metadata_runtime_persist")]
-    pub fn is_metadata_dirty(&mut self) -> bool {
-        self.delete_handle
-            .get_element()
-            .inner
-            .status
-            .is_general_metadata_dirty()
-    }
 }
 
 pub struct ResidentIter<'a, 'b, 'c, 'd, S: PersistentStorageModule, A: AllocatorModule> {
@@ -178,32 +168,12 @@ impl<A: AllocatorModule, S: PersistentStorageModule> DirtyIterItem<'_, '_, '_, '
     }
 
     #[inline]
-    #[cfg(feature = "enable_general_metadata_runtime_persist")]
-    pub fn sync_general_metadata(&mut self) -> Result<usize, ()> {
-        let dirty_size = self.delete_handle.get_element().persist_general_metadata(
-            self.arguments.storage,
-        )?;
-        *self.arguments.remaining_dirty_size += dirty_size;
-        Ok(dirty_size)
-    }
-
-    #[inline]
     pub fn is_user_data_dirty(&mut self) -> bool {
         self.delete_handle
             .get_element()
             .inner
             .status
             .is_data_dirty()
-    }
-
-    #[inline]
-    #[cfg(feature = "enable_general_metadata_runtime_persist")]
-    pub fn is_metadata_dirty(&mut self) -> bool {
-        self.delete_handle
-            .get_element()
-            .inner
-            .status
-            .is_general_metadata_dirty()
     }
 }
 

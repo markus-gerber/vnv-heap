@@ -21,7 +21,6 @@ libc = { version = "0.2.155", optional = true }
 default = []
 persist_debug_prints = ["dep:libc"]
 persist_debug_unsafe_prints = []
-enable_general_metadata_runtime_persist = []
 benchmarks = ["dep:serde", "dep:serde_json", "dep:seq-macro", "dep:rand"]
 
 [dev-dependencies]

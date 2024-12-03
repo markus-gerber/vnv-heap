@@ -124,9 +124,6 @@ impl BenchmarkRunner for DirtySizePersistLatencyRunner {
         }
     
         if options.run_dirty_size_persist_latency {
-            #[cfg(feature = "enable_general_metadata_runtime_persist")]
-            panic!("enable_general_metadata_runtime_persist is not supported!");
-
             let mut trigger = TRIGGER::new(trigger_persist);
 
             for_dirty_size!(DIRTY_SIZE, {

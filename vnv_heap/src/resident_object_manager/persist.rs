@@ -29,7 +29,7 @@ pub(crate) fn persist(
             // drop reference now to perform persist surgery
             let mut persist_data_later = false;
             if item.inner.status.is_data_dirty() {
-                if item.inner.status.is_partial_dirtiness_tracking_enabled() || cfg!(feature = "enable_general_metadata_runtime_persist") {
+                if item.inner.status.is_partial_dirtiness_tracking_enabled() {
                     // TODO persisting data for an object with partial dirtiness tracking can be optimized more
                     // e.g. group data and metadata into one write call
                     unsafe { item.write_user_data_dynamic(storage_ref).unwrap() };
@@ -61,19 +61,16 @@ pub(crate) fn persist(
             break;
         };
 
-        #[cfg(not(feature = "enable_general_metadata_runtime_persist"))]
-        {
-            unsafe {
-                persist_whole_metadata(
-                    curr,
-                    next_metadata_offset,
-                    storage_ref,
-                    persist_data_later,
-                )
-                .unwrap()
-            };    
-        }
-        
+        unsafe {
+            persist_whole_metadata(
+                curr,
+                next_metadata_offset,
+                storage_ref,
+                persist_data_later,
+            )
+            .unwrap()
+        };    
+    
         curr = next;
     }
 

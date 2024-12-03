@@ -107,9 +107,6 @@ impl BenchmarkRunner for BufferSizePersistLatencyRunner {
         }
     
         if options.run_buffer_size_persist_latency {
-            #[cfg(feature = "enable_general_metadata_runtime_persist")]
-            panic!("enable_general_metadata_runtime_persist is not supported!");
-
             let mut trigger = TRIGGER::new(trigger_persist);
 
             for_buffer_size!(BUF_SIZE, {
