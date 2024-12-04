@@ -14,10 +14,10 @@ use super::{GetCurrentTicks, PersistTrigger, PersistentStorageModule};
 const RESIDENT_CUTOFF_SIZE: usize = {
     let tmp = if size_of::<usize>() == 8 {
         // desktop with File Storage Module
-        96
+        96 + size_of::<usize>()
     } else if size_of::<usize>() == 4 {
         // zephyr with SPI Fram Storage module
-        52
+        52 + size_of::<usize>()
     } else {
         panic!("uhhm");
     };
@@ -126,8 +126,8 @@ impl BenchmarkRunner for BufferSizePersistLatencyRunner {
                 const REM_OBJ_SIZE: usize = RES.2;
                 const REM_OBJ_DIRTY: bool = RES.3;
 
-//                const REST: usize = remaining_dirty_size(REM_DIRTY_SIZE, BUF_SIZE - RESIDENT_CUTOFF_SIZE, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY);
-//                println!("obj_cnt: {}, dirty_objects: {}, rest: {}, rest dirty?: {}, DIRTYREST: {}", OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY, REST);
+            //    const REST: usize = remaining_dirty_size(REM_DIRTY_SIZE, BUF_SIZE - RESIDENT_CUTOFF_SIZE, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY);
+            //    println!("obj_cnt: {}, dirty_objects: {}, rest: {}, rest dirty?: {}, DIRTYREST: {}", OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY, REST);
 
                 let bench: WorstCasePersistLatencyBenchmark<
                     BUF_SIZE,
@@ -153,8 +153,8 @@ impl BenchmarkRunner for BufferSizePersistLatencyRunner {
                 const DIRTY_NORMAL_OBJECTS: usize = RES.1;
                 const REM_OBJ_SIZE: usize = RES.2;
                 const REM_OBJ_DIRTY: bool = RES.3;
-//                const REST: usize = remaining_dirty_size(REM_DIRTY_SIZE, BUF_SIZE - RESIDENT_CUTOFF_SIZE, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY);
-//                println!("obj_cnt: {}, dirty_objects: {}, rest: {}, rest dirty?: {}, DIRTYREST: {}", OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY, REST);
+                // const REST: usize = remaining_dirty_size(REM_DIRTY_SIZE, BUF_SIZE - RESIDENT_CUTOFF_SIZE, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY);
+                // println!("obj_cnt: {}, dirty_objects: {}, rest: {}, rest dirty?: {}, DIRTYREST: {}", OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY, REST);
 
 
                 let bench: WorstCasePersistLatencyBenchmark<

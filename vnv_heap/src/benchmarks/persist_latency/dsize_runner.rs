@@ -14,10 +14,10 @@ use super::{GetCurrentTicks, PersistTrigger, PersistentStorageModule};
 const RESIDENT_CUTOFF_SIZE: usize = {
     let tmp = if size_of::<usize>() == 8 {
         // desktop with File Storage Module
-        96
+        96 + size_of::<usize>()
     } else if size_of::<usize>() == 4 {
         // zephyr with SPI Fram Storage module
-        52
+        52 + size_of::<usize>()
     } else {
         panic!("uhhm");
     };
@@ -65,7 +65,7 @@ macro_rules! for_dirty_size {
         for_dirty_size_impl!($index, $inner, 127);
 
         #[cfg(target_pointer_width = "64")]
-        for_dirty_size_impl!($index, $inner, 126);
+        for_dirty_size_impl!($index, $inner, 125);
     };
 }
 
@@ -153,7 +153,6 @@ impl BenchmarkRunner for DirtySizePersistLatencyRunner {
                 > = WorstCasePersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "worst_case_persist_latency_dirty_size");
                 bench.run_benchmark::<TIMER, TRIGGER>(run_options, get_ticks, &mut trigger);
             });
-
             for_dirty_size!(DIRTY_SIZE, {
                 handle_curr_iteration();
 
@@ -182,5 +181,6 @@ impl BenchmarkRunner for DirtySizePersistLatencyRunner {
                 bench.run_benchmark::<TIMER, TRIGGER>(run_options, get_ticks, &mut trigger);
             });
         }
+
     }
 }

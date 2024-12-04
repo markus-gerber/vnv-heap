@@ -31,10 +31,10 @@ use super::*;
 const RESIDENT_CUTOFF_SIZE: usize = {
     if size_of::<usize>() == 8 {
         // desktop with File Storage Module
-        96
+        96 + size_of::<usize>()
     } else if size_of::<usize>() == 4 {
         // zephyr with SPI Fram Storage module
-        52
+        52 + size_of::<usize>()
     } else {
         panic!("uhhm");
     }

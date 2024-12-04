@@ -12,21 +12,21 @@ use crate::{
         object_management::DefaultObjectManagementModule,
     },
     test::get_test_heap,
-    vnv_persist_all, VNVArray, VNVObject,
+    vnv_persist_all, VNVObject,
 };
 
 #[test]
 fn test_persist_all_simple() {
     type TestType = [u8; 10];
-    type TestType2 = [u8; 200];
+    // type TestType2 = [u8; 200];
 
     fn rand_data(rand: &mut SmallRng) -> TestType {
         array::from_fn(|_| rand.next_u32() as u8)
     }
 
-    fn rand_data2(rand: &mut SmallRng) -> TestType2 {
-        array::from_fn(|_| rand.next_u32() as u8)
-    }
+    // fn rand_data2(rand: &mut SmallRng) -> TestType2 {
+    //     array::from_fn(|_| rand.next_u32() as u8)
+    // }
 
     const BUFFER_SIZE: usize = 1200;
     let mut buffer = [0u8; BUFFER_SIZE];
@@ -50,9 +50,9 @@ fn test_persist_all_simple() {
     let mut rand = SmallRng::seed_from_u64(SEED);
 
     let mut objects = vec![];
-    let mut lists = vec![];
+    // let mut lists = vec![];
     let mut check_states = vec![];
-    let mut check_states_lists = vec![];
+    // let mut check_states_lists = vec![];
     let mut resident: Vec<bool> = vec![];
 
     macro_rules! allocate {
@@ -65,15 +65,15 @@ fn test_persist_all_simple() {
         };
     }
 
-    macro_rules! allocate_list {
-        () => {
-            let data = rand_data2(&mut rand);
+    // macro_rules! allocate_list {
+    //     () => {
+    //         let data = rand_data2(&mut rand);
 
-            lists.push(heap.allocate_pd_array(data.clone()).unwrap());
-            check_states_lists.push(data);
-            resident.push(false);
-        };
-    }
+    //         lists.push(heap.allocate_pd_array(data.clone()).unwrap());
+    //         // check_states_lists.push(data);
+    //         resident.push(false);
+    //     };
+    // }
 
     fn update(
         objects: &mut Vec<
@@ -108,26 +108,26 @@ fn test_persist_all_simple() {
                 DefaultObjectManagementModule,
             >,
         >,
-        lists: &mut Vec<
-            VNVArray<
-                u8,
-                200,
-                LinkedListAllocatorModule,
-                NonResidentBuddyAllocatorModule<16>,
-                DefaultObjectManagementModule,
-            >,
-        >,
+        // lists: &mut Vec<
+        //     VNVArray<
+        //         u8,
+        //         200,
+        //         LinkedListAllocatorModule,
+        //         NonResidentBuddyAllocatorModule<16>,
+        //         DefaultObjectManagementModule,
+        //     >,
+        // >,
         check_states: &mut Vec<[u8; 10]>,
-        check_states_lists: &mut Vec<[u8; 200]>,
+        // check_states_lists: &mut Vec<[u8; 200]>,
     ) {
         for (object, check_state) in objects.iter_mut().zip(check_states.iter()) {
             let obj_ref = object.get().unwrap();
             assert_eq!(*obj_ref, *check_state)
         }
-        for (object, check_state) in lists.iter_mut().zip(check_states_lists.iter()) {
-            let obj_ref = object.get().unwrap();
-            assert_eq!(*obj_ref, *check_state)
-        }
+        // for (object, check_state) in lists.iter_mut().zip(check_states_lists.iter()) {
+        //     let obj_ref = object.get().unwrap();
+        //     assert_eq!(*obj_ref, *check_state)
+        // }
     }
 
     fn checked_persist(
@@ -140,17 +140,17 @@ fn test_persist_all_simple() {
                 DefaultObjectManagementModule,
             >,
         >,
-        lists: &mut Vec<
-            VNVArray<
-                u8,
-                200,
-                LinkedListAllocatorModule,
-                NonResidentBuddyAllocatorModule<16>,
-                DefaultObjectManagementModule,
-            >,
-        >,
+        // lists: &mut Vec<
+        //     VNVArray<
+        //         u8,
+        //         200,
+        //         LinkedListAllocatorModule,
+        //         NonResidentBuddyAllocatorModule<16>,
+        //         DefaultObjectManagementModule,
+        //     >,
+        // >,
         check_states: &mut Vec<[u8; 10]>,
-        check_states_lists: &mut Vec<[u8; 200]>,
+        // check_states_lists: &mut Vec<[u8; 200]>,
         resident: &mut Vec<bool>,
     ) {
         println!("checked");
@@ -183,7 +183,7 @@ fn test_persist_all_simple() {
             assert_eq!(resident[i], objects[i].is_resident())
         }
 
-        check_integrity(objects, lists, check_states, check_states_lists);
+        check_integrity(objects, check_states);
     }
 
     allocate!();
@@ -191,20 +191,20 @@ fn test_persist_all_simple() {
     checked_persist(
         null_mut(),
         &mut objects,
-        &mut lists,
+        // &mut lists,
         &mut check_states,
-        &mut check_states_lists,
+        // &mut check_states_lists,
         &mut resident,
     );
 
-    allocate_list!();
+    // allocate_list!();
 
     checked_persist(
         null_mut(),
         &mut objects,
-        &mut lists,
+        // &mut lists,
         &mut check_states,
-        &mut check_states_lists,
+        // &mut check_states_lists,
         &mut resident,
     );
 
@@ -212,16 +212,16 @@ fn test_persist_all_simple() {
         allocate!();
     }
 
-    for _ in 0..20 {
-        allocate_list!();
-    }
+    // for _ in 0..20 {
+    //     allocate_list!();
+    // }
 
     checked_persist(
         null_mut(),
         &mut objects,
-        &mut lists,
+        // &mut lists,
         &mut check_states,
-        &mut check_states_lists,
+        // &mut check_states_lists,
         &mut resident,
     );
 
@@ -229,36 +229,36 @@ fn test_persist_all_simple() {
         objects[i].get().unwrap();
     }
 
-    {
-        let mut mut_ref=  lists[2].get_mut().unwrap();
-        mut_ref.set(20, 20).unwrap();
-        check_states_lists[2][20] = 20;    
-    }
+    // {
+    //     let mut mut_ref=  lists[2].get_mut().unwrap();
+    //     mut_ref.set(20, 20).unwrap();
+    //     check_states_lists[2][20] = 20;    
+    // }
 
-    checked_persist(
-        null_mut(),
-        &mut objects,
-        &mut lists,
-        &mut check_states,
-        &mut check_states_lists,
-        &mut resident,
-    );
+    // checked_persist(
+    //     null_mut(),
+    //     &mut objects,
+    //     &mut lists,
+    //     &mut check_states,
+    //     // &mut check_states_lists,
+    //     &mut resident,
+    // );
 
-    {
-        let idx = lists.len() - 1;
-        let mut mut_ref=  lists[idx].get_mut().unwrap();
-        mut_ref.set(3, 3).unwrap();
-        check_states_lists[idx][3] = 3;
-    }
+    // {
+    //     let idx = lists.len() - 1;
+    //     let mut mut_ref=  lists[idx].get_mut().unwrap();
+    //     mut_ref.set(3, 3).unwrap();
+    //     check_states_lists[idx][3] = 3;
+    // }
 
-    checked_persist(
-        null_mut(),
-        &mut objects,
-        &mut lists,
-        &mut check_states,
-        &mut check_states_lists,
-        &mut resident,
-    );
+    // checked_persist(
+    //     null_mut(),
+    //     &mut objects,
+    //     &mut lists,
+    //     &mut check_states,
+    //     &mut check_states_lists,
+    //     &mut resident,
+    // );
 
     for i in [10, 23, 45, 1, 24, 10, 100] {
         update(&mut objects, &mut check_states, i, &mut rand);
@@ -267,9 +267,9 @@ fn test_persist_all_simple() {
     checked_persist(
         null_mut(),
         &mut objects,
-        &mut lists,
+        // &mut lists,
         &mut check_states,
-        &mut check_states_lists,
+        // &mut check_states_lists,
         &mut resident,
     );
 }

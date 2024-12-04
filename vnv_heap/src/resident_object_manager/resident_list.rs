@@ -28,9 +28,25 @@ impl ResidentList {
     ///
     /// This is only safe if `item` was not previously pushed to any list before (pushing after popping an item is okay tho).
     pub(crate) unsafe fn push(&self, item: &mut ResidentObjectMetadata) {
-        let old_head = self.head.load(Ordering::SeqCst);
-        item.next_resident_object.store(old_head, Ordering::SeqCst);
-        self.head.store(item, Ordering::SeqCst);
+        let new_addr = (item as *mut ResidentObjectMetadata) as usize;
+        let mut prev = &self.head;
+        let mut curr;
+
+        loop {
+            curr = prev.load(Ordering::SeqCst);
+            if curr.is_null() {
+                break;
+            }
+
+            if curr as usize > new_addr {
+                break;
+            }
+
+            prev = &curr.as_ref().unwrap().next_resident_object;
+        }
+
+        item.next_resident_object.store(curr, Ordering::SeqCst);
+        prev.store(item, Ordering::SeqCst);
     }
 
     /// Try to remove the first item in the list
@@ -191,7 +207,6 @@ mod test {
         resident_object_metadata::{ResidentObjectMetadata, ResidentObjectMetadataInner},
     };
     use std::{
-        collections::VecDeque,
         fmt::Debug,
         sync::atomic::{AtomicPtr, Ordering},
     };
@@ -265,27 +280,37 @@ mod test {
     }
 
     struct TestableModularLinkedList {
-        check_list: VecDeque<ResidentObjectMetadata>,
+        check_list: Vec<ResidentObjectMetadata>,
         list: ResidentList,
     }
 
     impl TestableModularLinkedList {
         pub fn new() -> Self {
             Self {
-                check_list: VecDeque::new(),
+                check_list: Vec::new(),
                 list: ResidentList::new(),
             }
         }
 
         pub fn push(&mut self, item: &mut ResidentObjectMetadata) {
-            self.check_list.push_front(item.clone());
+            {
+                let check_item = item.clone();
+                check_item.next_resident_object.store(item, Ordering::SeqCst);
+                self.check_list.push(check_item);
+            }
+            self.check_list.sort_by_key(|x| x.next_resident_object.load(Ordering::SeqCst) as usize);
             unsafe { self.list.push(item) };
 
             self.check_integrity();
         }
 
         pub fn pop(&mut self) -> Option<*mut ResidentObjectMetadata> {
-            let item = self.check_list.pop_front();
+            let item = if self.check_list.len() == 0 {
+                None
+            } else {
+                Some(self.check_list.remove(0))
+            };
+
             let item_2 = self.list.pop();
 
             assert_eq!(item.is_none(), item_2.is_none());
@@ -303,6 +328,11 @@ mod test {
         }
 
         pub fn check_integrity(&self) {
+            if ENABLE_PRINTS {
+                println!("\nCHECK_INTEGRITY");
+
+            }
+
             assert_eq!(self.list.iter().count(), self.check_list.len());
 
             for (a, b) in self.list.iter().zip(self.check_list.iter()) {
@@ -310,7 +340,7 @@ mod test {
                     println!("{:?} =?= {:?}", a, b);
                 }
                 if a != b {
-                    assert!(a == b);
+                    assert_eq!(a, b);
                 }
             }
         }
@@ -374,11 +404,11 @@ mod test {
         list.pop();
         check_integrity!();
 
+        list.push(&mut data[1]);
+        check_integrity!();
         list.push(&mut data[3]);
         check_integrity!();
         list.push(&mut data[2]);
-        check_integrity!();
-        list.push(&mut data[8]);
         check_integrity!();
 
         {
@@ -408,14 +438,14 @@ mod test {
                 .check_list
                 .into_iter()
                 .fold(
-                    (VecDeque::new(), false),
-                    |mut acc: (VecDeque<ResidentObjectMetadata>, bool), item| {
+                    (Vec::new(), false),
+                    |mut acc: (Vec<ResidentObjectMetadata>, bool), item| {
                         if acc.1 {
-                            acc.0.push_back(item);
+                            acc.0.push(item);
                             acc
                         } else {
                             if !item.inner.status.is_data_dirty() {
-                                acc.0.push_back(item.clone())
+                                acc.0.push(item.clone())
                             }
                             if item.inner.offset == 0 {
                                 acc.1 = true;
@@ -441,7 +471,7 @@ mod test {
                 handle.delete();
                 break;
             }
-            list.check_list.pop_front();
+            list.check_list.remove(0);
             list.print();
         }
         check_integrity!();

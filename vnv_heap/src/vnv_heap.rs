@@ -62,14 +62,14 @@ pub(crate) struct ResidentBufPersistentStorage<A: AllocatorModule, S: Persistent
 
 pub const fn calc_resident_buf_cutoff_size<A: AllocatorModule, S: PersistentStorageModule>() -> usize
 {
-    size_of::<ResidentBufPersistentStorage<A, S>>()
+    size_of::<ResidentBufPersistentStorage<A, S>>() + size_of::<usize>()
 }
 
 pub(crate) const fn calc_resident_buf_default_dirty_size<
     A: AllocatorModule,
     S: PersistentStorageModule,
 >() -> usize {
-    size_of::<ResidentBufPersistentStorage<A, S>>()
+    size_of::<ResidentBufPersistentStorage<A, S>>() + size_of::<usize>()
 }
 
 pub struct VNVHeap<
@@ -160,10 +160,13 @@ impl<
             resident_list,
             heap,
         )?;
+
+        // persist() needs one usize to specify its slice size
+        let non_resident_offset = config.max_dirty_bytes + size_of::<usize>();
         let mut non_resident_allocator = N::new();
         non_resident_allocator.init(
-            size_of::<usize>(),
-            storage_reference.get_max_size() - size_of::<usize>(),
+            non_resident_offset,
+            storage_reference.get_max_size() - non_resident_offset,
             &mut storage_reference,
         )?;
 
@@ -219,6 +222,9 @@ impl<
             ptr.write(inner);
             ptr.as_mut().unwrap()
         };
+
+        // note: persist() needs one usize to specify its slice size
+        // calc_resident_buf_cutoff_size > ResidentBufPersistentStorage
 
         Ok((
             calc_resident_buf_cutoff_size::<A, S>(),
@@ -337,17 +343,14 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
     ) -> Result<AllocationIdentifier<T>, ()> {
         trace!("Allocate new object with {} bytes", size_of::<T>());
 
-        let (backup_obj_layout, metadata_rel_offset) =
-            calc_backup_obj_layout_static::<T>(use_partial_dirtiness_tracking);
+        let backup_obj_layout = calc_backup_obj_layout_static::<T>();
 
-        let base_offset = self
+        let metadata_offset = self
             .non_resident_allocator
             .allocate(backup_obj_layout, &mut self.storage_reference)?;
-        let metadata_offset = base_offset + metadata_rel_offset;
 
         let initial_value = match self.resident_object_manager.try_to_allocate(
             initial_value,
-            base_offset,
             metadata_offset,
             use_partial_dirtiness_tracking,
         ) {
@@ -384,11 +387,10 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
             &mut self.storage_reference,
         )?;
 
-        let (total_layout, object_offset) =
-            calc_backup_obj_layout_static::<T>(use_partial_dirtiness_tracking);
+        let backup_layout = calc_backup_obj_layout_static::<T>();
         self.non_resident_allocator.deallocate(
-            identifier.offset - object_offset,
-            total_layout,
+            identifier.offset,
+            backup_layout,
             &mut self.storage_reference,
         )
     }

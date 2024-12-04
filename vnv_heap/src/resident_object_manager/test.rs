@@ -3,6 +3,7 @@ use core::{
     ptr::{null, null_mut},
 };
 use core::sync::atomic::AtomicBool;
+use std::mem::size_of;
 
 use try_lock::TryLock;
 
@@ -56,7 +57,7 @@ fn test_release_dirty_size() {
 
     let initial_data: TestObj = [0u8; 20];
     let offset_list: [usize; OBJ_COUNT] = array::from_fn(|_| {
-        let (layout, _) = calc_backup_obj_layout_static::<TestObj>(false);
+        let layout = calc_backup_obj_layout_static::<TestObj>();
         let offset = non_resident_alloc
             .allocate(layout, &mut storage)
             .unwrap();
@@ -153,12 +154,12 @@ fn test_remain_resident() {
         .unwrap();
 
     non_resident_alloc
-        .init(0, STORAGE_SIZE, &mut storage)
+        .init(size_of::<usize>(), STORAGE_SIZE - size_of::<usize>(), &mut storage)
         .unwrap();
 
     let initial_data: TestObj = [0u8; 20];
     let offset_list: [usize; OBJ_COUNT] = array::from_fn(|_| {
-        let (layout, _) = calc_backup_obj_layout_static::<TestObj>(false);
+        let layout = calc_backup_obj_layout_static::<TestObj>();
         let offset = non_resident_alloc
             .allocate(layout, &mut storage)
             .unwrap();

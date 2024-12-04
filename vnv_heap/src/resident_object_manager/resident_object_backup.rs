@@ -1,55 +1,39 @@
 use core::{
     alloc::Layout,
     mem::size_of,
-    ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
     sync::atomic::AtomicPtr,
 };
-
-use self::persistent_storage_util::read_storage_data;
+use std::usize;
 
 use super::{
     partial_dirtiness_tracking::PartialDirtinessTrackingInfo,
     resident_object_metadata::{ResidentObjectMetadata, ResidentObjectMetadataInner},
     resident_object_status::ResidentObjectStatus,
 };
-use crate::{
-    modules::persistent_storage::{persistent_storage_util, PersistentStorageModule},
-    resident_object_manager::partial_dirtiness_tracking::MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE,
-};
 
 pub(crate) const TOTAL_METADATA_BACKUP_SIZE: usize = {
     size_of::<ResidentObjectMetadataBackup>()
 };
 
-pub(crate) const fn calc_backup_obj_layout_static<T>(
-    use_partial_dirtiness_tracking: bool,
-) -> (Layout, usize) {
-    let dirtiness_buf_size = if use_partial_dirtiness_tracking {
-        let (_, byte_count) = PartialDirtinessTrackingInfo::calc_bit_and_byte_count(size_of::<T>());
-
-        byte_count
-    } else {
-        0
-    };
-
+pub(crate) const fn calc_backup_obj_layout_static<T>() -> Layout {
     assert!(Layout::from_size_align(
-        dirtiness_buf_size + TOTAL_METADATA_BACKUP_SIZE + size_of::<T>(),
+        size_of::<T>(),
         1
     )
     .is_ok());
     let layout = unsafe {
         Layout::from_size_align_unchecked(
-            dirtiness_buf_size + TOTAL_METADATA_BACKUP_SIZE + size_of::<T>(),
+            size_of::<T>(),
             1,
         )
     };
 
-    (layout, dirtiness_buf_size)
+    layout
 }
 
 #[inline]
 pub(crate) const fn calc_backup_obj_user_data_offset() -> usize {
-    TOTAL_METADATA_BACKUP_SIZE
+    0
 }
 
 /// Metadata of resident objects that will be saved
@@ -57,55 +41,46 @@ pub(crate) const fn calc_backup_obj_user_data_offset() -> usize {
 /// after a power failure
 ///
 /// IMPORTANT: DO NOT REORDER THE FIELDS OF THIS STRUCT AS IT IS CRUCIAL TO THE CURRENT IMPLEMENTATION
-///
-/// ALSO NOTE: ONLY REMOVE/ADD FIELDS WITH UPDATING:
-/// TOTAL_METADATA_BACKUP_SIZE, GENERAL_METADATA_BACKUP_SIZE and METADATA_EXCEPT_GENERAL_BACKUP_SIZE
-#[repr(C, packed(1))]
-pub(crate) struct ResidentObjectMetadataBackup {
-    /// Next item in the resident object list
-    /// This is either 0 or the offset of the next metadata in non volatile storage
-    pub(crate) next_resident_object: usize,
-
-    pub(crate) inner: ResidentObjectMetadataBackupInner,
-}
-
-/// IMPORTANT: DO NOT REORDER THE FIELDS OF THIS STRUCT AS IT IS CRUCIAL TO THE CURRENT IMPLEMENTATION
 #[derive(Clone, Copy)]
 #[repr(C, packed(1))]
-pub(crate) struct ResidentObjectMetadataBackupInner {
+pub(crate) struct ResidentObjectMetadataBackup {
     /// What status is the resident object in?
     pub(crate) status: ResidentObjectStatus,
 
     /// Points to the location in RAM where this metadata object is stored
-    pub(crate) offset: usize,
+    pub(crate) ram_offset: usize,
+
+    pub(crate) storage_offset: usize,
 
     pub(crate) layout: Layout,
 }
 
-impl ResidentObjectMetadataBackupInner {
-    fn from(value: &ResidentObjectMetadataInner) -> Self {
+impl ResidentObjectMetadataBackup {
+    pub(crate) fn from_metadata(value: &ResidentObjectMetadata) -> Self {
         let ResidentObjectMetadataInner {
-            status: dirty_status,
+            status,
             layout,
-            offset: _offset,
+            offset: storage_offset,
             partial_dirtiness_tracking_info: _partial_dirtiness_tracking_info,
 
             #[cfg(debug_assertions)]
-                data_offset: _data_offset,
-        } = value;
+            data_offset: _data_offset,
+        } = value.inner;
 
         Self {
-            status: dirty_status.clone(),
+            status: status.clone(),
             layout: layout.clone(),
-            offset: (value as *const ResidentObjectMetadataInner) as usize,
+            ram_offset: (value as *const ResidentObjectMetadata) as usize,
+            storage_offset: storage_offset
         }
     }
 
-    fn to_metadata(self, storage_offset: usize) -> ResidentObjectMetadataInner {
-        let ResidentObjectMetadataBackupInner {
+    pub(crate) fn to_metadata(self, next_resident_object: *mut ResidentObjectMetadata) -> ResidentObjectMetadata {
+        let ResidentObjectMetadataBackup {
             status,
             layout,
-            offset: _offset,
+            ram_offset: _offset,
+            storage_offset
         } = self;
 
         let partial_dirtiness_tracking_info = if status.is_partial_dirtiness_tracking_enabled() {
@@ -114,7 +89,7 @@ impl ResidentObjectMetadataBackupInner {
             PartialDirtinessTrackingInfo::new_unused()
         };
 
-        ResidentObjectMetadataInner {
+        let inner = ResidentObjectMetadataInner {
             status,
             partial_dirtiness_tracking_info,
             layout: layout,
@@ -122,32 +97,16 @@ impl ResidentObjectMetadataBackupInner {
 
             #[cfg(debug_assertions)]
             data_offset: usize::MAX,
-        }
-    }
-}
-
-impl ResidentObjectMetadataBackup {
-    fn from_metadata(metadata: &ResidentObjectMetadata, next_item_offset: usize) -> Self {
-        let obj = ResidentObjectMetadataBackup {
-            inner: ResidentObjectMetadataBackupInner::from(&metadata.inner),
-            next_resident_object: next_item_offset,
         };
 
-        obj
-    }
-
-    fn to_metadata(
-        self,
-        storage_offset: usize,
-        next_resident_object: *mut ResidentObjectMetadata,
-    ) -> ResidentObjectMetadata {
         ResidentObjectMetadata {
-            inner: self.inner.to_metadata(storage_offset),
+            inner: inner,
             next_resident_object: AtomicPtr::new(next_resident_object),
         }
     }
 }
 
+/* 
 /// Persists metadata including dirty bit list (if partial dirtiness tracking is enabled)
 ///
 /// # Safety
@@ -303,9 +262,10 @@ pub(crate) unsafe fn restore_metadata<S: PersistentStorageModule>(
     next_resident_object: *mut ResidentObjectMetadata,
     storage: &mut S,
 ) -> Result<(), ()> {
+    /*
     // step 1: read the whole resident object metadata backup and save it
     let backup: ResidentObjectMetadataBackup = read_storage_data(storage, offset)?;
-
+    
     let metadata = backup.to_metadata(offset, next_resident_object);
     dest_ptr.write(metadata);
 
@@ -325,16 +285,17 @@ pub(crate) unsafe fn restore_metadata<S: PersistentStorageModule>(
             .get_dirty_buf_slice(dest_ptr);
         storage.read(dest_ref.inner.offset - byte_cnt, dest_slice)?;
     }
-
+*/
     Ok(())
 }
-
+*/
+/* 
 #[cfg(test)]
 mod test {
+ 
     use std::mem::size_of;
 
     use super::{calc_backup_obj_layout_static, calc_backup_obj_user_data_offset};
-
     #[test]
     fn test_backup_obj_layout() {
         test_backup_obj_layout_internal::<usize>();
@@ -395,17 +356,8 @@ mod test {
     }
 
     fn test_backup_obj_layout_internal<T>() {
-        let user_data_offset = calc_backup_obj_user_data_offset();
-        let (layout, metadata_offset) = calc_backup_obj_layout_static::<T>(false);
+        let layout = calc_backup_obj_layout_static::<T>();
 
-        assert_eq!(user_data_offset + size_of::<T>(), layout.size());
-        assert_eq!(metadata_offset, 0);
-
-        let (layout, metadata_offset) = calc_backup_obj_layout_static::<T>(true);
-
-        assert_eq!(
-            metadata_offset + user_data_offset + size_of::<T>(),
-            layout.size()
-        );
+        assert_eq!(size_of::<T>(), layout.size());
     }
-}
+}*/

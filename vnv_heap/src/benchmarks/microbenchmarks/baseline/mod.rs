@@ -34,7 +34,7 @@ use super::*;
 type A = LinkedListAllocatorModule;
 
 const BUCKET_SIZE: usize = 1024 + size_of::<A>();
-const STEP_SIZE: usize = 32;
+const STEP_SIZE: usize = 16;
 const MIN_OBJ_SIZE: usize = 0;
 const MAX_OBJ_SIZE: usize = 1024;
 
@@ -53,7 +53,7 @@ macro_rules! for_obj_size_impl {
 
 macro_rules! for_obj_size {
     ($index: ident, $inner: expr) => {
-        for_obj_size_impl!($index, $inner, 33);
+        for_obj_size_impl!($index, $inner, 65);
     };
 }
 

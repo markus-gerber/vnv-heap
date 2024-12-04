@@ -347,15 +347,9 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
     pub(crate) fn try_to_allocate<T>(
         &mut self,
         data: T,
-        storage_base_offset: usize,
-        storage_metadata_offset: usize,
+        storage_offset: usize,
         use_partial_dirtiness_tracking: bool,
     ) -> Result<(), T> {
-        debug_assert_eq!(
-            use_partial_dirtiness_tracking,
-            (storage_metadata_offset - storage_base_offset) != 0
-        );
-
         let (resident_obj_layout, resident_metadata_rel_offset) =
             calc_resident_obj_layout_static::<T>(use_partial_dirtiness_tracking);
 
@@ -383,7 +377,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         let ptr = res_ptr as *mut ResidentObject<T>;
 
         let mut metadata = ResidentObjectMetadata::new::<T>(
-            storage_metadata_offset,
+            storage_offset,
             use_partial_dirtiness_tracking,
         );
         metadata.inner.status.set_data_dirty(true);
