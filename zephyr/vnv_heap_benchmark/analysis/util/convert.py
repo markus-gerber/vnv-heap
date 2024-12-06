@@ -11,17 +11,25 @@ def convert_datasets(raw_data, dataset_type: str, bench_names: list[(str, str)],
         converted = convert_data(raw_data, bench_id, columns, unwrapped)
         converted["dataset_type"] = dataset_type
         converted["benchmark_title"] = bench_name
+        converted["benchmark_id"] = bench_id
         res.append(converted)
 
     return pd.concat(res)
 
-def display_dataset_infos(datasets: pd.DataFrame, scale: str = "us"):
+def display_dataset_infos_combined(datasets: pd.DataFrame, scale: str = "us"):
     for dataset_type in datasets["dataset_type"].unique():
         for benchmark_title in datasets["benchmark_title"].unique():
             dataset = datasets[(datasets["dataset_type"] == dataset_type) & (datasets["benchmark_title"] == benchmark_title)]
             scaled_data = scale_data(dataset, scale)
             display(HTML(f"<b>{dataset_type} - {benchmark_title}</b> [in {scale}]"))
             display(scaled_data["mean"].agg(["min", "max"]))
+
+def display_dataset_infos(datasets: pd.DataFrame, scale: str = "us"):
+    for benchmark_title in datasets["benchmark_title"].unique():
+        dataset = datasets[(datasets["benchmark_title"] == benchmark_title)]
+        scaled_data = scale_data(dataset, scale)
+        display(HTML(f"<b>{benchmark_title}</b> [in {scale}]"))
+        display(scaled_data["mean"].agg(["min", "max"]))
 
 
 def scale_and_filter_data(data: pd.DataFrame, unit: str, object_sizes: list[int]):
