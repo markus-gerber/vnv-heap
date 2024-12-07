@@ -34,9 +34,11 @@ static PERSIST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 #[derive(Debug)]
 pub struct LayoutInfo {
     #[allow(unused)]
-    cutoff_layout: Layout,
+    pub cutoff_size: usize,
     #[allow(unused)]
-    resident_object_metadata: Layout,
+    pub resident_object_metadata: usize,
+    #[allow(unused)]
+    pub object_dirty_size: usize,
 }
 
 /// Persists all existing heaps.
@@ -293,8 +295,9 @@ impl<
 
     pub fn get_layout_info() -> LayoutInfo {
         LayoutInfo {
-            resident_object_metadata: Layout::new::<ResidentObjectMetadata>(),
-            cutoff_layout: Layout::new::<ResidentBufPersistentStorage<A, S>>(),
+            resident_object_metadata: size_of::<ResidentObjectMetadata>(),
+            cutoff_size: calc_resident_buf_cutoff_size::<A, S>(),
+            object_dirty_size: ResidentObjectMetadata::fresh_object_dirty_size::<()>(false)
         }
     }
 

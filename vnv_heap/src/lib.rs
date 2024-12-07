@@ -24,4 +24,6 @@ pub use crate::vnv_heap::*;
 pub use crate::vnv_object::VNVObject;
 pub use crate::vnv_array::VNVArray;
 pub use vnv_config::VNVConfig;
+pub use vnv_ref::VNVRef;
+pub use vnv_mut_ref::VNVMutRef;
 pub mod modules;

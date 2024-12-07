@@ -37,6 +37,7 @@ pub(crate) const MAX_SUPPORTED_PARTIAL_DIRTY_BUF_SIZE: usize = u8::MAX as usize;
 
 /// Information on partial dirtiness tracking
 #[derive(Clone, Copy, PartialEq)]
+#[repr(packed)]
 pub(crate) struct PartialDirtinessTrackingInfo {
     /// Amount of bytes currently used by partial dirtiness tracking
     /// This is also the offset where to find the partial dirtiness list based
@@ -114,7 +115,7 @@ impl PartialDirtinessTrackingInfo {
         &'a self,
         base_ptr: *const ResidentObjectMetadata,
     ) -> PartialDirtinessTrackingWrapper<'a> {
-        let size_info_cache = self.size_info_cache.clone();
+        let size_info_cache = self.size_info_cache;
 
         PartialDirtinessTrackingWrapper {
             data_range: self.get_dirty_buf_slice(base_ptr),

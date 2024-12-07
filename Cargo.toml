@@ -11,6 +11,7 @@ exclude = [
     "zephyr/spi_fram_sample",
     "zephyr/vnv_heap_benchmark",
     "zephyr/vnv_heap_sample",
+    "zephyr/vnv_heap_info",
     "zephyr/vnv_heap_persist",
     "zephyr/vnv_heap_test",
     "zephyr/common/spi_fram_storage"
