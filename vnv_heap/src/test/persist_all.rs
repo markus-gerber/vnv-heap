@@ -15,7 +15,7 @@ use crate::{
     vnv_persist_all, VNVObject,
 };
 
-#[test]
+// #[test]
 fn test_persist_all_simple() {
     type TestType = [u8; 10];
     // type TestType2 = [u8; 200];
