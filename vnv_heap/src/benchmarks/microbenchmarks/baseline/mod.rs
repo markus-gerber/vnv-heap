@@ -1,6 +1,6 @@
 
-use super::super::baseline::MemoryManager;
-use super::super::baseline as model;
+use super::super::common::MemoryManager;
+use super::super::common as model;
 
 // import benchmarks
 mod baseline_get_min;

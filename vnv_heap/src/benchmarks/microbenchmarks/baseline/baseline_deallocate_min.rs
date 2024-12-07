@@ -2,7 +2,7 @@ use crate::modules::persistent_storage::PersistentStorageModule;
 use core::hint::black_box;
 use serde::Serialize;
 
-use super::{model::MemoryManager, AllocatorModule, Benchmark, ModuleOptionsBaseline, Timer};
+use super::{common::MemoryManager, AllocatorModule, Benchmark, ModuleOptionsBaseline, Timer};
 
 #[derive(Serialize)]
 pub struct BaselineDeallocateMinBenchmarkOptions {

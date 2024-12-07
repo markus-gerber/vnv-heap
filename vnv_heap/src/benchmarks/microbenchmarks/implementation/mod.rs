@@ -201,6 +201,7 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
 
             heap
         }
+        let mut buf = [0u8; BUF_SIZE];
 
         // allocate benchmarks
         if options.run_allocate_benchmarks {
@@ -276,7 +277,6 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
         if options.run_get_benchmarks {
             for_obj_size!(SIZE, {
                 handle_curr_iteration();
-                let mut buf = [0u8; BUF_SIZE];
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
                 let bench: GetMinBenchmark<A, NonResidentBuddyAllocatorModule<19>, M, SIZE> =
@@ -289,7 +289,6 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                 const METADATA_SIZE: usize = get_resident_size::<()>();
                 const BLOCKER_SIZE: usize = BUF_SIZE - METADATA_SIZE - RESIDENT_CUTOFF_SIZE;
 
-                let mut buf = [0u8; BUF_SIZE];
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
                 let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
@@ -309,7 +308,6 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                 const BLOCKER_CNT: usize = RES.0;
                 const REM_SIZE: usize = RES.1;
 
-                let mut buf = [0u8; BUF_SIZE];
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
                 let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
@@ -325,7 +323,6 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
             for_obj_size!(SIZE, {
                 handle_curr_iteration();
 
-                let mut buf = [0u8; BUF_SIZE];
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
                 let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
@@ -336,7 +333,6 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
             for_obj_size!(SIZE, {
                 handle_curr_iteration();
 
-                let mut buf = [0u8; BUF_SIZE];
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
                 let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;

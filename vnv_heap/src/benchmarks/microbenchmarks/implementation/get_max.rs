@@ -115,16 +115,16 @@ impl<
         assert_eq!(REM_SIZE % size_of::<usize>(), 0);
         assert_eq!(OBJ_SIZE % size_of::<usize>(), 0);
 
+        let mut blockers = vec![];
+        for _ in 0..blocker_cnt {
+            blockers.push(heap.allocate(0).unwrap());
+        }
+
         let rem_obj = if REM_SIZE != 0 {
             Some(heap.allocate([0; REM_SIZE]).unwrap())
         } else {
             None
         };
-
-        let mut blockers = vec![];
-        for _ in 0..blocker_cnt {
-            blockers.push(heap.allocate(0).unwrap());
-        }
 
         Self {
             object: heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap(),
@@ -156,40 +156,35 @@ impl<
     fn execute<T: Timer>(&mut self) -> u32 {
         // prepare run
         {
+            self.object.unload().unwrap();
+
             // load blocker objects into memory and make them dirty
-            let rem_mut = if let Some(obj) = self.rem_obj.as_mut() {
-                Some(obj.get_mut().unwrap())
-            } else {
-                None
-            };
-            
             let mut refs = vec![];
             
             for blocker in self.blockers.iter_mut() {
                 refs.push(blocker.get_mut().unwrap());
             };
 
+            let rem_mut = if let Some(obj) = self.rem_obj.as_mut() {
+                Some(obj.get_mut().unwrap())
+            } else {
+                None
+            };
+
             // it should not be possible to load debug object (size 0) into resident buffer without unloading the blocker object
             assert!(self.debug_obj.get().is_err(), "Loading debug object should result in an error");
-            
+
             drop(refs);
             drop(rem_mut);
-
 
             if let Some(first) = self.blockers.first() {
                 let heap = first.get_heap();
 
                 let res_list = heap.get_resident_object_manager().get_resident_list();
                 let iter = res_list.iter();
-                let mut i = 0;
+                
                 for x in iter {
-                    if i < self.blockers.len() {
-                        assert_eq!(x.inner.layout.size(), size_of::<usize>())
-                    } else {
-                        assert_eq!(x.inner.layout.size(), REM_SIZE);
-                    }
-    
-                    i += 1;
+                    assert!(x.inner.layout.size() == size_of::<usize>() || x.inner.layout.size() == REM_SIZE);
                 }
 
                 drop(heap);
