@@ -27,9 +27,9 @@ const RESIDENT_CUTOFF_SIZE: usize = {
 
 // NOTE: if you change one of these three variables
 // you also have to update the value in the for_obj_size macro!
-const DIRTY_SIZE: usize = 512;
+const MAX_DIRTY_SIZE: usize = 2 * 1024;
 const STEP_SIZE: usize = 32;
-const MIN_BUFFER_SIZE: usize = DIRTY_SIZE;
+const MIN_BUFFER_SIZE: usize = 256;
 
 const MAX_BUFFER_SIZE: usize = 4 * 1024;
 
@@ -51,7 +51,7 @@ macro_rules! for_buffer_size_impl {
 
 macro_rules! for_buffer_size {
     ($index: ident, $inner: expr) => {
-        for_buffer_size_impl!($index, $inner, 113);
+        for_buffer_size_impl!($index, $inner, 121);
     };
 }
 
@@ -112,6 +112,14 @@ impl BenchmarkRunner for BufferSizePersistLatencyRunner {
             for_buffer_size!(BUF_SIZE, {
                 handle_curr_iteration();
 
+                const DIRTY_SIZE: usize = {
+                    if MAX_DIRTY_SIZE > BUF_SIZE {
+                        BUF_SIZE
+                    } else {
+                        MAX_DIRTY_SIZE
+                    }
+                };
+
                 const REM_DIRTY_SIZE: usize = DIRTY_SIZE - RESIDENT_CUTOFF_SIZE;
                 let mut buf = [0u8; BUF_SIZE];
                 let mut heap = get_persist_bench_heap(&mut buf, DIRTY_SIZE, get_storage());
@@ -140,6 +148,13 @@ impl BenchmarkRunner for BufferSizePersistLatencyRunner {
             for_buffer_size!(BUF_SIZE, {
                 handle_curr_iteration();
 
+                const DIRTY_SIZE: usize = {
+                    if MAX_DIRTY_SIZE > BUF_SIZE {
+                        BUF_SIZE
+                    } else {
+                        MAX_DIRTY_SIZE
+                    }
+                };
                 const REM_DIRTY_SIZE: usize = DIRTY_SIZE - RESIDENT_CUTOFF_SIZE;
                 let mut buf = [0u8; BUF_SIZE];
                 let mut heap = get_persist_bench_heap(&mut buf, DIRTY_SIZE, get_storage());
