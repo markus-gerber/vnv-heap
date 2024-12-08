@@ -160,124 +160,25 @@ fn prev_power_of_two(num: usize) -> usize {
 
 #[cfg(test)]
 mod test {
-    use core::{alloc::Layout, mem::size_of};
-
     use crate::modules::{
-        nonresident_allocator::NonResidentBuddyAllocatorModule,
-        persistent_storage::{test::get_test_storage, PersistentStorageModule},
+        nonresident_allocator::test::{
+            test_non_resident_allocator_simple_generic, AllocatedRegion,
+        },
+        persistent_storage::PersistentStorageModule,
     };
 
-    use super::NonResidentAllocatorModule;
-
-    #[derive(Debug, Clone, Copy)]
-    struct AllocatedRegion {
-        offset: usize,
-        size: usize,
-    }
-
-    fn allocate<const SIZE: usize, S: PersistentStorageModule>(
-        size: usize,
-        allocator: &mut NonResidentBuddyAllocatorModule<SIZE>,
-        regions: &mut Vec<AllocatedRegion>,
-        storage: &mut S,
-    ) {
-        let offset = allocator
-            .allocate(
-                Layout::from_size_align(size, size_of::<usize>()).unwrap(),
-                storage,
-            )
-            .expect("should have space left");
-        regions.push(AllocatedRegion {
-            offset: offset,
-            size: size,
-        });
-    }
-
-    fn deallocate<const SIZE: usize, S: PersistentStorageModule>(
-        index: usize,
-        allocator: &mut NonResidentBuddyAllocatorModule<SIZE>,
-        regions: &mut Vec<AllocatedRegion>,
-        storage: &mut S,
-    ) -> AllocatedRegion {
-        let item = regions.remove(index);
-        allocator
-            .deallocate(
-                item.offset,
-                Layout::from_size_align(item.size, size_of::<usize>()).unwrap(),
-                storage,
-            )
-            .unwrap();
-
-        item
-    }
+    use super::NonResidentBuddyAllocatorModule;
 
     #[test]
-    fn test_non_resident_allocator_simple() {
-        let mut allocator: NonResidentBuddyAllocatorModule<16> =
-            NonResidentBuddyAllocatorModule::new();
-        let mut storage = get_test_storage("test_non_resident_allocator_no_overlap", TOTAL_SIZE);
-        const MIN_SIZE: usize = size_of::<usize>();
-        const TOTAL_SIZE: usize = MIN_SIZE * 4;
-        allocator.init(0, TOTAL_SIZE, &mut storage).unwrap();
-
-        let mut regions: Vec<AllocatedRegion> = Vec::new();
-
-        for _ in 0..4 {
-            allocate(MIN_SIZE, &mut allocator, &mut regions, &mut storage);
-            check_integrity(&regions, &allocator, &mut storage);
-        }
-
-        allocator
-            .allocate(
-                Layout::from_size_align(MIN_SIZE, MIN_SIZE).unwrap(),
-                &mut storage,
-            )
-            .expect_err("should have no space left");
-
-        check_integrity(&regions, &allocator, &mut storage);
-
-        for i in [2, 2, 1, 0] {
-            deallocate(i, &mut allocator, &mut regions, &mut storage);
-            check_integrity(&regions, &allocator, &mut storage);
-        }
-
-        // all items deallocated, should have enough space for big object again
-        allocate(TOTAL_SIZE, &mut allocator, &mut regions, &mut storage);
-        check_integrity(&regions, &allocator, &mut storage);
-
-        allocator
-            .allocate(
-                Layout::from_size_align(MIN_SIZE, MIN_SIZE).unwrap(),
-                &mut storage,
-            )
-            .expect_err("should have no space left");
-        check_integrity(&regions, &allocator, &mut storage);
-
-        deallocate(0, &mut allocator, &mut regions, &mut storage);
-        check_integrity(&regions, &allocator, &mut storage);
-    }
-
-    fn check_no_overlap(regions: &Vec<AllocatedRegion>) {
-        for (region, i) in regions.iter().zip(0..) {
-            for (cmp, j) in regions.iter().zip(0..) {
-                if i == j {
-                    continue;
-                }
-
-                assert!(
-                    (cmp.offset + cmp.size <= region.offset)
-                        || (region.offset + region.size <= cmp.offset),
-                    "allocated regions should not overlap"
-                )
-            }
-        }
+    pub(super) fn test_non_resident_allocator_simple() {
+        test_non_resident_allocator_simple_generic(check_integrity);
     }
 
     /// checks that the free list does not overlap itself
     /// and that it does no overlap with allocated regions
-    fn check_integrity<const ORDER: usize, S: PersistentStorageModule>(
+    fn check_integrity<S: PersistentStorageModule>(
         regions: &Vec<AllocatedRegion>,
-        allocator: &NonResidentBuddyAllocatorModule<ORDER>,
+        allocator: &NonResidentBuddyAllocatorModule<16>,
         storage: &mut S,
     ) {
         let mut items: Vec<AllocatedRegion> = regions.iter().map(|x| x.clone()).collect();
@@ -291,6 +192,5 @@ mod test {
             }
         }
 
-        check_no_overlap(&items);
     }
 }
