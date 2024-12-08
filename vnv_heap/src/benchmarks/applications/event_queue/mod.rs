@@ -16,37 +16,37 @@ fn run_event_queue_application<const OBJ_SIZE: usize, Q: EventQueue<OBJ_SIZE>, T
     assert!(queue.consume().is_none(), "list should be empty");
     assert!(queue.capacity() >= queue_length + 1);
 
-    let timer = T::start();
 
     let mut seed = 0;
+    for _ in 0..queue_length {
+        let mut obj = [0u8; OBJ_SIZE];
+        rand_data(&mut obj, seed);
+        seed += 1;
 
-    for _ in 0..1 {
-        for _ in 0..queue_length {
-            let mut obj = [0u8; OBJ_SIZE];
-            rand_data(&mut obj, seed);
-            seed += 1;
-    
-            queue.produce(obj);
-        }    
+        queue.produce(obj);
+    }
 
-        for _ in 0..iterations {
-            // first produce an object
-            let mut obj = [0u8; OBJ_SIZE];
-            rand_data(&mut obj, seed);
-            seed += 1;
-    
-            queue.produce(obj);
-    
-            // then consume an other one
-            black_box(queue.consume().unwrap());
-        }
-    
-        for _ in 0..queue_length {
-            black_box(queue.consume().unwrap());
-        }
+    let timer = T::start();
+
+    for _ in 0..iterations {
+        // first produce an object
+        let mut obj = [0u8; OBJ_SIZE];
+        rand_data(&mut obj, seed);
+        seed += 1;
+
+        queue.produce(obj);
+
+        // then consume an other one
+        black_box(queue.consume().unwrap());
     }
 
     let duration = timer.stop();
+
+    for _ in 0..queue_length {
+        black_box(queue.consume().unwrap());
+    }
+
+
     duration
 }
 
