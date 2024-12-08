@@ -66,6 +66,7 @@ pub extern "C" fn rust_main() {
     println!("Buffer Cutoff\n-> {} bytes", layout_info.cutoff_size);
     println!("Resident Object Metadata\n-> {} bytes", layout_info.resident_object_metadata);
     println!("Resident Object Dirty Size\n-> {} bytes", layout_info.object_dirty_size);
+    println!("Persist Access Point Size\n-> {} bytes", layout_info.persist_access_point_size);
 
     println!("############### FINISHED ###############")
 }

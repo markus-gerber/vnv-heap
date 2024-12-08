@@ -1,16 +1,12 @@
-: 40MHz
-I (95) boot.esp32c3: SPI Mode       : DIO
-I (99) boot.esp32c3: SPI Flash Size : 4MB
-I (103) boot: Enabling RNG early entropy source...
-I (107) boot: DRAM: lma 0x00000020 vma 0x3fc89c40 len 0x3974   (14708)
+x3fc89c40 len 0x3974   (14708)
 I (113) boot: IRAM: lma 0x0000399c vma 0x40380000 len 0x9c30   (39984)
 I (120) boot: padd: lma 0x0000d5d8 vma 0x00000000 len 0x2a20   (10784)
-I (126) boot: IMAP: lma 0x00010000 vma 0x42000000 len 0x7a30   (31280)
-I (132) boot: padd: lma 0x00017a38 vma 0x00000000 len 0x85c0   (34240)
-I (138) boot: DMAP: lma 0x00020000 vma 0x3c010000 len 0x24fc   (9468)
+I (126) boot: IMAP: lma 0x00010000 vma 0x42000000 len 0x7a58   (31320)
+I (132) boot: padd: lma 0x00017a60 vma 0x00000000 len 0x8598   (34200)
+I (138) boot: DMAP: lma 0x00020000 vma 0x3c010000 len 0x2528   (9512)
 I (144) boot: Image with 6 segments
-I (148) boot: DROM segment: paddr=00020000h, vaddr=3c010000h, size=02500h (  9472) map
-I (155) boot: IROM segment: paddr=00010000h, vaddr=42000000h, size=07A2Eh ( 31278) map
+I (148) boot: DROM segment: paddr=00020000h, vaddr=3c010000h, size=02530h (  9520) map
+I (155) boot: IROM segment: paddr=00010000h, vaddr=42000000h, size=07A58h ( 31320) map
 
 I (199) heap_runtime: ESP heap runtime init at 0x3fc90420 size 238 kB.
 
@@ -39,3 +35,5 @@ Resident Object Metadata
 -> 20 bytes
 Resident Object Dirty Size
 -> 17 bytes
+Persist Access Point Size
+-> 52 bytes

@@ -18,7 +18,6 @@ use crate::{
     }, shared_persist_lock::SharedPersistLock, vnv_list::VNVList, vnv_object::VNVObject, VNVArray, VNVConfig
 };
 use core::{
-    alloc::Layout,
     cell::RefCell,
     marker::PhantomData,
     mem::{size_of, ManuallyDrop},
@@ -33,12 +32,10 @@ static PERSIST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[derive(Debug)]
 pub struct LayoutInfo {
-    #[allow(unused)]
     pub cutoff_size: usize,
-    #[allow(unused)]
     pub resident_object_metadata: usize,
-    #[allow(unused)]
     pub object_dirty_size: usize,
+    pub persist_access_point_size: usize
 }
 
 /// Persists all existing heaps.
@@ -293,11 +290,12 @@ impl<
         &self.inner
     }
 
-    pub fn get_layout_info() -> LayoutInfo {
+    pub const fn get_layout_info() -> LayoutInfo {
         LayoutInfo {
             resident_object_metadata: size_of::<ResidentObjectMetadata>(),
             cutoff_size: calc_resident_buf_cutoff_size::<A, S>(),
-            object_dirty_size: ResidentObjectMetadata::fresh_object_dirty_size::<()>(false)
+            object_dirty_size: ResidentObjectMetadata::fresh_object_dirty_size::<()>(false),
+            persist_access_point_size: size_of::<PersistAccessPoint>()
         }
     }
 
