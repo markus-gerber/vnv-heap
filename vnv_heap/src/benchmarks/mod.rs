@@ -14,7 +14,8 @@ use microbenchmarks::*;
 
 pub(crate) mod common;
 
-
+mod applications;
+use applications::*;
 
 use crate::{
     modules::{
@@ -32,7 +33,8 @@ pub struct RunAllBenchmarkOptions {
     pub run_persistent_storage_benchmarks: bool,
     pub run_long_persistent_storage_benchmarks: bool,
     pub run_dirty_size_persist_latency: bool,
-    pub run_buffer_size_persist_latency: bool
+    pub run_buffer_size_persist_latency: bool,
+    pub run_event_queue_benchmarks: bool
 }
 
 impl Default for RunAllBenchmarkOptions {
@@ -47,7 +49,8 @@ impl Default for RunAllBenchmarkOptions {
             run_persistent_storage_benchmarks: false,
             run_long_persistent_storage_benchmarks: false,
             run_dirty_size_persist_latency: false,
-            run_buffer_size_persist_latency: false
+            run_buffer_size_persist_latency: false,
+            run_event_queue_benchmarks: false
         }
     }
 }
@@ -64,7 +67,8 @@ impl RunAllBenchmarkOptions {
             run_persistent_storage_benchmarks: true,
             run_long_persistent_storage_benchmarks: true,
             run_dirty_size_persist_latency: true,
-            run_buffer_size_persist_latency: true
+            run_buffer_size_persist_latency: true,
+            run_event_queue_benchmarks: true
         }
     }
     pub fn microbenchmarks() -> Self {
@@ -78,6 +82,19 @@ impl RunAllBenchmarkOptions {
             run_persistent_storage_benchmarks: true,
             run_long_persistent_storage_benchmarks: true,
             ..Default::default()
+        }
+    }
+    pub fn applications() -> Self {
+        Self {
+            run_event_queue_benchmarks: true,
+            ..Default::default()
+        }
+    }
+    pub fn all_except_persist() -> Self {
+        Self {
+            run_dirty_size_persist_latency: false,
+            run_buffer_size_persist_latency: false,
+            ..Self::all()
         }
     }
 }
@@ -108,6 +125,7 @@ pub fn run_all_benchmarks<
     iteration_count += StorageBenchmarkRunner::get_iteration_count(&options);
     iteration_count += DirtySizePersistLatencyRunner::get_iteration_count(&options);
     iteration_count += BufferSizePersistLatencyRunner::get_iteration_count(&options);
+    iteration_count += EventQueueBenchmarkRunner::get_iteration_count(&options);
     let mut handle_it = || {
         handle_curr_iteration(&mut curr_iteration, iteration_count);
     };
@@ -118,6 +136,7 @@ pub fn run_all_benchmarks<
     StorageBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     DirtySizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     BufferSizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    EventQueueBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     println!("")
 
 }

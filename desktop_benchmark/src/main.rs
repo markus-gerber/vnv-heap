@@ -54,7 +54,7 @@ fn main() {
                     run_long_persistent_storage_benchmarks: true,
                     ..Default::default()
                 }*/
-                RunAllBenchmarkOptions::microbenchmarks(),
+                RunAllBenchmarkOptions::all_except_persist(),
                 get_storage,
                 || 0,
             );
