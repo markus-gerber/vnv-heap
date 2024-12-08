@@ -53,7 +53,7 @@ class PlotLinesOptions(NamedTuple):
     scale: Literal['ms', 'us', 'µs', 'ns']
     data: list[LinePlotEntry]
     legend_cols: int | None
-    
+    norm: float | None
 
 def plot_lines(options: PlotLinesOptions):
     x_label = options["x_label"]
@@ -72,11 +72,19 @@ def plot_lines(options: PlotLinesOptions):
     min_x = 0
     max_x = 0
     for (line_data, i) in zip(data, range(0, len(data))):
-        data_scaled = scale_data(line_data["data"], scale)
+        data_curr = scale_data(line_data["data"], scale)
+
+        if "norm" in options:
+            norm = options["norm"]
+
+            data_curr["mean"] /= norm
+            data_curr["min"] /= norm
+            data_curr["max"] /= norm
+        
         sns.lineplot(
             ax=ax,
-            x=data_scaled[line_data["x"]],
-            y=data_scaled[line_data["y"]],
+            x=data_curr[line_data["x"]],
+            y=data_curr[line_data["y"]],
             label=line_data["name"],
             markers=["o"],
             marker=line_data["marker"],
@@ -88,8 +96,8 @@ def plot_lines(options: PlotLinesOptions):
         for line in ax.lines:
             line.set_linestyle("--")
 
-        min_x = min(min_x, min(data_scaled[line_data["x"]]))
-        max_x = max(max_x, max(data_scaled[line_data["x"]]))
+        min_x = min(min_x, min(data_curr[line_data["x"]]))
+        max_x = max(max_x, max(data_curr[line_data["x"]]))
 
     # set_grid(64, max_x, ax)
 
@@ -100,7 +108,7 @@ def plot_lines(options: PlotLinesOptions):
         ax.set_ylabel(y_label)
 
     ncol = 0
-    if options["legend_cols"]:
+    if "legend_cols" in options:
         ncol = options["legend_cols"]
     else:
         ncol = len(ax.legend().get_lines())
