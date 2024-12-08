@@ -7,6 +7,8 @@ mod file_storage;
 #[cfg(not(no_std))]
 pub use file_storage::FilePersistentStorageModule;
 
+mod truncated;
+pub use truncated::*;
 
 pub trait PersistentStorageModule {
     /// Reads a region `[offset, offset + dest.len())` to a storage location `dest` that is at least `dest.len()` bytes big.
