@@ -18,10 +18,12 @@ def exit_program():
 signal.signal(signal.SIGINT, lambda _, __: exit_program())
 
 print("> cargo build")
+sys.stdout.flush()
 assert subprocess.run(["cargo", "build"]).returncode == 0
 
 print("")
 print("> ../target/debug/desktop_persist")
+sys.stdout.flush()
 process = subprocess.Popen("../target/debug/desktop_persist", env={"RUST_BACKTRACE": "1"})
 
 time.sleep(1)
