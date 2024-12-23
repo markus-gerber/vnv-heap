@@ -260,7 +260,7 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
 }
 
 
-pub(super) const fn calc_obj_cnt_and_rem_size_max_latency(
+pub(super) const fn calc_obj_cnt_and_rem_size_max_objects(
     dirty_size: usize,
     buf_size: usize,
 ) -> (usize, usize, usize, bool) {
@@ -368,7 +368,7 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_latency(
 }
 
 #[derive(Serialize)]
-pub struct WorstCasePersistLatencyBenchmarkOptions {
+pub struct PersistLatencyBenchmarkOptions {
     dirty_size: usize,
     buffer_size: usize,
     rem_object_size: usize,
@@ -379,7 +379,7 @@ pub struct WorstCasePersistLatencyBenchmarkOptions {
     cutoff_size: usize
 }
 
-pub(super) struct WorstCasePersistLatencyBenchmark<
+pub(super) struct PersistLatencyBenchmark<
     'a,
     'b,
     const BUFFER_SIZE: usize,
@@ -414,7 +414,7 @@ pub(super) struct WorstCasePersistLatencyBenchmark<
 }
 
 impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJECT_SIZE: usize>
-    WorstCasePersistLatencyBenchmark<'a, 'b, BUFFER_SIZE, CUTOFF_SIZE, REM_OBJECT_SIZE>
+    PersistLatencyBenchmark<'a, 'b, BUFFER_SIZE, CUTOFF_SIZE, REM_OBJECT_SIZE>
 {
     pub(super) fn new<S: PersistentStorageModule>(
         dirty_size: usize,
@@ -508,15 +508,15 @@ impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJEC
 }
 
 impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJECT_SIZE: usize>
-    PersistBenchmark<WorstCasePersistLatencyBenchmarkOptions>
-    for WorstCasePersistLatencyBenchmark<'a, 'b, BUFFER_SIZE, CUTOFF_SIZE, REM_OBJECT_SIZE>
+    PersistBenchmark<PersistLatencyBenchmarkOptions>
+    for PersistLatencyBenchmark<'a, 'b, BUFFER_SIZE, CUTOFF_SIZE, REM_OBJECT_SIZE>
 {
     fn get_name(&self) -> &'static str {
         self.benchmark_name
     }
 
-    fn get_bench_options(&self) -> WorstCasePersistLatencyBenchmarkOptions {
-        WorstCasePersistLatencyBenchmarkOptions {
+    fn get_bench_options(&self) -> PersistLatencyBenchmarkOptions {
+        PersistLatencyBenchmarkOptions {
             buffer_size: BUFFER_SIZE,
             dirty_size: self.dirty_size,
             object_cnt: self.objects.len(),

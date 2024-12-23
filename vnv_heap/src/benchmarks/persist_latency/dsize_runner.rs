@@ -1,6 +1,6 @@
 use std::mem::{align_of, size_of};
 
-use worst_case::{calc_obj_cnt_and_rem_size_max_dirty, calc_obj_cnt_and_rem_size_max_latency, WorstCasePersistLatencyBenchmark};
+use bench::{calc_obj_cnt_and_rem_size_max_dirty, calc_obj_cnt_and_rem_size_max_objects, PersistLatencyBenchmark};
 
 use super::*;
 use crate::{
@@ -137,7 +137,7 @@ impl BenchmarkRunner for DirtySizePersistLatencyRunner {
                     assert_eq!(rem_dirty, REM_DIRTY_SIZE);
                 }
 
-                const RES: (usize, usize, usize, bool) = calc_obj_cnt_and_rem_size_max_latency(REM_DIRTY_SIZE, BUF_SIZE - RESIDENT_CUTOFF_SIZE);
+                const RES: (usize, usize, usize, bool) = calc_obj_cnt_and_rem_size_max_objects(REM_DIRTY_SIZE, BUF_SIZE - RESIDENT_CUTOFF_SIZE);
                 const OBJ_CNT: usize = RES.0;
                 const DIRTY_NORMAL_OBJECTS: usize = RES.1;
                 const REM_OBJ_SIZE: usize = RES.2;
@@ -146,11 +146,11 @@ impl BenchmarkRunner for DirtySizePersistLatencyRunner {
 //                const REST: usize = remaining_dirty_size(REM_DIRTY_SIZE, BUF_SIZE - RESIDENT_CUTOFF_SIZE, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY);
 //                println!("obj_cnt: {}, dirty_objects: {}, rest: {}, rest dirty?: {}, DIRTYREST: {}", OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY, REST);
 
-                let bench: WorstCasePersistLatencyBenchmark<
+                let bench: PersistLatencyBenchmark<
                     BUF_SIZE,
                     RESIDENT_CUTOFF_SIZE,
                     REM_OBJ_SIZE,
-                > = WorstCasePersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "worst_case_persist_latency_dirty_size");
+                > = PersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "max_objects_persist_latency_dirty_size");
                 bench.run_benchmark::<TIMER, TRIGGER>(run_options, get_ticks, &mut trigger);
             });
             for_dirty_size!(DIRTY_SIZE, {
@@ -173,11 +173,11 @@ impl BenchmarkRunner for DirtySizePersistLatencyRunner {
 //                println!("obj_cnt: {}, dirty_objects: {}, rest: {}, rest dirty?: {}, DIRTYREST: {}", OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_SIZE, REM_OBJ_DIRTY, REST);
 
 
-                let bench: WorstCasePersistLatencyBenchmark<
+                let bench: PersistLatencyBenchmark<
                     BUF_SIZE,
                     RESIDENT_CUTOFF_SIZE,
                     REM_OBJ_SIZE,
-                > = WorstCasePersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "max_dirty_persist_latency_dirty_size");
+                > = PersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "max_dirty_persist_latency_dirty_size");
                 bench.run_benchmark::<TIMER, TRIGGER>(run_options, get_ticks, &mut trigger);
             });
         }

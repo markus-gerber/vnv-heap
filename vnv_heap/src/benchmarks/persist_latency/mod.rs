@@ -4,7 +4,7 @@ mod dsize_runner;
 // buffer size runner
 mod bsize_runner;
 
-mod worst_case;
+mod bench;
 pub(super) use dsize_runner::*;
 pub(super) use bsize_runner::*;
 
