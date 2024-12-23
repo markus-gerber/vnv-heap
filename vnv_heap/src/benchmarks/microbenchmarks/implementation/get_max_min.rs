@@ -6,11 +6,12 @@ use crate::{
     VNVHeap, VNVObject,
 };
 use core::hint::black_box;
+use std::mem::size_of;
 use serde::Serialize;
 
 use super::{Benchmark, ModuleOptions, Timer};
 
-const SMALLEST_OBJ_SIZE: usize = 0;
+const SMALLEST_OBJ_SIZE: usize = size_of::<usize>();
 type SmallestObjData = [u8; SMALLEST_OBJ_SIZE];
 
 #[derive(Serialize)]

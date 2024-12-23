@@ -1,4 +1,4 @@
-use core::{any::type_name, mem::size_of};
+use core::any::type_name;
 
 #[cfg(not(test))]
 use std::io::stdout;
@@ -120,25 +120,49 @@ pub fn run_all_benchmarks<
         *curr_iteration += 1;
     }
 
-    iteration_count += ImplementationBenchmarkRunner::get_iteration_count(&options);
-    iteration_count += BaselineBenchmarkRunner::get_iteration_count(&options);
-    iteration_count += StorageBenchmarkRunner::get_iteration_count(&options);
-    iteration_count += DirtySizePersistLatencyRunner::get_iteration_count(&options);
-    iteration_count += BufferSizePersistLatencyRunner::get_iteration_count(&options);
-    iteration_count += EventQueueBenchmarkRunner::get_iteration_count(&options);
+    // the if conditions are used so the compiler can optimize and ignore runners that are not used
+    if options.run_allocate_benchmarks || options.run_get_benchmarks || options.run_deallocate_benchmarks {
+        iteration_count += ImplementationBenchmarkRunner::get_iteration_count(&options);
+    }
+    if options.run_allocate_benchmarks || options.run_get_benchmarks || options.run_deallocate_benchmarks {
+        iteration_count += BaselineBenchmarkRunner::get_iteration_count(&options);
+    }
+    if options.run_persistent_storage_benchmarks || options.run_long_persistent_storage_benchmarks {
+        iteration_count += StorageBenchmarkRunner::get_iteration_count(&options);
+    }
+    if options.run_dirty_size_persist_latency {
+        iteration_count += DirtySizePersistLatencyRunner::get_iteration_count(&options);
+    }
+    if options.run_buffer_size_persist_latency {
+        iteration_count += BufferSizePersistLatencyRunner::get_iteration_count(&options);
+    }
+    if options.run_event_queue_benchmarks {
+        iteration_count += EventQueueBenchmarkRunner::get_iteration_count(&options);
+    }
     let mut handle_it = || {
         handle_curr_iteration(&mut curr_iteration, iteration_count);
     };
 
     // run benchmarks
-    ImplementationBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
-    BaselineBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
-    StorageBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
-    DirtySizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
-    BufferSizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
-    EventQueueBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    if options.run_allocate_benchmarks || options.run_get_benchmarks || options.run_deallocate_benchmarks {
+        ImplementationBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    }
+    if options.run_allocate_benchmarks || options.run_get_benchmarks || options.run_deallocate_benchmarks {
+        BaselineBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    }
+    if options.run_persistent_storage_benchmarks || options.run_long_persistent_storage_benchmarks {
+        StorageBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    }
+    if options.run_dirty_size_persist_latency {
+        DirtySizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    }
+    if options.run_buffer_size_persist_latency {
+        BufferSizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    }
+    if options.run_event_queue_benchmarks {
+        EventQueueBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    }
     println!("")
-
 }
 
 pub(self) trait BenchmarkRunner {

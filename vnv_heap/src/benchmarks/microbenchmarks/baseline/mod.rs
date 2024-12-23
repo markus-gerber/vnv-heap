@@ -1,6 +1,5 @@
 
 use super::super::common::MemoryManager;
-use super::super::common as model;
 
 // import benchmarks
 mod baseline_get_min;
@@ -30,6 +29,7 @@ pub use baseline_deallocate_min_max::*;
 pub use baseline_deallocate_max_min::*;
 
 use super::*;
+use core::mem::size_of;
 
 type A = LinkedListAllocatorModule;
 

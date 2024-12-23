@@ -22,6 +22,8 @@ pub use get_max_min::*;
 pub use get_min::*;
 pub use get_min_max::*;
 
+use core::mem::size_of;
+
 use crate::{
     calc_resident_buf_cutoff_size, modules::object_management::DefaultObjectManagementModule, resident_object_manager::resident_object_metadata::ResidentObjectMetadata, VNVConfig
 };

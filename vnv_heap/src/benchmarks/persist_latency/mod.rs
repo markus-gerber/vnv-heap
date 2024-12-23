@@ -20,14 +20,11 @@ use crate::benchmarks::BenchmarkRunInfo;
 
 use crate::{
     benchmarks::BenchmarkRunResult,
-    modules::object_management::DefaultObjectManagementModule,
+    modules::{allocator::LinkedListAllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, object_management::DefaultObjectManagementModule, persistent_storage::PersistentStorageModule},
     vnv_persist_all, VNVConfig, VNVHeap,
 };
 
 use super::{
-    microbenchmarks::{
-        LinkedListAllocatorModule, NonResidentBuddyAllocatorModule, PersistentStorageModule,
-    },
     BenchmarkRunOptions, Timer,
 };
 
