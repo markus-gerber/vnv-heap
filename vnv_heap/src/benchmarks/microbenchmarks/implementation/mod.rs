@@ -4,8 +4,8 @@
 // mod deallocate_case1;
 // mod deallocate_max;
 // mod deallocate_min;
-mod get_max_old;
 mod get_max;
+mod get_max_old;
 mod get_max_min;
 mod get_min;
 mod get_min_max;
@@ -16,8 +16,8 @@ mod get_min_max;
 // pub use deallocate_case1::*;
 // pub use deallocate_max::*;
 // pub use deallocate_min::*;
-pub use get_max_old::*;
 pub use get_max::*;
+pub use get_max_old::*;
 pub use get_max_min::*;
 pub use get_min::*;
 pub use get_min_max::*;
@@ -294,13 +294,13 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
                 let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
-                let bench: GetMaxOldBenchmark<
+                let bench: GetMaxBenchmark<
                     A,
                     NonResidentBuddyAllocatorModule<19>,
                     M,
                     SIZE,
                     BLOCKER_SIZE,
-                > = GetMaxOldBenchmark::new(&heap, start_res_size);
+                > = GetMaxBenchmark::new(&heap, start_res_size);
                 bench.run_benchmark::<TIMER>(run_options);
             });
             for_obj_size!(SIZE, {
@@ -313,13 +313,13 @@ impl BenchmarkRunner for ImplementationBenchmarkRunner {
                 let res_size = buf.len();
                 let heap = get_bench_heap(&mut buf, res_size, get_storage());
                 let start_res_size = res_size - RESIDENT_CUTOFF_SIZE;
-                let bench: GetMaxBenchmark<
+                let bench: GetMaxOldBenchmark<
                     A,
                     NonResidentBuddyAllocatorModule<19>,
                     M,
                     SIZE,
                     REM_SIZE
-                > = GetMaxBenchmark::new(&heap, start_res_size, BLOCKER_CNT);
+                > = GetMaxOldBenchmark::new(&heap, start_res_size, BLOCKER_CNT);
                 bench.run_benchmark::<TIMER>(run_options);
             });
             for_obj_size!(SIZE, {
