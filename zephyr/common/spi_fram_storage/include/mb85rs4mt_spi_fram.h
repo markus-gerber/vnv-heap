@@ -14,7 +14,7 @@
 
 struct spi_dt_spec mb85rs4mt_init(int* error) {
 	struct spi_config spi_cfg = {
-		.frequency = 20000000U,
+		.frequency = 40000000U,
 		.operation = SPI_WORD_SET(8),
 		.cs = SPI_CS_CONTROL_INIT(DT_NODELABEL(spidev), 10),
 	};

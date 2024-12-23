@@ -8,7 +8,8 @@ use spi_fram_storage::MB85RS4MTFramStorageModule;
 use vnv_heap::benchmarks::{
     PersistTrigger, BenchmarkRunOptions, Timer, run_all_benchmarks, RunAllBenchmarkOptions
 };
-use core::mem::MaybeUninit;
+use vnv_heap::modules::persistent_storage::SlicedStorageModule;
+use core::mem::{MaybeUninit, size_of};
 
 extern "C" {
     pub fn helper_k_cycle_get_32() -> u32;
@@ -32,7 +33,7 @@ pub extern "C" fn rust_main() {
     run_all_benchmarks::<
         ZephyrTimer,
         ZephyrPersistTrigger,
-        MB85RS4MTFramStorageModule,
+        SlicedStorageModule::<SLICE_SIZE, MB85RS4MTFramStorageModule>,
         _
     >(
         BenchmarkRunOptions {
@@ -42,9 +43,11 @@ pub extern "C" fn rust_main() {
             result_buffer: &mut [0; 10],
         },
         RunAllBenchmarkOptions {
+            run_persistent_storage_benchmarks: true,
+            run_baseline_get_benchmarks: true,
+            run_get_benchmarks: true,
             run_dirty_size_persist_latency: true,
-            run_buffer_size_persist_latency: true,
-        //    run_persistent_storage_benchmarks: true,
+            run_event_queue_benchmarks: true,
             ..Default::default()
         },
         //RunAllBenchmarkOptions::all(),
@@ -183,7 +186,10 @@ impl Drop for ZephyrPersistTrigger {
     }
 }
 
+const SLICE_SIZE: usize = size_of::<usize>();
 
-fn get_storage() -> MB85RS4MTFramStorageModule {
-    unsafe { MB85RS4MTFramStorageModule::new() }.unwrap()
+fn get_storage() -> SlicedStorageModule::<SLICE_SIZE, MB85RS4MTFramStorageModule> {
+    let inner_storage = unsafe { MB85RS4MTFramStorageModule::new() }.unwrap();
+
+    SlicedStorageModule::new(inner_storage)
 }
