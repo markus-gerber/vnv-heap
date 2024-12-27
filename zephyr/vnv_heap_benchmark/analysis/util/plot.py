@@ -26,99 +26,182 @@ def save_plot(name: str, save_asset: bool = False):
         thesis_dir = os.environ["VNV_HEAP_THESIS_DIR"]
         plt.savefig(f"{thesis_dir}/figures/plot_{name}.pdf", bbox_inches='tight')
 
+    if "VNV_HEAP_PAPER_DIR" in os.environ:
+        paper_dir = os.environ["VNV_HEAP_PAPER_DIR"]
+        plt.savefig(f"{paper_dir}/assets/{name}.pdf", bbox_inches='tight')
+
     if save_asset:
         plt.savefig(f"../../../assets/{name}_plot.svg", bbox_inches='tight')
 
-def set_theme(colors=3, skip=0, ignore=-1):
-    sns.set_theme()
+def set_theme(colors=2, skip=0, ignore=-1):
+    style = sns.axes_style("whitegrid")
+    style["grid.color"] = "#ddd"
+    style["axes.edgecolor"] = "#ddd"
+    style["axes.spines.right"] = False
+    style["axes.spines.top"] = False
 
-    palette = sns.color_palette("mako", n_colors=colors)[skip:]
-    if ignore != -1:
-        palette.pop(ignore)
+    sns.set_theme(style=style)
+    sns.set_context("paper", rc={"font.size":8, "font.family": "Libertine", "axes.titlesize":8, "axes.labelsize":8})
+
+    #palette = sns.color_palette("mako", n_colors=colors)[skip:]
+    #if ignore != -1:
+    #    palette.pop(ignore)
+    if colors == 1:
+        palette = [plot_colors["heap"]]
+    elif colors == 2:
+        palette = [plot_colors["baseline"], plot_colors["heap"]]
+    elif colors == 3:
+        palette = [plot_colors["baseline"], plot_colors["baseline2"], plot_colors["heap"]]
 
     sns.set_palette(palette=palette)
     return palette
 
 
-class LinePlotEntry(NamedTuple):
-    name: str
-    x: str
-    y: str
-    marker: str
-    data: pd.DataFrame
+# class LinePlotEntry(NamedTuple):
+#     name: str
+#     x: str
+#     y: str
+#     marker: str
+#     use_edge_color: bool | None
+#     data: pd.DataFrame
     
-class PlotLinesOptions(NamedTuple):
-    x_label: str | None
-    y_label: str | None
-    scale: Literal['ms', 'us', 'µs', 'ns']
-    data: list[LinePlotEntry]
-    legend_cols: int | None
-    norm: float | None
+# class PlotLinesOptions(NamedTuple):
+#     x_label: str | None
+#     y_label: str | None
+#     scale: Literal['ms', 'us', 'µs', 'ns']
+#     data: list[LinePlotEntry]
+#     legend_cols: int | None
+#     norm: float | None
+#     height: float | None
+#     width: float | None
+#     title: str | None
 
-def plot_lines(options: PlotLinesOptions):
-    x_label = options["x_label"]
-    y_label = options["y_label"]
-    scale = options["scale"]
-    data = options["data"]
-
-    palette = set_theme(colors=len(data))
-
-    fig = plt.figure(1)
-    fig.set_figheight(6)
-    fig.set_figwidth(10)
-
-    ax = plt.subplot()
-
-    min_x = 0
-    max_x = 0
-    for (line_data, i) in zip(data, range(0, len(data))):
-        data_curr = scale_data(line_data["data"], scale)
-
-        if "norm" in options:
-            norm = options["norm"]
-
-            data_curr["mean"] /= norm
-            data_curr["min"] /= norm
-            data_curr["max"] /= norm
-        
-        sns.lineplot(
-            ax=ax,
-            x=data_curr[line_data["x"]],
-            y=data_curr[line_data["y"]],
-            label=line_data["name"],
-            markers=["o"],
-            marker=line_data["marker"],
-            markerfacecolor=palette[i],
-            color="#aaaaaa",
-            dashes=True
-        )
-        
-        for line in ax.lines:
-            line.set_linestyle("--")
-
-        min_x = min(min_x, min(data_curr[line_data["x"]]))
-        max_x = max(max_x, max(data_curr[line_data["x"]]))
-
-    # set_grid(64, max_x, ax)
-
-    if x_label:
-        ax.set_xlabel(x_label)
-
-    if y_label:
-        ax.set_ylabel(y_label)
-
-    ncol = 0
-    if "legend_cols" in options:
-        ncol = options["legend_cols"]
+def plot_lines(options: dict | list[dict]):
+    if type(options) == dict:
+        option_list = [options]
+    elif type(options) == list:
+        option_list = options
     else:
-        ncol = len(ax.legend().get_lines())
+        raise Exception("illegal input")
 
-    ax.legend(
-        loc = "lower center",
-        bbox_to_anchor=(.5, 1),
-        ncol=ncol,
-        title=None,
-        frameon=False
-    )
+    if "height" not in option_list[0]:
+        figheight = 3.3
+    else:
+        figheight = 3.3*option_list[0]["height"]
 
-    return ax
+    if "width" not in option_list[0]:
+        figwidth = 3.3
+    else:
+        figwidth = 3.3 * option_list[0]["width"]
+
+    palette = set_theme(colors=len(option_list[0]["data"]))
+
+    (fig, axes) = plt.subplots(1, len(option_list), figsize=(figwidth, figheight), sharey=True)
+    if len(option_list) == 1:
+        axes = [axes]
+        
+    for (i, options) in enumerate(option_list):
+        ax = axes[i]
+            
+        x_label = options["x_label"]
+        y_label = options["y_label"]
+        scale = options["scale"]
+        data = options["data"]
+
+        min_x = 0
+        max_x = 0
+        for (line_data, i) in zip(data, range(0, len(data))):
+            data_curr = scale_data(line_data["data"], scale)
+
+            if "norm" in options:
+                norm = options["norm"]
+
+                data_curr["mean"] /= norm
+                data_curr["min"] /= norm
+                data_curr["max"] /= norm
+            
+            if "use_edge_color" in line_data and line_data["use_edge_color"]:
+                markerfacecolor = "None"
+                markeredgecolor = palette[i]
+            else:
+                markerfacecolor = palette[i]
+                markeredgecolor = "None"
+            
+            sns.lineplot(
+                ax=ax,
+                x=data_curr[line_data["x"]],
+                y=data_curr[line_data["y"]],
+                label=line_data["name"],
+                markers=["o"],
+                marker=line_data["marker"],
+                markerfacecolor=markerfacecolor,
+                markeredgecolor=markeredgecolor,
+                color="#bbb",
+                linewidth=1,
+                dashes=True,
+                clip_on=False,
+                zorder=1,
+            )
+
+            sns.scatterplot(
+                ax=ax,
+                x=data_curr[line_data["x"]],
+                y=data_curr[line_data["y"]],
+                markers=["o"],
+                marker=line_data["marker"],
+                facecolor=markerfacecolor,
+                edgecolor=markeredgecolor,
+                linewidth=1,
+                clip_on=False,
+                zorder=3,
+            )
+            
+            for line in ax.lines:
+                line.set_linestyle("--")
+
+            min_x = min(min_x, min(data_curr[line_data["x"]]))
+            max_x = max(max_x, max(data_curr[line_data["x"]]))
+
+        # set_grid(64, max_x, ax)
+
+        if x_label:
+            ax.set_xlabel(x_label)
+
+        if y_label:
+            ax.set_ylabel(y_label)
+            
+        if "title" in options:
+            ax.set_title(options["title"], fontweight='bold')
+
+        ncol = 0
+        if "legend_cols" in options:
+            ncol = options["legend_cols"]
+        else:
+            ncol = len(ax.legend().get_lines())
+
+        if len(ax.get_legend().legend_handles) != 0:
+            if "title" in options:
+                ax.legend(
+                    loc = "lower center",
+                    bbox_to_anchor=(.5, 1.1),
+                    ncol=len(ax.get_legend().legend_handles),
+                    title=None,
+                    frameon=False
+                )
+            else:
+                ax.legend(
+                    loc = "lower center",
+                    bbox_to_anchor=(.5, 1),
+                    ncol=len(ax.get_legend().legend_handles),
+                    title=None,
+                    frameon=False
+                )
+
+    return axes
+
+plot_colors = {
+    "heap": sns.color_palette("tab10")[0], # blue
+    "baseline": sns.color_palette("tab10")[3], # red
+    "baseline2": sns.color_palette("tab10")[1] # orange
+}
+
