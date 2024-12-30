@@ -44,7 +44,7 @@ const RESIDENT_CUTOFF_SIZE: usize = {
 
 // NOTE: if you change one of these three variables
 // you also have to update the value in the for_obj_size macro!
-const BUF_SIZE: usize = 1 * 1024 + RESIDENT_CUTOFF_SIZE;
+const BUF_SIZE: usize = 1 * 1024 + RESIDENT_CUTOFF_SIZE + size_of::<ResidentObjectMetadata>();
 const STEP_SIZE: usize = 16;
 const MIN_OBJ_SIZE: usize = 8;
 const MIN_OBJ_SIZE_RANGE: usize = 16;
@@ -83,6 +83,7 @@ macro_rules! for_obj_size_impl {
     ($index: ident, $inner: expr, $value: expr) => {
         {
             static_assertions::const_assert_eq!($value, STEP_COUNT);
+            static_assertions::const_assert_eq!(MAX_OBJ_SIZE, 1 * 1024);
             if MIN_OBJ_SIZE != MIN_OBJ_SIZE_RANGE {
                 const $index: usize = MIN_OBJ_SIZE;
                 $inner
@@ -114,10 +115,10 @@ macro_rules! for_obj_size {
         // because of the size of the metadata
         // STEP_COUNT has a different value for different target platforms!
         #[cfg(target_pointer_width = "32")]
-        for_obj_size_impl!($index, $inner, 62);
+        for_obj_size_impl!($index, $inner, 63);
 
         #[cfg(target_pointer_width = "64")]
-        for_obj_size_impl!($index, $inner, 60);
+        for_obj_size_impl!($index, $inner, 63);
     };
 }
 

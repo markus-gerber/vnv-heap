@@ -124,7 +124,7 @@ pub fn run_all_benchmarks<
     if options.run_allocate_benchmarks || options.run_get_benchmarks || options.run_deallocate_benchmarks {
         iteration_count += ImplementationBenchmarkRunner::get_iteration_count(&options);
     }
-    if options.run_allocate_benchmarks || options.run_get_benchmarks || options.run_deallocate_benchmarks {
+    if options.run_baseline_allocate_benchmarks || options.run_baseline_deallocate_benchmarks || options.run_baseline_get_benchmarks {
         iteration_count += BaselineBenchmarkRunner::get_iteration_count(&options);
     }
     if options.run_persistent_storage_benchmarks || options.run_long_persistent_storage_benchmarks {
@@ -147,7 +147,7 @@ pub fn run_all_benchmarks<
     if options.run_allocate_benchmarks || options.run_get_benchmarks || options.run_deallocate_benchmarks {
         ImplementationBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     }
-    if options.run_allocate_benchmarks || options.run_get_benchmarks || options.run_deallocate_benchmarks {
+    if options.run_baseline_allocate_benchmarks || options.run_baseline_deallocate_benchmarks || options.run_baseline_get_benchmarks {
         BaselineBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     }
     if options.run_persistent_storage_benchmarks || options.run_long_persistent_storage_benchmarks {

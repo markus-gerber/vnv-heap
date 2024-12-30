@@ -5,8 +5,8 @@ mod dsize_runner;
 mod bsize_runner;
 
 mod bench;
-pub(super) use dsize_runner::*;
 pub(super) use bsize_runner::*;
+pub(super) use dsize_runner::*;
 
 use std::sync::atomic::AtomicBool;
 
@@ -20,13 +20,16 @@ use crate::benchmarks::BenchmarkRunInfo;
 
 use crate::{
     benchmarks::BenchmarkRunResult,
-    modules::{allocator::LinkedListAllocatorModule, nonresident_allocator::NonResidentBuddyAllocatorModule, object_management::DefaultObjectManagementModule, persistent_storage::PersistentStorageModule},
+    modules::{
+        allocator::LinkedListAllocatorModule,
+        nonresident_allocator::NonResidentBuddyAllocatorModule,
+        object_management::DefaultObjectManagementModule,
+        persistent_storage::PersistentStorageModule,
+    },
     vnv_persist_all, VNVConfig, VNVHeap,
 };
 
-use super::{
-    BenchmarkRunOptions, Timer,
-};
+use super::{BenchmarkRunOptions, Timer};
 
 pub type GetCurrentTicks = fn() -> u32;
 
@@ -49,17 +52,15 @@ fn get_ticks_dummy() -> u32 {
     0
 }
 
+type A = LinkedListAllocatorModule;
+type N = NonResidentBuddyAllocatorModule<19>;
+type M = DefaultObjectManagementModule;
+
 fn get_persist_bench_heap<'a, S: PersistentStorageModule + 'static>(
     buf: &'a mut [u8],
     max_dirty: usize,
     storage: S,
-) -> VNVHeap<
-    'a,
-    LinkedListAllocatorModule,
-    NonResidentBuddyAllocatorModule<19>,
-    DefaultObjectManagementModule,
-    S,
-> {
+) -> VNVHeap<'a, A, N, M, S> {
     let config = VNVConfig {
         max_dirty_bytes: max_dirty,
     };
@@ -136,7 +137,7 @@ trait PersistBenchmark<O: Serialize> {
         trigger.stop_persist_trigger();
 
         assert!(FINISHED.load(std::sync::atomic::Ordering::SeqCst));
-        
+
         unsafe {
             let res = RESULTS.result_list.as_mut().unwrap();
             assert_eq!(res.len(), options.result_buffer.len());
@@ -202,7 +203,7 @@ fn trigger_persist() {
 
         helper.result_list.as_mut().unwrap()[helper.result_index] -= ticks;
         helper.result_index += 1;
-        
+
         if helper.result_index >= helper.result_list.as_mut().unwrap().len() {
             // finished
             FINISHED.store(true, std::sync::atomic::Ordering::SeqCst);

@@ -13,6 +13,9 @@ pub use truncated::*;
 mod sliced;
 pub use sliced::*;
 
+mod dummy;
+pub use dummy::*;
+
 pub trait PersistentStorageModule {
     /// Reads a region `[offset, offset + dest.len())` to a storage location `dest` that is at least `dest.len()` bytes big.
     ///

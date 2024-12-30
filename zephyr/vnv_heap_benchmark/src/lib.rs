@@ -44,10 +44,11 @@ pub extern "C" fn rust_main() {
         },
         RunAllBenchmarkOptions {
             run_persistent_storage_benchmarks: true,
-            run_baseline_get_benchmarks: true,
-            run_get_benchmarks: true,
+            // run_baseline_get_benchmarks: true,
+            // run_get_benchmarks: true,
             run_dirty_size_persist_latency: true,
-            run_event_queue_benchmarks: true,
+            run_buffer_size_persist_latency: true,
+            // run_event_queue_benchmarks: true,
             ..Default::default()
         },
         //RunAllBenchmarkOptions::all(),
@@ -186,7 +187,7 @@ impl Drop for ZephyrPersistTrigger {
     }
 }
 
-const SLICE_SIZE: usize = size_of::<usize>();
+const SLICE_SIZE: usize = 4;
 
 fn get_storage() -> SlicedStorageModule::<SLICE_SIZE, MB85RS4MTFramStorageModule> {
     let inner_storage = unsafe { MB85RS4MTFramStorageModule::new() }.unwrap();

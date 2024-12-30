@@ -6,7 +6,7 @@ pub use persistent_storage_write::*;
 
 use super::*;
 
-const STEP_SIZE: usize = 16;
+const STEP_SIZE: usize = 4;
 const MIN_OBJ_SIZE: usize = 0;
 const MAX_OBJ_SIZE: usize = 8 * 1024;
 

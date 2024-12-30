@@ -6,7 +6,10 @@ use super::*;
 use crate::{
     benchmarks::{
         BenchmarkRunOptions, BenchmarkRunner, RunAllBenchmarkOptions, Timer,
-    }, calc_resident_buf_cutoff_size, modules::allocator::LinkedListAllocatorModule, resident_object_manager::resident_object_metadata::ResidentObjectMetadata, util::round_up_to_nearest
+    }, calc_resident_buf_cutoff_size, modules::{
+        persistent_storage::DummyStorageModule,
+        allocator::LinkedListAllocatorModule
+    }, resident_object_manager::resident_object_metadata::ResidentObjectMetadata, util::round_up_to_nearest, VNVObject
 };
 
 use super::{GetCurrentTicks, PersistTrigger, PersistentStorageModule};
@@ -25,22 +28,29 @@ const RESIDENT_CUTOFF_SIZE: usize = {
     round_up_to_nearest(tmp, align_of::<usize>())
 };
 
-// NOTE: if you change one of these three variables
-// you also have to update the value in the for_obj_size macro!
-const BUF_SIZE: usize = 4 * 1024;
-const STEP_SIZE: usize = 32;
-const MIN_DIRTY_SIZE: usize = RESIDENT_CUTOFF_SIZE;
-const MIN_DIRTY_SIZE_ROUNDED: usize = {
-    round_up_to_nearest(MIN_DIRTY_SIZE, STEP_SIZE)
+const VNV_HEAP_RAM_OVERHEAD: usize = {
+    size_of::<VNVHeap<'_, A, N, M, DummyStorageModule>>()
+        + size_of::<VNVObject<'_, '_, (), A, N, M>>()
+        + VNVHeap::<'_, A, N, M, DummyStorageModule>::get_layout_info().persist_access_point_size
 };
 
+// NOTE: if you change one of these three variables
+// you also have to update the value in the for_obj_size macro!
+const BUF_SIZE: usize = 4 * 1024 - VNV_HEAP_RAM_OVERHEAD;
+const STEP_SIZE: usize = 32;
 const MAX_DIRTY_SIZE: usize = BUF_SIZE;
+
+const MIN_DIRTY_SIZE: usize = RESIDENT_CUTOFF_SIZE;
+const MIN_DIRTY_SIZE_ROUNDED: usize = {
+    MAX_DIRTY_SIZE - (((MAX_DIRTY_SIZE - MIN_DIRTY_SIZE) / STEP_SIZE) * STEP_SIZE) 
+};
 
 const STEP_COUNT: usize = (MAX_DIRTY_SIZE - MIN_DIRTY_SIZE_ROUNDED) / STEP_SIZE + 1;
 
 macro_rules! for_dirty_size_impl {
     ($index: ident, $inner: expr, $value: expr) => {
         static_assertions::const_assert_eq!($value, STEP_COUNT);
+        static_assertions::const_assert_eq!((MAX_DIRTY_SIZE - MIN_DIRTY_SIZE_ROUNDED) % STEP_SIZE, 0);
         if MIN_DIRTY_SIZE != MIN_DIRTY_SIZE_ROUNDED {
             const $index: usize = MIN_DIRTY_SIZE;
             $inner
@@ -62,10 +72,10 @@ macro_rules! for_dirty_size {
         // because of the size of the metadata
         // STEP_COUNT has a different value for different target platforms!
         #[cfg(target_pointer_width = "32")]
-        for_dirty_size_impl!($index, $inner, 127);
+        for_dirty_size_impl!($index, $inner, 121);
 
         #[cfg(target_pointer_width = "64")]
-        for_dirty_size_impl!($index, $inner, 125);
+        for_dirty_size_impl!($index, $inner, 114);
     };
 }
 
@@ -150,6 +160,7 @@ impl BenchmarkRunner for DirtySizePersistLatencyRunner {
                     BUF_SIZE,
                     RESIDENT_CUTOFF_SIZE,
                     REM_OBJ_SIZE,
+                    VNV_HEAP_RAM_OVERHEAD
                 > = PersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "max_objects_persist_latency_dirty_size");
                 bench.run_benchmark::<TIMER, TRIGGER>(run_options, get_ticks, &mut trigger);
             });
@@ -177,6 +188,7 @@ impl BenchmarkRunner for DirtySizePersistLatencyRunner {
                     BUF_SIZE,
                     RESIDENT_CUTOFF_SIZE,
                     REM_OBJ_SIZE,
+                    VNV_HEAP_RAM_OVERHEAD
                 > = PersistLatencyBenchmark::new::<S>(DIRTY_SIZE, &mut heap, OBJ_CNT, DIRTY_NORMAL_OBJECTS, REM_OBJ_DIRTY, "max_dirty_persist_latency_dirty_size");
                 bench.run_benchmark::<TIMER, TRIGGER>(run_options, get_ticks, &mut trigger);
             });

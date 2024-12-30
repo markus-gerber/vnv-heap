@@ -1,15 +1,15 @@
-use std::{
-    hint::black_box,
-    mem::size_of,
-};
+use std::{hint::black_box, mem::size_of};
 
 use serde::Serialize;
 
 use crate::{
-    modules::object_management::DefaultObjectManagementModule, resident_object_manager::{
+    modules::object_management::DefaultObjectManagementModule,
+    resident_object_manager::{
         resident_object::{calc_resident_obj_layout_static, ResidentObject},
         resident_object_metadata::ResidentObjectMetadata,
-    }, util::round_up_to_nearest, VNVHeap, VNVObject
+    },
+    util::round_up_to_nearest,
+    VNVHeap, VNVObject,
 };
 
 use super::{
@@ -44,11 +44,21 @@ const fn does_fit(_dirty_size: usize, buf_size: usize, obj_cnt: usize, rem_size:
         size_of::<ResidentObjectMetadata>() + rem_size
     };
 
-    assert!(buf_size - (obj_size + rem_size_total) >= 2 * size_of::<usize>() || buf_size - (obj_size + rem_size_total) == 0);
+    assert!(
+        buf_size - (obj_size + rem_size_total) >= 2 * size_of::<usize>()
+            || buf_size - (obj_size + rem_size_total) == 0
+    );
     buf_size >= obj_size + rem_size_total
 }
 
-const fn remaining_dirty_size(dirty_size: usize, _buf_size: usize, obj_cnt: usize, dirty_obj_cnt: usize, rem_size: usize, rem_dirty: bool) -> usize {
+const fn remaining_dirty_size(
+    dirty_size: usize,
+    _buf_size: usize,
+    obj_cnt: usize,
+    dirty_obj_cnt: usize,
+    rem_size: usize,
+    rem_dirty: bool,
+) -> usize {
     let mut res = ResidentObjectMetadata::fresh_object_dirty_size::<usize>(false) * obj_cnt;
     res += size_of::<usize>() * dirty_obj_cnt;
 
@@ -66,15 +76,27 @@ const fn remaining_dirty_size(dirty_size: usize, _buf_size: usize, obj_cnt: usiz
     }
 }
 
-
 pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
     dirty_size: usize,
     buf_size: usize,
 ) -> (usize, usize, usize, bool) {
-    
-    const fn final_check(dirty_size: usize, buf_size: usize, obj_cnt: usize, dirty_obj_cnt: usize, rem_size: usize, rem_dirty: bool) {
+    const fn final_check(
+        dirty_size: usize,
+        buf_size: usize,
+        obj_cnt: usize,
+        dirty_obj_cnt: usize,
+        rem_size: usize,
+        rem_dirty: bool,
+    ) {
         assert!(does_fit(dirty_size, buf_size, obj_cnt, rem_size));
-        let rem_dirty = remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        let rem_dirty = remaining_dirty_size(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
         let metadata_dirty_size = ResidentObjectMetadata::fresh_object_dirty_size::<usize>(false);
         let metadata_size = size_of::<ResidentObjectMetadata>();
 
@@ -85,7 +107,7 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
             }
         } else {
             if rem_space >= rem_dirty {
-                if rem_space - rem_dirty == 0 || rem_space - rem_dirty >= 2*size_of::<usize>() {
+                if rem_space - rem_dirty == 0 || rem_space - rem_dirty >= 2 * size_of::<usize>() {
                     assert!(rem_dirty < size_of::<usize>());
                 }
             } else if rem_dirty > size_of::<usize>() {
@@ -107,15 +129,27 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
 
     // try to create as much objects as possible
     while obj_cnt < max_obj_cnt {
-        let rem_dirty_size =
-            remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        let rem_dirty_size = remaining_dirty_size(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
 
         if rem_dirty_size >= metadata_dirty_size {
             obj_cnt += 1;
         } else if rem_dirty_size >= size_of::<usize>() && obj_cnt > 0 {
             obj_cnt -= 1;
-            let rem_dirty_size =
-                remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+            let rem_dirty_size = remaining_dirty_size(
+                dirty_size,
+                buf_size,
+                obj_cnt,
+                dirty_obj_cnt,
+                rem_size,
+                rem_dirty,
+            );
 
             assert!(rem_dirty_size >= metadata_dirty_size);
 
@@ -124,21 +158,53 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
             final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, true);
             return (obj_cnt, dirty_obj_cnt, rem_size, true);
         } else {
-            final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+            final_check(
+                dirty_size,
+                buf_size,
+                obj_cnt,
+                dirty_obj_cnt,
+                rem_size,
+                rem_dirty,
+            );
             return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
         }
     }
 
-    let rem_dirty_size = remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+    let rem_dirty_size = remaining_dirty_size(
+        dirty_size,
+        buf_size,
+        obj_cnt,
+        dirty_obj_cnt,
+        rem_size,
+        rem_dirty,
+    );
 
     if rem_dirty_size < size_of::<usize>() {
-        final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        let rem_space = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
+        assert!(rem_size == 0);
+        if rem_space > 0 && rem_space < 2 * size_of::<usize>() {
+            obj_cnt -= 1;
+        }
+        final_check(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
         return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
     }
 
     while dirty_obj_cnt < max_obj_cnt {
-        let rem_dirty_size =
-            remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        let rem_dirty_size = remaining_dirty_size(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
 
         if rem_dirty_size >= size_of::<usize>() {
             dirty_obj_cnt += 1;
@@ -156,14 +222,47 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
                     rem_dirty = false;
                 }
             }
-            final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+            final_check(
+                dirty_size,
+                buf_size,
+                obj_cnt,
+                dirty_obj_cnt,
+                rem_size,
+                rem_dirty,
+            );
             return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
         }
     }
 
-    let rem_dirty_size = remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+    let rem_dirty_size = remaining_dirty_size(
+        dirty_size,
+        buf_size,
+        obj_cnt,
+        dirty_obj_cnt,
+        rem_size,
+        rem_dirty,
+    );
     if rem_dirty_size < size_of::<usize>() {
-        final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        final_check(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
+        return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+    }
+
+    if obj_cnt == 0 {
+        final_check(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
         return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
     }
 
@@ -173,9 +272,17 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
 
     rem_size = 0;
     rem_dirty = false;
-    let rem_dirty_size = remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+    let rem_dirty_size = remaining_dirty_size(
+        dirty_size,
+        buf_size,
+        obj_cnt,
+        dirty_obj_cnt,
+        rem_size,
+        rem_dirty,
+    );
     if rem_dirty_size - metadata_dirty_size <= buf_size - obj_cnt * obj_size - metadata_size {
-        rem_size = ((rem_dirty_size - metadata_dirty_size) / size_of::<usize>()) * size_of::<usize>();
+        rem_size =
+            ((rem_dirty_size - metadata_dirty_size) / size_of::<usize>()) * size_of::<usize>();
         rem_dirty = true;
 
         let rem_space = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
@@ -185,17 +292,32 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
 
         assert!(does_fit(dirty_size, buf_size, obj_cnt, rem_size));
 
-        final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        final_check(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
         return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
     } else {
-        rem_size = ((buf_size - obj_cnt * obj_size - metadata_size) / size_of::<usize>()) * size_of::<usize>();
+        rem_size = ((buf_size - obj_cnt * obj_size - metadata_size) / size_of::<usize>())
+            * size_of::<usize>();
         rem_dirty = true;
 
         assert!(does_fit(dirty_size, buf_size, obj_cnt, rem_size));
     }
 
     while obj_cnt > 0 {
-        let rem_dirty_size = remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        let rem_dirty_size = remaining_dirty_size(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
 
         if rem_dirty_size >= size_of::<usize>() {
             obj_cnt -= 1;
@@ -203,40 +325,72 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
 
             rem_size = 0;
             rem_dirty = false;
-            let rem_dirty_size = remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+            let rem_dirty_size = remaining_dirty_size(
+                dirty_size,
+                buf_size,
+                obj_cnt,
+                dirty_obj_cnt,
+                rem_size,
+                rem_dirty,
+            );
 
-            if rem_dirty_size - metadata_dirty_size <= buf_size - obj_cnt * obj_size - metadata_size {
-                rem_size = ((rem_dirty_size - metadata_dirty_size) / size_of::<usize>()) * size_of::<usize>();
+            if rem_dirty_size - metadata_dirty_size <= buf_size - obj_cnt * obj_size - metadata_size
+            {
+                rem_size = ((rem_dirty_size - metadata_dirty_size) / size_of::<usize>())
+                    * size_of::<usize>();
                 rem_dirty = true;
-        
+
                 let rem_space = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
                 if rem_space < 2 * size_of::<usize>() && rem_space != 0 {
-                    rem_size -= round_up_to_nearest(2 * size_of::<usize>() - rem_space, size_of::<usize>());
+                    rem_size -=
+                        round_up_to_nearest(2 * size_of::<usize>() - rem_space, size_of::<usize>());
                 }
-        
+
                 assert!(does_fit(dirty_size, buf_size, obj_cnt, rem_size));
-        
-                final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+
+                final_check(
+                    dirty_size,
+                    buf_size,
+                    obj_cnt,
+                    dirty_obj_cnt,
+                    rem_size,
+                    rem_dirty,
+                );
                 return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
             } else {
-                rem_size = ((buf_size - obj_cnt * obj_size - metadata_size) / size_of::<usize>()) * size_of::<usize>();
+                rem_size = ((buf_size - obj_cnt * obj_size - metadata_size) / size_of::<usize>())
+                    * size_of::<usize>();
                 rem_dirty = true;
-        
+
                 assert!(does_fit(dirty_size, buf_size, obj_cnt, rem_size));
             }
         } else {
-            final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+            final_check(
+                dirty_size,
+                buf_size,
+                obj_cnt,
+                dirty_obj_cnt,
+                rem_size,
+                rem_dirty,
+            );
             return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
         }
     }
 
-
     rem_size = 0;
     rem_dirty = false;
-    let rem_dirty_size = remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+    let rem_dirty_size = remaining_dirty_size(
+        dirty_size,
+        buf_size,
+        obj_cnt,
+        dirty_obj_cnt,
+        rem_size,
+        rem_dirty,
+    );
 
     if rem_dirty_size - metadata_dirty_size <= buf_size - obj_cnt * obj_size - metadata_size {
-        rem_size = ((rem_dirty_size - metadata_dirty_size) / size_of::<usize>()) * size_of::<usize>();
+        rem_size =
+            ((rem_dirty_size - metadata_dirty_size) / size_of::<usize>()) * size_of::<usize>();
         rem_dirty = true;
 
         let rem_space = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
@@ -246,27 +400,55 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
 
         assert!(does_fit(dirty_size, buf_size, obj_cnt, rem_size));
 
-        final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        final_check(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
         return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
     } else {
-        rem_size = ((buf_size - obj_cnt * obj_size - metadata_size) / size_of::<usize>()) * size_of::<usize>();
+        rem_size = ((buf_size - obj_cnt * obj_size - metadata_size) / size_of::<usize>())
+            * size_of::<usize>();
         rem_dirty = true;
 
         assert!(does_fit(dirty_size, buf_size, obj_cnt, rem_size));
     }
 
-    final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+    final_check(
+        dirty_size,
+        buf_size,
+        obj_cnt,
+        dirty_obj_cnt,
+        rem_size,
+        rem_dirty,
+    );
     (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty)
 }
-
 
 pub(super) const fn calc_obj_cnt_and_rem_size_max_objects(
     dirty_size: usize,
     buf_size: usize,
 ) -> (usize, usize, usize, bool) {
-    const fn final_check(dirty_size: usize, buf_size: usize, obj_cnt: usize, dirty_obj_cnt: usize, rem_size: usize, rem_dirty: bool) {
+    const fn final_check(
+        dirty_size: usize,
+        buf_size: usize,
+        obj_cnt: usize,
+        dirty_obj_cnt: usize,
+        rem_size: usize,
+        rem_dirty: bool,
+    ) {
         assert!(does_fit(dirty_size, buf_size, obj_cnt, rem_size));
-        let rem_dirty = remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        let rem_dirty = remaining_dirty_size(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
         let metadata_dirty_size = ResidentObjectMetadata::fresh_object_dirty_size::<usize>(false);
         let metadata_size = size_of::<ResidentObjectMetadata>();
 
@@ -277,7 +459,7 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_objects(
             }
         } else {
             if rem_space >= rem_dirty {
-                if rem_space - rem_dirty == 0 || rem_space - rem_dirty >= 2*size_of::<usize>() {
+                if rem_space - rem_dirty == 0 || rem_space - rem_dirty >= 2 * size_of::<usize>() {
                     assert!(rem_dirty < size_of::<usize>());
                 }
             }
@@ -295,15 +477,27 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_objects(
 
     // try to create as much objects as possible
     while obj_cnt < max_obj_cnt {
-        let rem_dirty_size =
-            remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        let rem_dirty_size = remaining_dirty_size(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
 
         if rem_dirty_size >= metadata_dirty_size {
             obj_cnt += 1;
         } else if rem_dirty_size >= size_of::<usize>() && obj_cnt > 0 {
             obj_cnt -= 1;
-            let rem_dirty_size =
-                remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+            let rem_dirty_size = remaining_dirty_size(
+                dirty_size,
+                buf_size,
+                obj_cnt,
+                dirty_obj_cnt,
+                rem_size,
+                rem_dirty,
+            );
 
             assert!(rem_dirty_size >= metadata_dirty_size);
 
@@ -312,21 +506,53 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_objects(
             final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, true);
             return (obj_cnt, dirty_obj_cnt, rem_size, true);
         } else {
-            final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+            final_check(
+                dirty_size,
+                buf_size,
+                obj_cnt,
+                dirty_obj_cnt,
+                rem_size,
+                rem_dirty,
+            );
             return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
         }
     }
 
-    let rem_dirty_size = remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+    let rem_dirty_size = remaining_dirty_size(
+        dirty_size,
+        buf_size,
+        obj_cnt,
+        dirty_obj_cnt,
+        rem_size,
+        rem_dirty,
+    );
 
     if rem_dirty_size < size_of::<usize>() {
-        final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        let rem_space = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
+        assert!(rem_size == 0);
+        if rem_space > 0 && rem_space < 2 * size_of::<usize>() {
+            obj_cnt -= 1;
+        }
+        final_check(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
         return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
     }
 
     while dirty_obj_cnt < max_obj_cnt {
-        let rem_dirty_size =
-            remaining_dirty_size(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+        let rem_dirty_size = remaining_dirty_size(
+            dirty_size,
+            buf_size,
+            obj_cnt,
+            dirty_obj_cnt,
+            rem_size,
+            rem_dirty,
+        );
 
         if rem_dirty_size >= size_of::<usize>() {
             dirty_obj_cnt += 1;
@@ -344,7 +570,14 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_objects(
                 }
             }
 
-            final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+            final_check(
+                dirty_size,
+                buf_size,
+                obj_cnt,
+                dirty_obj_cnt,
+                rem_size,
+                rem_dirty,
+            );
             return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
         }
     }
@@ -362,8 +595,14 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_objects(
         }
     }
 
-
-    final_check(dirty_size, buf_size, obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
+    final_check(
+        dirty_size,
+        buf_size,
+        obj_cnt,
+        dirty_obj_cnt,
+        rem_size,
+        rem_dirty,
+    );
     return (obj_cnt, dirty_obj_cnt, rem_size, rem_dirty);
 }
 
@@ -376,7 +615,8 @@ pub struct PersistLatencyBenchmarkOptions {
     remaining_dirty_size: usize,
     objects_dirty: usize,
     rem_object_dirty: bool,
-    cutoff_size: usize
+    cutoff_size: usize,
+    ram_overhead: usize,
 }
 
 pub(super) struct PersistLatencyBenchmark<
@@ -385,6 +625,7 @@ pub(super) struct PersistLatencyBenchmark<
     const BUFFER_SIZE: usize,
     const CUTOFF_SIZE: usize,
     const REM_OBJECT_SIZE: usize,
+    const VNV_HEAP_RAM_OVERHEAD: usize,
 > {
     dirty_size: usize,
     objects: Vec<
@@ -413,8 +654,22 @@ pub(super) struct PersistLatencyBenchmark<
     rem_object_dirty: bool,
 }
 
-impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJECT_SIZE: usize>
-    PersistLatencyBenchmark<'a, 'b, BUFFER_SIZE, CUTOFF_SIZE, REM_OBJECT_SIZE>
+impl<
+        'a,
+        'b,
+        const BUFFER_SIZE: usize,
+        const CUTOFF_SIZE: usize,
+        const REM_OBJECT_SIZE: usize,
+        const VNV_HEAP_RAM_OVERHEAD: usize,
+    >
+    PersistLatencyBenchmark<
+        'a,
+        'b,
+        BUFFER_SIZE,
+        CUTOFF_SIZE,
+        REM_OBJECT_SIZE,
+        VNV_HEAP_RAM_OVERHEAD,
+    >
 {
     pub(super) fn new<S: PersistentStorageModule>(
         dirty_size: usize,
@@ -428,7 +683,7 @@ impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJEC
         normal_objects: usize,
         dirty_normal_objects: usize,
         is_rem_dirty: bool,
-        benchmark_name: &'static str
+        benchmark_name: &'static str,
     ) -> Self {
         assert!(dirty_normal_objects <= normal_objects);
 
@@ -472,20 +727,28 @@ impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJEC
             objects.push(obj);
         }
 
-
         let mut dirty_normal_objects_curr = dirty_normal_objects;
         for obj in objects.iter_mut() {
-            assert!(obj.is_resident(), "metadata dirty size: {}, resident obj size: {}", ResidentObjectMetadata::fresh_object_dirty_size::<usize>(false), calc_resident_obj_layout_static::<usize>(false).0.size());
+            assert!(
+                obj.is_resident(),
+                "metadata dirty size: {}, resident obj size: {}",
+                ResidentObjectMetadata::fresh_object_dirty_size::<usize>(false),
+                calc_resident_obj_layout_static::<usize>(false).0.size()
+            );
             if dirty_normal_objects_curr > 0 {
                 assert!(obj.is_data_dirty());
-                dirty_normal_objects_curr -= 1;    
+                dirty_normal_objects_curr -= 1;
             } else {
-                assert!(!obj.is_data_dirty());    
+                assert!(!obj.is_data_dirty());
             }
         }
 
         if let Some(rem_obj) = rem_object.as_ref() {
-            assert!(rem_obj.is_resident(), "{}", calc_resident_obj_layout_static::<usize>(false).0.size());
+            assert!(
+                rem_obj.is_resident(),
+                "{}",
+                calc_resident_obj_layout_static::<usize>(false).0.size()
+            );
             assert_eq!(rem_obj.is_data_dirty(), is_rem_dirty);
         }
 
@@ -502,14 +765,27 @@ impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJEC
             benchmark_name,
             remaining_dirty_size: rem_dirty,
             objects_dirty: dirty_normal_objects,
-            rem_object_dirty: is_rem_dirty
+            rem_object_dirty: is_rem_dirty,
         }
     }
 }
 
-impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJECT_SIZE: usize>
-    PersistBenchmark<PersistLatencyBenchmarkOptions>
-    for PersistLatencyBenchmark<'a, 'b, BUFFER_SIZE, CUTOFF_SIZE, REM_OBJECT_SIZE>
+impl<
+        'a,
+        'b,
+        const BUFFER_SIZE: usize,
+        const CUTOFF_SIZE: usize,
+        const REM_OBJECT_SIZE: usize,
+        const VNV_HEAP_RAM_OVERHEAD: usize,
+    > PersistBenchmark<PersistLatencyBenchmarkOptions>
+    for PersistLatencyBenchmark<
+        'a,
+        'b,
+        BUFFER_SIZE,
+        CUTOFF_SIZE,
+        REM_OBJECT_SIZE,
+        VNV_HEAP_RAM_OVERHEAD,
+    >
 {
     fn get_name(&self) -> &'static str {
         self.benchmark_name
@@ -524,7 +800,8 @@ impl<'a, 'b, const BUFFER_SIZE: usize, const CUTOFF_SIZE: usize, const REM_OBJEC
             remaining_dirty_size: self.remaining_dirty_size,
             objects_dirty: self.objects_dirty,
             rem_object_dirty: self.rem_object_dirty,
-            cutoff_size: CUTOFF_SIZE
+            cutoff_size: CUTOFF_SIZE,
+            ram_overhead: VNV_HEAP_RAM_OVERHEAD,
         }
     }
 

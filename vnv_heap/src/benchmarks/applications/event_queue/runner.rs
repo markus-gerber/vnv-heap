@@ -1,17 +1,30 @@
-use std::{array::from_fn, mem::{size_of, MaybeUninit}};
+use std::{
+    array::from_fn,
+    mem::{size_of, MaybeUninit},
+};
 
 use applications::event_queue::{
     implementation::EventQueueImplementationBenchmark, ram::EventQueueRAMBenchmark,
     storage::EventQueueStorageBenchmark,
 };
-
-use crate::{modules::{nonresident_allocator::{calc_non_resident_block_allocator_bit_list_size, NonResidentBlockAllocator}, object_management::DefaultObjectManagementModule, persistent_storage::TruncatedStorageModule}, vnv_list::{ListItemContainer, VNVList}, VNVConfig};
+use crate::{
+    modules::{
+        nonresident_allocator::{
+            calc_non_resident_block_allocator_bit_list_size, NonResidentBlockAllocator,
+        },
+        object_management::DefaultObjectManagementModule,
+        persistent_storage::{DummyStorageModule, TruncatedStorageModule},
+    },
+    vnv_list::{ListItemContainer, VNVList},
+    VNVConfig,
+};
 
 use super::super::super::*;
 
 const BLOCK_SIZE: usize = size_of::<ListItemContainer<[u8; OBJ_SIZE]>>();
-const STORAGE_SIZE: usize = 2*MAX_TOTAL_SIZE;
-const BIT_LIST_SIZE: usize = calc_non_resident_block_allocator_bit_list_size(BLOCK_SIZE, STORAGE_SIZE);
+const STORAGE_SIZE: usize = 2 * MAX_TOTAL_SIZE;
+const BIT_LIST_SIZE: usize =
+    calc_non_resident_block_allocator_bit_list_size(BLOCK_SIZE, STORAGE_SIZE);
 
 type A = LinkedListAllocatorModule;
 type M = DefaultObjectManagementModule;
@@ -20,12 +33,14 @@ type N = NonResidentBlockAllocator<BLOCK_SIZE, BIT_LIST_SIZE>;
 const ITERATION_COUNT: usize = 10;
 const OBJ_SIZE: usize = 256;
 
+const RAM_LIMIT: usize = 4 * 1024;
+
 const VNV_HEAP_RAM_OVERHEAD: usize = {
-    size_of::<VNVList<'_, '_, [u8; OBJ_SIZE], A, N, M>>() +
-    size_of::<VNVHeap<'_, A, N, M, DummyStorageModule>>() +
-    VNVHeap::<'_, A, N, M, DummyStorageModule>::get_layout_info().persist_access_point_size
+    size_of::<VNVList<'_, '_, [u8; OBJ_SIZE], A, N, M>>()
+        + size_of::<VNVHeap<'_, A, N, M, DummyStorageModule>>()
+        + VNVHeap::<'_, A, N, M, DummyStorageModule>::get_layout_info().persist_access_point_size
 };
-const VNV_HEAP_BUF_SIZE: usize = 4 * 1024 - VNV_HEAP_RAM_OVERHEAD; // TODO
+const VNV_HEAP_BUF_SIZE: usize = RAM_LIMIT - VNV_HEAP_RAM_OVERHEAD;
 
 const STEP_SIZE: usize = 1;
 const MIN_TOTAL_SIZE: usize = 0;
@@ -114,7 +129,6 @@ impl BenchmarkRunner for EventQueueBenchmarkRunner {
             });
 
             {
-
                 fn get_bench_heap<'a, S2: PersistentStorageModule + 'static>(
                     buf: &'a mut [u8],
                     max_dirty: usize,
@@ -158,22 +172,5 @@ impl BenchmarkRunner for EventQueueBenchmarkRunner {
                 });
             }
         }
-    }
-}
-
-
-struct DummyStorageModule;
-
-impl PersistentStorageModule for DummyStorageModule {
-    fn read(&mut self, _offset: usize, _dest: &mut [u8]) -> Result<(), ()> {
-        panic!("not implemented")
-    }
-
-    fn get_max_size(&self) -> usize {
-        panic!("not implemented")
-    }
-
-    fn write(&mut self, _offset: usize, _src: &[u8]) -> Result<(), ()> {
-        panic!("not implemented")
     }
 }

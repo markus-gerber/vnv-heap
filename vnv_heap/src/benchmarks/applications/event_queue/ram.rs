@@ -85,7 +85,7 @@ impl<
 }
 
 
-struct RingBuffer<'a, const OBJ_SIZE: usize> {
+pub(super) struct RingBuffer<'a, const OBJ_SIZE: usize> {
     buffer: &'a mut [MaybeUninit<[u8; OBJ_SIZE]>],
     next_in: usize,
     next_out: usize,
