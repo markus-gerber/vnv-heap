@@ -33,15 +33,16 @@ def save_plot(name: str, save_asset: bool = False):
     if save_asset:
         plt.savefig(f"../../../assets/{name}_plot.svg", bbox_inches='tight')
 
-def set_theme(colors=2, skip=0, ignore=-1):
+def set_theme(colors=2, skip=0, ignore=-1, hide_spines=False):
     style = sns.axes_style("whitegrid")
     style["grid.color"] = "#ddd"
     style["axes.edgecolor"] = "#ddd"
-    style["axes.spines.right"] = False
-    style["axes.spines.top"] = False
+    if hide_spines:
+        style["axes.spines.right"] = True
+        style["axes.spines.top"] = True
 
     sns.set_theme(style=style)
-    sns.set_context("paper", rc={"font.size":8, "font.family": "Libertine", "axes.titlesize":8, "axes.labelsize":8})
+    sns.set_context("paper", rc={"font.size":8, "font.family": "Libertine", "axes.titlesize":8, "axes.labelsize":8, "xtick.labelsize": 8, "ytick.labelsize": 8, "legend.title_fontsize": 9})
 
     #palette = sns.color_palette("mako", n_colors=colors)[skip:]
     #if ignore != -1:
@@ -84,15 +85,13 @@ def plot_lines(options: dict | list[dict]):
     else:
         raise Exception("illegal input")
 
-    if "height" not in option_list[0]:
-        figheight = 3.3
-    else:
-        figheight = 3.3*option_list[0]["height"]
+    figheight = 3.3
+    if "height" in option_list[0]:
+        figheight *= option_list[0]["height"]
 
-    if "width" not in option_list[0]:
-        figwidth = 3.3
-    else:
-        figwidth = 3.3 * option_list[0]["width"]
+    figwidth = 3.3
+    if "width" in option_list[0]:
+        figwidth *= option_list[0]["width"]
 
     palette = set_theme(colors=len(option_list[0]["data"]))
 
@@ -102,7 +101,10 @@ def plot_lines(options: dict | list[dict]):
         
     for (i, options) in enumerate(option_list):
         ax = axes[i]
-            
+
+        ax.set_xmargin(0)
+        ax.set_ymargin(0)
+
         x_label = options["x_label"]
         y_label = options["y_label"]
         scale = options["scale"]
