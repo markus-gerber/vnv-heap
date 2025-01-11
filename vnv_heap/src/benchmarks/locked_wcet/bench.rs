@@ -3,11 +3,10 @@ use std::{marker::PhantomData, sync::atomic::AtomicBool};
 use serde::Serialize;
 
 use super::{microbenchmarks::PersistentStorageModule, util::*, AllocatorModule};
-use crate::benchmarks::GetCurrentTicks;
 
 use super::Benchmark;
 
-pub(super) trait LockedWCETExecutor<'a, A: AllocatorModule> {
+pub(super) trait LockedWCETExecutor<'a, A: AllocatorModule, O: Serialize> {
     fn execute(
         &mut self,
         storage_ref: &mut BenchmarkableSharedStorageReference<'static, 'static>,
@@ -16,19 +15,18 @@ pub(super) trait LockedWCETExecutor<'a, A: AllocatorModule> {
     ) -> u32;
 
     fn get_name(&self) -> &'static str;
+
+    fn get_bench_options(&self) -> O;
 }
 
-#[derive(Serialize)]
-pub(super) struct LockedWCETBenchmarkOptions {}
-
-pub(super) struct LockedWCETBenchmark<'a, A: AllocatorModule, E: LockedWCETExecutor<'a, A>> {
+pub(super) struct LockedWCETBenchmark<'a, A: AllocatorModule, O: Serialize, E: LockedWCETExecutor<'a, A, O>> {
     storage_ref: BenchmarkableSharedStorageReference<'static, 'static>,
     executor: E,
     heap: BenchmarkableSharedPersistLock<'a, *mut A>,
-    _phantom_data: PhantomData<(&'a (), E)>,
+    _phantom_data: PhantomData<(&'a (), E, O)>,
 }
 
-impl<'a, A: AllocatorModule, E: LockedWCETExecutor<'a, A>> LockedWCETBenchmark<'a, A, E> {
+impl<'a, A: AllocatorModule, O: Serialize, E: LockedWCETExecutor<'a, A, O>> LockedWCETBenchmark<'a, A, O, E> {
     pub(super) fn new<S: PersistentStorageModule + 'static>(
         storage: &'a mut S,
         allocator: &'a mut A,
@@ -61,15 +59,15 @@ impl<'a, A: AllocatorModule, E: LockedWCETExecutor<'a, A>> LockedWCETBenchmark<'
     }
 }
 
-impl<'a, A: AllocatorModule, E: LockedWCETExecutor<'a, A>> Benchmark<LockedWCETBenchmarkOptions>
-    for LockedWCETBenchmark<'a, A, E>
+impl<'a, A: AllocatorModule, O: Serialize, E: LockedWCETExecutor<'a, A, O>> Benchmark<O>
+    for LockedWCETBenchmark<'a, A, O, E>
 {
     fn get_name(&self) -> &'static str {
         self.executor.get_name()
     }
 
-    fn get_bench_options(&self) -> LockedWCETBenchmarkOptions {
-        LockedWCETBenchmarkOptions {}
+    fn get_bench_options(&self) -> O {
+        self.executor.get_bench_options()
     }
 
     fn execute<T: crate::benchmarks::Timer>(&mut self) -> u32 {
@@ -77,7 +75,7 @@ impl<'a, A: AllocatorModule, E: LockedWCETExecutor<'a, A>> Benchmark<LockedWCETB
     }
 }
 
-impl<'a, A: AllocatorModule, E: LockedWCETExecutor<'a, A>> Drop for LockedWCETBenchmark<'a, A, E> {
+impl<'a, A: AllocatorModule, O: Serialize, E: LockedWCETExecutor<'a, A, O>> Drop for LockedWCETBenchmark<'a, A, O, E> {
     fn drop(&mut self) {
         unsafe {
             BENCHMARKABLE_PERSIST_ACCESS_POINT.unset().unwrap();

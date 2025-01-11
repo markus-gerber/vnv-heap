@@ -64,7 +64,7 @@ impl BenchmarkRunner for LockedWCETRunner {
         options: &RunAllBenchmarkOptions,
         get_storage: &F,
         handle_curr_iteration: &mut G,
-        get_ticks: GetCurrentTicks,
+        _get_ticks: GetCurrentTicks,
     ) {
         assert_eq!(
             RESIDENT_CUTOFF_SIZE,

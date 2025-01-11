@@ -1,9 +1,16 @@
 use std::marker::PhantomData;
 
+use serde::Serialize;
+
 use crate::{
     benchmarks::{locked_wcet::LockedWCETExecutor, Timer},
     modules::allocator::AllocatorModule,
 };
+
+#[derive(Serialize)]
+pub(crate) struct StorageLockedWCETExecutorOptions {
+    object_size: usize,
+}
 
 pub(crate) struct StorageLockedWCETExecutor<'a, const ACCESS_SIZE: usize, TIMER: Timer> {
     buffer: &'a mut [u8; ACCESS_SIZE],
@@ -19,7 +26,8 @@ impl<'a, const ACCESS_SIZE: usize, TIMER: Timer> StorageLockedWCETExecutor<'a, A
     }
 }
 
-impl<'a, 'b, A: AllocatorModule, const ACCESS_SIZE: usize, TIMER: Timer> LockedWCETExecutor<'a, A>
+impl<'a, 'b, A: AllocatorModule, const ACCESS_SIZE: usize, TIMER: Timer>
+    LockedWCETExecutor<'a, A, StorageLockedWCETExecutorOptions>
     for StorageLockedWCETExecutor<'b, ACCESS_SIZE, TIMER>
 {
     fn execute(
@@ -28,7 +36,7 @@ impl<'a, 'b, A: AllocatorModule, const ACCESS_SIZE: usize, TIMER: Timer> LockedW
             'static,
             'static,
         >,
-        heap: &mut crate::benchmarks::locked_wcet::BenchmarkableSharedPersistLock<'a, *mut A>,
+        _heap: &mut crate::benchmarks::locked_wcet::BenchmarkableSharedPersistLock<'a, *mut A>,
         enable_measurement: &std::sync::atomic::AtomicBool,
     ) -> u32 {
         enable_measurement.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -40,5 +48,11 @@ impl<'a, 'b, A: AllocatorModule, const ACCESS_SIZE: usize, TIMER: Timer> LockedW
 
     fn get_name(&self) -> &'static str {
         "storage_locked_wcet"
+    }
+
+    fn get_bench_options(&self) -> StorageLockedWCETExecutorOptions {
+        StorageLockedWCETExecutorOptions {
+            object_size: self.buffer.len(),
+        }
     }
 }

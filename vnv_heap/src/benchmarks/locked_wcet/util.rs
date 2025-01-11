@@ -127,6 +127,7 @@ impl PersistentStorageModule for BenchmarkableSharedStorageReference<'_, '_> {
 }
 
 impl BenchmarkableSharedStorageReference<'_, '_> {
+    #[allow(unused)]
     pub(super) fn read_benchmarked<TIMER: Timer>(&mut self, offset: usize, dest: &mut [u8]) -> Result<u32, ()> {
         let guard = self.lock.try_lock_measured::<TIMER>().ok_or(())?;
 
