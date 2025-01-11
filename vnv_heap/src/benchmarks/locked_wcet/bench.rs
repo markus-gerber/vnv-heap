@@ -33,12 +33,7 @@ impl<'a, A: AllocatorModule, E: LockedWCETExecutor<'a, A>> LockedWCETBenchmark<'
         storage: &'a mut S,
         allocator: &'a mut A,
         executor: E,
-        get_curr_ticks: GetCurrentTicks,
     ) -> Self {
-        {
-            let mut fn_ref = GET_CURR_TICKS.try_lock().unwrap();
-            *fn_ref = Some(get_curr_ticks);
-        }
         let sref: BenchmarkableSharedStorageReference<'_, '_> =
             BenchmarkableSharedStorageReference::new(BenchmarkableSharedPersistLock::new(
                 storage,
@@ -84,10 +79,6 @@ impl<'a, A: AllocatorModule, E: LockedWCETExecutor<'a, A>> Benchmark<LockedWCETB
 
 impl<'a, A: AllocatorModule, E: LockedWCETExecutor<'a, A>> Drop for LockedWCETBenchmark<'a, A, E> {
     fn drop(&mut self) {
-        {
-            let mut fn_ref = GET_CURR_TICKS.try_lock().unwrap();
-            *fn_ref = None;
-        }
         unsafe {
             BENCHMARKABLE_PERSIST_ACCESS_POINT.unset().unwrap();
         }

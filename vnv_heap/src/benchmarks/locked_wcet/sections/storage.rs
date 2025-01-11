@@ -1,17 +1,26 @@
-use crate::{benchmarks::locked_wcet::LockedWCETExecutor, modules::allocator::AllocatorModule};
+use std::marker::PhantomData;
 
-pub(crate) struct StorageLockedWCETExecutor<'a, const ACCESS_SIZE: usize> {
+use crate::{
+    benchmarks::{locked_wcet::LockedWCETExecutor, Timer},
+    modules::allocator::AllocatorModule,
+};
+
+pub(crate) struct StorageLockedWCETExecutor<'a, const ACCESS_SIZE: usize, TIMER: Timer> {
     buffer: &'a mut [u8; ACCESS_SIZE],
+    _phantom_data: PhantomData<TIMER>,
 }
 
-impl<'a, const ACCESS_SIZE: usize> StorageLockedWCETExecutor<'a, ACCESS_SIZE> {
+impl<'a, const ACCESS_SIZE: usize, TIMER: Timer> StorageLockedWCETExecutor<'a, ACCESS_SIZE, TIMER> {
     pub(crate) fn new(buffer: &'a mut [u8; ACCESS_SIZE]) -> Self {
-        Self { buffer }
+        Self {
+            buffer,
+            _phantom_data: PhantomData,
+        }
     }
 }
 
-impl<'a, 'b, A: AllocatorModule, const ACCESS_SIZE: usize> LockedWCETExecutor<'a, A>
-    for StorageLockedWCETExecutor<'b, ACCESS_SIZE>
+impl<'a, 'b, A: AllocatorModule, const ACCESS_SIZE: usize, TIMER: Timer> LockedWCETExecutor<'a, A>
+    for StorageLockedWCETExecutor<'b, ACCESS_SIZE, TIMER>
 {
     fn execute(
         &mut self,
@@ -24,7 +33,9 @@ impl<'a, 'b, A: AllocatorModule, const ACCESS_SIZE: usize> LockedWCETExecutor<'a
     ) -> u32 {
         enable_measurement.store(true, std::sync::atomic::Ordering::SeqCst);
 
-        storage_ref.write_benchmarked(0, self.buffer).unwrap()
+        storage_ref
+            .write_benchmarked::<TIMER>(0, self.buffer)
+            .unwrap()
     }
 
     fn get_name(&self) -> &'static str {

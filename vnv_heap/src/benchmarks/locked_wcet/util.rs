@@ -1,9 +1,9 @@
 use core::panic;
-use std::{marker::PhantomData, mem::{transmute, ManuallyDrop}, ops::{Deref, DerefMut}, sync::{atomic::{AtomicBool, AtomicPtr, Ordering}, Mutex}};
+use std::{marker::PhantomData, mem::{transmute, ManuallyDrop}, ops::{Deref, DerefMut}, sync::atomic::{AtomicBool, Ordering}};
 
 use try_lock::TryLock;
 
-use crate::{benchmarks::GetCurrentTicks, shared_persist_lock::{SharedPersistGuard, SharedPersistLock}};
+use crate::{benchmarks::Timer, shared_persist_lock::{SharedPersistGuard, SharedPersistLock}};
 
 use super::microbenchmarks::PersistentStorageModule;
 
@@ -54,7 +54,7 @@ impl BenchmarkablePersistAccessPoint {
 }
 
 impl BenchmarkablePersistAccessPoint {
-    pub(super) fn persist_if_not_empty(&self, start_time: u32, get_curr_ticks: GetCurrentTicks) -> u32 {
+    pub(super) fn persist_if_not_empty<F: FnOnce() -> u32>(&self, measurement_stop: F) -> u32 {
         let mut lock_guard = match self.inner.try_lock() {
             Some(guard) => guard,
             None => {
@@ -78,7 +78,7 @@ impl BenchmarkablePersistAccessPoint {
                 }
             }
 
-            return get_curr_ticks() - start_time;
+            return measurement_stop();
         }
 
         panic!("should not happen");
@@ -86,19 +86,15 @@ impl BenchmarkablePersistAccessPoint {
 
 }
 
-pub(super) static GET_CURR_TICKS: Mutex<Option<GetCurrentTicks>> = Mutex::new(None);
-
 pub(super) static mut BENCHMARKABLE_PERSIST_ACCESS_POINT: BenchmarkablePersistAccessPoint = BenchmarkablePersistAccessPoint::empty();
 pub(super) static BENCHMARKABLE_HEAP_LOCK: TryLock<()> = TryLock::new(());
 pub(super) static BENCHMARKABLE_STORAGE_LOCK: TryLock<()> = TryLock::new(());
 pub(super) static BENCHMARKABLE_PERSIST_QUEUED: AtomicBool = AtomicBool::new(false);
 
 
-pub(super) fn benchmarkable_vnv_persist_all(start_time: u32, get_curr_ticks: GetCurrentTicks) -> u32 {
-    unsafe { BENCHMARKABLE_PERSIST_ACCESS_POINT.persist_if_not_empty(start_time, get_curr_ticks) }
+pub(super) fn benchmarkable_vnv_persist_all<F: FnOnce() -> u32>(measurement_stop: F) -> u32 {
+    unsafe { BENCHMARKABLE_PERSIST_ACCESS_POINT.persist_if_not_empty(measurement_stop) }
 }
-
-
 
 pub(super) struct BenchmarkableSharedStorageReference<'a, 'b> {
     lock: BenchmarkableSharedPersistLock<'a, *mut dyn PersistentStorageModule>,
@@ -131,15 +127,15 @@ impl PersistentStorageModule for BenchmarkableSharedStorageReference<'_, '_> {
 }
 
 impl BenchmarkableSharedStorageReference<'_, '_> {
-    pub(super) fn read_benchmarked(&mut self, offset: usize, dest: &mut [u8]) -> Result<u32, ()> {
-        let guard = self.lock.try_lock().ok_or(())?;
+    pub(super) fn read_benchmarked<TIMER: Timer>(&mut self, offset: usize, dest: &mut [u8]) -> Result<u32, ()> {
+        let guard = self.lock.try_lock_measured::<TIMER>().ok_or(())?;
 
         let s_ref = unsafe { guard.as_mut().unwrap() };
         s_ref.read(offset, dest)?;
         Ok(guard.measured_drop())
     }
-    pub(super) fn write_benchmarked(&mut self, offset: usize, src: &[u8]) -> Result<u32, ()> {
-        let guard = self.lock.try_lock().ok_or(())?;
+    pub(super) fn write_benchmarked<TIMER: Timer>(&mut self, offset: usize, src: &[u8]) -> Result<u32, ()> {
+        let guard = self.lock.try_lock_measured::<TIMER>().ok_or(())?;
 
         let s_ref = unsafe { guard.as_mut().unwrap() };
         s_ref.write(offset, src)?;
@@ -182,14 +178,18 @@ impl<'a, T> BenchmarkableSharedPersistLock<'a, T> {
         }
     }
     
-    pub(super) fn try_lock<'b>(&'b self) -> Option<BenchmarkableSharedPersistGuard<'a, 'b, T>> {
-        let get_curr_ticks = { GET_CURR_TICKS.lock().unwrap().unwrap().clone() };
-        let start_time = get_curr_ticks();
+    pub(super) fn try_lock_measured<'b, TIMER: Timer>(&'b self) -> Option<BenchmarkableSharedPersistGuard<'a, 'b, T, TIMER>> {
+        let timer = TIMER::start();
         if let Some(res) = self.inner.try_lock() {
-            Some(BenchmarkableSharedPersistGuard { inner: ManuallyDrop::new(res), start_time, get_curr_ticks })
+            Some(BenchmarkableSharedPersistGuard { inner: ManuallyDrop::new(res), timer: Some(timer) })
         } else {
             None
         }
+    }
+
+    
+    pub(super) fn try_lock<'b>(&'b self) -> Option<SharedPersistGuard<'a, 'b, T>> {
+        self.inner.try_lock()
     }
 
 }
@@ -208,21 +208,23 @@ impl<T: Clone> BenchmarkableSharedPersistLock<'_, T> {
 }
 
 
-pub(super) struct BenchmarkableSharedPersistGuard<'a, 'b, T> {
+pub(super) struct BenchmarkableSharedPersistGuard<'a, 'b, T, TIMER: Timer> {
     inner: ManuallyDrop<SharedPersistGuard<'a, 'b, T>>,
-    start_time: u32,
-    get_curr_ticks: GetCurrentTicks
+    timer: Option<TIMER>,
 }
 
 
-impl<T> BenchmarkableSharedPersistGuard<'_, '_, T> {
+impl<T, TIMER: Timer> BenchmarkableSharedPersistGuard<'_, '_, T, TIMER> {
     pub(super) fn measured_drop(mut self) -> u32 {
         // do the same steps as in SharedPersistGuard::drop
         unsafe { ManuallyDrop::drop(&mut self.inner.guard) }
 
         // we dont care about the result here as we just want to measure the latency
         if self.inner.persist_queued.swap(false, Ordering::SeqCst) {
-            let time = benchmarkable_vnv_persist_all(self.start_time, self.get_curr_ticks);
+            let timer = self.timer.take().unwrap();
+            let time = benchmarkable_vnv_persist_all(move || {
+                timer.stop()
+            });
 
             time
         } else {
@@ -231,7 +233,7 @@ impl<T> BenchmarkableSharedPersistGuard<'_, '_, T> {
     }
 }
 
-impl<T> Drop for BenchmarkableSharedPersistGuard<'_, '_, T> {
+impl<T, TIMER: Timer> Drop for BenchmarkableSharedPersistGuard<'_, '_, T, TIMER> {
     fn drop(&mut self) {
         // do not do any measurements or persists
         unsafe { ManuallyDrop::drop(&mut self.inner.guard) }
@@ -239,7 +241,7 @@ impl<T> Drop for BenchmarkableSharedPersistGuard<'_, '_, T> {
 }
 
 
-impl<T> Deref for BenchmarkableSharedPersistGuard<'_, '_, T> {
+impl<T, TIMER: Timer> Deref for BenchmarkableSharedPersistGuard<'_, '_, T, TIMER> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -247,7 +249,7 @@ impl<T> Deref for BenchmarkableSharedPersistGuard<'_, '_, T> {
     }
 }
 
-impl<T> DerefMut for BenchmarkableSharedPersistGuard<'_, '_, T> {
+impl<T, TIMER: Timer> DerefMut for BenchmarkableSharedPersistGuard<'_, '_, T, TIMER> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner.obj_ref
     }

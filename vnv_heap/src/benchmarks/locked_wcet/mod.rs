@@ -78,8 +78,8 @@ impl BenchmarkRunner for LockedWCETRunner {
             let mut a = A::new();
             let mut storage = get_storage();
             let mut buffer = [0u8; 4];
-            let executor = StorageLockedWCETExecutor::new(&mut buffer);
-            let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor, get_ticks);
+            let executor = StorageLockedWCETExecutor::<4, TIMER>::new(&mut buffer);
+            let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor);
             bench.run_benchmark::<TIMER>(run_options);
         }
     }
