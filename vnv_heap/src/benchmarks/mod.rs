@@ -12,6 +12,9 @@ pub use persist_latency::*;
 mod microbenchmarks;
 use microbenchmarks::*;
 
+mod locked_wcet;
+use locked_wcet::*;
+
 pub(crate) mod common;
 
 mod applications;
@@ -34,7 +37,8 @@ pub struct RunAllBenchmarkOptions {
     pub run_long_persistent_storage_benchmarks: bool,
     pub run_dirty_size_persist_latency: bool,
     pub run_buffer_size_persist_latency: bool,
-    pub run_event_queue_benchmarks: bool
+    pub run_event_queue_benchmarks: bool,
+    pub run_locked_wcet_benchmarks: bool
 }
 
 impl Default for RunAllBenchmarkOptions {
@@ -50,7 +54,8 @@ impl Default for RunAllBenchmarkOptions {
             run_long_persistent_storage_benchmarks: false,
             run_dirty_size_persist_latency: false,
             run_buffer_size_persist_latency: false,
-            run_event_queue_benchmarks: false
+            run_event_queue_benchmarks: false,
+            run_locked_wcet_benchmarks: false
         }
     }
 }
@@ -68,7 +73,8 @@ impl RunAllBenchmarkOptions {
             run_long_persistent_storage_benchmarks: true,
             run_dirty_size_persist_latency: true,
             run_buffer_size_persist_latency: true,
-            run_event_queue_benchmarks: true
+            run_event_queue_benchmarks: true,
+            run_locked_wcet_benchmarks: true
         }
     }
     pub fn microbenchmarks() -> Self {
@@ -81,6 +87,7 @@ impl RunAllBenchmarkOptions {
             run_baseline_get_benchmarks: true,
             run_persistent_storage_benchmarks: true,
             run_long_persistent_storage_benchmarks: true,
+            run_locked_wcet_benchmarks: false,
             ..Default::default()
         }
     }
@@ -139,6 +146,9 @@ pub fn run_all_benchmarks<
     if options.run_event_queue_benchmarks {
         iteration_count += EventQueueBenchmarkRunner::get_iteration_count(&options);
     }
+    if options.run_locked_wcet_benchmarks {
+        iteration_count += LockedWCETRunner::get_iteration_count(&options);
+    }
     let mut handle_it = || {
         handle_curr_iteration(&mut curr_iteration, iteration_count);
     };
@@ -161,6 +171,9 @@ pub fn run_all_benchmarks<
     }
     if options.run_event_queue_benchmarks {
         EventQueueBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    }
+    if options.run_locked_wcet_benchmarks {
+        LockedWCETRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     }
     println!("")
 }

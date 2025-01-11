@@ -32,9 +32,9 @@ impl<'a, T> SharedPersistLock<'a, T> {
 }
 
 pub(crate) struct SharedPersistGuard<'a, 'b, T> {
-    persist_queued: &'a AtomicBool,
-    obj_ref: &'b mut T,
-    guard: ManuallyDrop<Locked<'b, ()>>,
+    pub(crate) persist_queued: &'a AtomicBool,
+    pub(crate) obj_ref: &'b mut T,
+    pub(crate) guard: ManuallyDrop<Locked<'b, ()>>,
 }
 
 impl<T> Deref for SharedPersistGuard<'_, '_, T> {
