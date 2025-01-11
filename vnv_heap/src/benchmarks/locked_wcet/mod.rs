@@ -42,6 +42,31 @@ const VNV_HEAP_RAM_OVERHEAD: usize = {
         + VNVHeap::<'_, A, N, M, DummyStorageModule>::get_layout_info().persist_access_point_size
 };
 
+
+const STEP_SIZE: usize = 32;
+
+const MIN_BUFFER_SIZE: usize = 512 - VNV_HEAP_RAM_OVERHEAD;
+const MAX_BUFFER_SIZE: usize = 4 * 1024 - VNV_HEAP_RAM_OVERHEAD;
+
+const STEP_COUNT: usize = (MAX_BUFFER_SIZE - MIN_BUFFER_SIZE) / STEP_SIZE + 1;
+
+macro_rules! for_buffer_size_impl {
+    ($index: ident, $inner: expr) => {
+        static_assertions::const_assert_eq!((MAX_BUFFER_SIZE - MIN_BUFFER_SIZE) % STEP_SIZE, 0);
+        for x in 0..STEP_COUNT {
+            let $index: usize = x * STEP_SIZE + MIN_BUFFER_SIZE;
+            $inner
+        }
+    };
+}
+
+macro_rules! for_buffer_size {
+    ($index: ident, $inner: expr) => {
+        for_buffer_size_impl!($index, $inner);
+    };
+}
+
+
 pub(crate) struct LockedWCETRunner;
 
 impl BenchmarkRunner for LockedWCETRunner {
@@ -49,6 +74,7 @@ impl BenchmarkRunner for LockedWCETRunner {
         let mut iteration_count = 0;
         if options.run_locked_wcet_benchmarks {
             iteration_count += 1;
+            iteration_count += STEP_COUNT;
         }
 
         iteration_count
@@ -73,14 +99,26 @@ impl BenchmarkRunner for LockedWCETRunner {
         );
 
         if options.run_locked_wcet_benchmarks {
+            let mut buffer = [0u8; MAX_BUFFER_SIZE];
 
-            handle_curr_iteration();
-            let mut a = A::new();
-            let mut storage = get_storage();
-            let mut buffer = [0u8; 4];
-            let executor = StorageLockedWCETExecutor::<4, TIMER>::new(&mut buffer);
-            let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor);
-            bench.run_benchmark::<TIMER>(run_options);
+            for_buffer_size!(buffer_size, {
+                handle_curr_iteration();
+                let mut a = A::new();
+                let mut storage = get_storage();
+                let executor = ObjectManager1LockedWCETExecutor::<TIMER>::new(&mut buffer[0..buffer_size], size_of::<usize>());
+                let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor);
+                bench.run_benchmark::<TIMER>(run_options);
+            });
+            
+            {
+                handle_curr_iteration();
+                let mut a = A::new();
+                let mut storage = get_storage();
+                let mut buffer = [0u8; 4];
+                let executor = StorageLockedWCETExecutor::<TIMER>::new(&mut buffer);
+                let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor);
+                bench.run_benchmark::<TIMER>(run_options);    
+            }
         }
     }
 }

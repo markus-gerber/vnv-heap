@@ -12,13 +12,13 @@ pub(crate) struct StorageLockedWCETExecutorOptions {
     object_size: usize,
 }
 
-pub(crate) struct StorageLockedWCETExecutor<'a, const ACCESS_SIZE: usize, TIMER: Timer> {
-    buffer: &'a mut [u8; ACCESS_SIZE],
+pub(crate) struct StorageLockedWCETExecutor<'a, TIMER: Timer> {
+    buffer: &'a mut [u8],
     _phantom_data: PhantomData<TIMER>,
 }
 
-impl<'a, const ACCESS_SIZE: usize, TIMER: Timer> StorageLockedWCETExecutor<'a, ACCESS_SIZE, TIMER> {
-    pub(crate) fn new(buffer: &'a mut [u8; ACCESS_SIZE]) -> Self {
+impl<'a, TIMER: Timer> StorageLockedWCETExecutor<'a, TIMER> {
+    pub(crate) fn new(buffer: &'a mut [u8]) -> Self {
         Self {
             buffer,
             _phantom_data: PhantomData,
@@ -26,9 +26,9 @@ impl<'a, const ACCESS_SIZE: usize, TIMER: Timer> StorageLockedWCETExecutor<'a, A
     }
 }
 
-impl<'a, 'b, A: AllocatorModule, const ACCESS_SIZE: usize, TIMER: Timer>
+impl<'a, 'b, A: AllocatorModule, TIMER: Timer>
     LockedWCETExecutor<'a, A, StorageLockedWCETExecutorOptions>
-    for StorageLockedWCETExecutor<'b, ACCESS_SIZE, TIMER>
+    for StorageLockedWCETExecutor<'b, TIMER>
 {
     fn execute(
         &mut self,
