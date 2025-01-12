@@ -6,7 +6,7 @@ use crate::{
     VNVHeap, VNVObject,
 };
 use core::hint::black_box;
-use std::mem::size_of;
+use std::{mem::size_of, ops::Deref};
 use serde::Serialize;
 
 use super::{Benchmark, ModuleOptions, Timer};
@@ -33,6 +33,7 @@ pub struct GetMaxMinBenchmark<
     object: VNVObject<'a, 'b, [u8; OBJ_SIZE], A, N, M>,
     // others are small objects that are resident too
     others: Vec<VNVObject<'a, 'b, SmallestObjData, A, N, M>>,
+    other_ptrs: Vec<usize>,
 }
 
 impl<
@@ -56,6 +57,7 @@ impl<
         );
         let mut object = heap.allocate::<[u8; OBJ_SIZE]>([0u8; OBJ_SIZE]).unwrap();
         let mut others: Vec<VNVObject<'a, 'b, SmallestObjData, A, N, M>> = vec![];
+        let mut other_ptrs = vec![];
 
         object.unload().unwrap();
         loop {
@@ -75,18 +77,20 @@ impl<
                     .borrow_mut()
                     .get_ref(new_obj.get_alloc_id(), false)
             };
-            if pin_res.is_err() {
+            if let Ok(ptr) = pin_res {
+                others.push(new_obj);
+                other_ptrs.push(ptr as usize)
+            } else {
                 // could not make resident
                 // deallocate and break
                 break;
-            } else {
-                others.push(new_obj);
             }
         }
 
         // okay now we allocated too many objects, as "object" cannot be resident anymore
         // so unpin and deallocate the last one of the other objects now
         let last = others.pop().unwrap();
+        let _ = other_ptrs.pop().unwrap();
 
         unsafe {
             heap.get_inner()
@@ -102,6 +106,7 @@ impl<
             _heap: heap,
             object,
             others,
+            other_ptrs
         }
     }
 }
@@ -123,7 +128,18 @@ impl<
 
     #[inline]
     fn execute<T: Timer>(&mut self) -> u32 {
-        debug_assert!(self.object.is_resident(), "object should be resident");
+
+        {
+            debug_assert!(self.object.is_resident(), "object should be resident");
+            for other in self.others.iter() {
+                assert!(other.is_resident());
+            }
+
+            let obj_ptr = self.object.get().unwrap().deref().as_ptr() as usize;
+            for other in self.other_ptrs.iter() {
+                assert!(*other < obj_ptr);
+            }
+        }
 
         let timer = T::start();
 

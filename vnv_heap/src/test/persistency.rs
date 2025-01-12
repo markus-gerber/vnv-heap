@@ -3,6 +3,7 @@ use std::{array, vec};
 
 use super::get_test_heap;
 
+// TODO
 //#[test]
 fn test_heap_persistency() {
     type TestType = [u8; 10];
