@@ -22,12 +22,15 @@ impl ResidentList {
         self.head.load(Ordering::SeqCst).is_null()
     }
 
-    /// Push `item` to the front of the list
+    /// Inserts `item` to the list.
+    /// 
+    /// As all items are sorted based on their addresses, this will iterate over the list and insert
+    /// it to the right place.
     ///
     /// ### Safety
     ///
-    /// This is only safe if `item` was not previously pushed to any list before (pushing after popping an item is okay tho).
-    pub(crate) unsafe fn push(&self, item: &mut ResidentObjectMetadata) {
+    /// This is only safe if this list does not contain `item`.
+    pub(crate) unsafe fn insert(&self, item: &mut ResidentObjectMetadata) {
         let new_addr = (item as *mut ResidentObjectMetadata) as usize;
         let mut prev = &self.head;
         let mut curr;
@@ -49,21 +52,20 @@ impl ResidentList {
         prev.store(item, Ordering::SeqCst);
     }
 
-    /// Try to remove the first item in the list
-    pub(crate) fn pop(&self) -> Option<*mut ResidentObjectMetadata> {
-        match self.is_empty() {
-            true => None,
-            false => {
-                // Advance head pointer
-                let item = self.head.load(Ordering::SeqCst);
-                let new_head = unsafe { item.as_ref().unwrap() }
-                    .next_resident_object
-                    .load(Ordering::SeqCst);
+    /// Removes `item` from the list.
+    /// 
+    /// Returns Err if this item was not found in this list
+    pub(crate) fn remove(&self, item: *mut ResidentObjectMetadata) -> Result<(), ()> {
+        let mut iter = self.iter_mut();
 
-                self.head.store(new_head, Ordering::SeqCst);
-                Some(item)
+        while let Some(mut curr) = iter.next() {
+            if item == curr.get_element() {
+                curr.delete();
+                return Ok(());
             }
         }
+
+        Err(())
     }
 
     /// Returns an immutable iterator over the items in the list
@@ -292,39 +294,37 @@ mod test {
             }
         }
 
-        pub fn push(&mut self, item: &mut ResidentObjectMetadata) {
+        pub fn insert(&mut self, item: &mut ResidentObjectMetadata) {
             {
                 let check_item = item.clone();
                 check_item.next_resident_object.store(item, Ordering::SeqCst);
                 self.check_list.push(check_item);
             }
             self.check_list.sort_by_key(|x| x.next_resident_object.load(Ordering::SeqCst) as usize);
-            unsafe { self.list.push(item) };
+            unsafe { self.list.insert(item) };
 
             self.check_integrity();
         }
 
-        pub fn pop(&mut self) -> Option<*mut ResidentObjectMetadata> {
-            let item = if self.check_list.len() == 0 {
-                None
-            } else {
-                Some(self.check_list.remove(0))
+        pub fn remove(&mut self, index: usize) -> Result<(), ()> {
+            
+            let (ptr, item) = {
+                let mut iter = self.list.iter();
+                for _ in 0..index {
+                    iter.next().unwrap();
+                }
+                let item = iter.next().unwrap();
+                let copy = item.clone();
+                ((item as *const ResidentObjectMetadata) as *mut ResidentObjectMetadata, copy)
             };
 
-            let item_2 = self.list.pop();
+            let item2 = self.check_list.remove(index);
+            assert_eq!(item, item2);
 
-            assert_eq!(item.is_none(), item_2.is_none());
-            if item.is_none() {
-                return None;
-            }
+            self.list.remove(ptr)?;
 
-            let item = item.unwrap();
-            let item_2 = item_2.unwrap();
-
-            assert!(&item == unsafe { item_2.as_ref() }.unwrap());
             self.check_integrity();
-
-            Some(item_2)
+            Ok(())
         }
 
         pub fn check_integrity(&self) {
@@ -334,8 +334,13 @@ mod test {
             }
 
             assert_eq!(self.list.iter().count(), self.check_list.len());
+            let mut counter = 0;
 
             for (a, b) in self.list.iter().zip(self.check_list.iter()) {
+                if counter == 1000 {
+                    panic!("endless loop detected!");
+                }
+                counter += 1;
                 if ENABLE_PRINTS {
                     println!("{:?} =?= {:?}", a, b);
                 }
@@ -384,32 +389,50 @@ mod test {
             }};
         }
 
-        list.push(&mut data[1]);
+        list.insert(&mut data[1]);
         check_integrity!();
-        list.push(&mut data[5]);
+        list.insert(&mut data[5]);
         check_integrity!();
-        list.push(&mut data[4]);
+        list.insert(&mut data[4]);
         check_integrity!();
-        list.push(&mut data[3]);
+        list.insert(&mut data[3]);
         check_integrity!();
-        list.push(&mut data[2]);
+        list.insert(&mut data[2]);
         check_integrity!();
-        list.push(&mut data[8]);
-        check_integrity!();
-
-        list.pop();
-        check_integrity!();
-        list.pop();
-        check_integrity!();
-        list.pop();
+        list.insert(&mut data[8]);
         check_integrity!();
 
-        list.push(&mut data[1]);
+        // list at this point: [1,2,3,4,5,8]
+
+        list.remove(0).unwrap();
         check_integrity!();
-        list.push(&mut data[3]);
+        
+        // list at this point: [2,3,4,5,8]
+        list.remove(4).unwrap();
         check_integrity!();
-        list.push(&mut data[2]);
+        
+        // list at this point: [2,3,4,5]
+        list.remove(0).unwrap();
         check_integrity!();
+        
+        // list at this point: [3,4,5]
+        list.remove(1).unwrap();
+        check_integrity!();
+        
+        // list at this point: [3,5]
+        
+        list.insert(&mut data[1]);
+        check_integrity!();
+
+        // list at this point: [1,3,5]
+        list.insert(&mut data[8]);
+        check_integrity!();
+
+        // list at this point: [1,3,5,8]
+        list.insert(&mut data[2]);
+        check_integrity!();
+        
+        // list at this point: [1,2,3,5,8]
 
         {
             if ENABLE_PRINTS {
@@ -499,27 +522,27 @@ mod test {
             }};
         }
 
-        list.push(&mut data[7]);
+        list.insert(&mut data[7]);
         check_integrity!();
-        list.push(&mut data[6]);
+        list.insert(&mut data[6]);
         check_integrity!();
-        list.push(&mut data[3]);
+        list.insert(&mut data[3]);
         check_integrity!();
-        list.push(&mut data[2]);
+        list.insert(&mut data[2]);
         check_integrity!();
-        list.push(&mut data[5]);
+        list.insert(&mut data[5]);
         check_integrity!();
-        list.push(&mut data[4]);
+        list.insert(&mut data[4]);
         check_integrity!();
-        list.push(&mut data[8]);
+        list.insert(&mut data[8]);
         check_integrity!();
-        list.push(&mut data[1]);
+        list.insert(&mut data[1]);
         check_integrity!();
-        list.push(&mut data[0]);
+        list.insert(&mut data[0]);
         check_integrity!();
 
         for _ in 0..9 {
-            list.pop();
+            list.remove(0).unwrap();
             check_integrity!();
         }
     }

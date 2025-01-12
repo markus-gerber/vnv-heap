@@ -255,7 +255,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                 "Dirty size of newly created metadata should match const value"
             );
 
-            self.resident_list.push(meta_ref);
+            self.resident_list.insert(meta_ref);
         }
 
         // FINISHED WITH CRITICAL ALLOCATE SECTION!
@@ -283,8 +283,8 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                     // during its execution, it is fine
                     let guard = self.heap.try_lock().unwrap();
 
-                    // pop previously created resident object
-                    let _ = self.resident_list.pop();
+                    // remove previously created resident object
+                    let _ = self.resident_list.remove(meta_ptr);
 
                     guard.as_mut().unwrap().deallocate(obj_ptr, total_layout);
                     drop(guard);
@@ -403,7 +403,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                 "Previously calculated dirty size should match the current/actual one"
             );
 
-            unsafe { self.resident_list.push(&mut obj_ref.metadata) };
+            unsafe { self.resident_list.insert(&mut obj_ref.metadata) };
         }
 
         drop(guard);
