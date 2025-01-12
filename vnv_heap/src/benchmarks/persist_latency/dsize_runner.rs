@@ -75,6 +75,11 @@ macro_rules! for_dirty_size {
         for_dirty_size_impl!($index, $inner, 121);
 
         #[cfg(target_pointer_width = "64")]
+        #[cfg(test)]
+        for_dirty_size_impl!($index, $inner, 113);
+
+        #[cfg(target_pointer_width = "64")]
+        #[cfg(not(test))]
         for_dirty_size_impl!($index, $inner, 114);
     };
 }
@@ -82,6 +87,7 @@ macro_rules! for_dirty_size {
 pub(crate) struct DirtySizePersistLatencyRunner;
 
 impl BenchmarkRunner for DirtySizePersistLatencyRunner {
+
     fn get_iteration_count(options: &RunAllBenchmarkOptions) -> usize {
         let mut iteration_count = 0;
         if options.run_dirty_size_persist_latency {

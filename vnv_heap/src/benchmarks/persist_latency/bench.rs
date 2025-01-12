@@ -243,6 +243,19 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_dirty(
         rem_dirty,
     );
     if rem_dirty_size < size_of::<usize>() {
+        let rem_space = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
+        if rem_space < size_of::<usize>() && rem_space != 0 {
+            obj_cnt -= 1;
+        } else if rem_space < 2 * size_of::<usize>() && rem_space != 0 {
+            obj_cnt -= 1;
+            rem_size = rem_space + size_of::<usize>();
+
+            if rem_dirty_size >= rem_space {
+                rem_dirty = true;
+            } else {
+                rem_dirty = false;
+            }
+        }
         final_check(
             dirty_size,
             buf_size,
@@ -582,16 +595,29 @@ pub(super) const fn calc_obj_cnt_and_rem_size_max_objects(
         }
     }
 
-    let rem_space = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
-    if rem_space < 2 * size_of::<usize>() && rem_space != 0 {
+    let rem_space_curr = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
+    if rem_space_curr < 2 * size_of::<usize>() && rem_space_curr != 0 {
         obj_cnt -= 1;
         dirty_obj_cnt -= 1;
-        rem_size = rem_space + size_of::<usize>();
 
-        if rem_dirty_size >= rem_space {
-            rem_dirty = true;
-        } else {
-            rem_dirty = false;
+        if rem_space_curr % size_of::<usize>() == 0 {
+            let rem_space_curr = rem_space(dirty_size, buf_size, obj_cnt, rem_size);
+            let rem_dirty_size = remaining_dirty_size(
+                dirty_size,
+                buf_size,
+                obj_cnt,
+                dirty_obj_cnt,
+                rem_size,
+                rem_dirty,
+            );
+
+            rem_size = rem_space_curr - size_of::<ResidentObjectMetadata>();
+    
+            if rem_dirty_size >= rem_size + metadata_dirty_size {
+                rem_dirty = true;
+            } else {
+                rem_dirty = false;
+            }    
         }
     }
 
