@@ -103,12 +103,13 @@ mod test {
             allocator: &N,
             storage: &mut FilePersistentStorageModule,
         ),
+        name: &'static str
     ) {
         let mut allocator: N = N::new();
         const MIN_SIZE: usize = size_of::<usize>();
         const TOTAL_SIZE: usize = 1024;
 
-        let mut storage = get_test_storage("test_non_resident_allocator_no_overlap", TOTAL_SIZE);
+        let mut storage = get_test_storage(name, TOTAL_SIZE);
         allocator.init(0, TOTAL_SIZE, &mut storage).unwrap();
 
         let mut regions: Vec<AllocatedRegion> = Vec::new();

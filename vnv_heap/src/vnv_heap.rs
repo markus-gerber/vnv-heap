@@ -111,8 +111,7 @@ impl<
         // (until PERSIST_ACCESS_POINT is unset)
         #[cfg(test)]
         let mutex_guard = PERSIST_MUTEX.lock().map_err(|_| {
-            println!("Error while locking PERSIST_MUTEX! This normally happens if one thread panics and still has access to a VNVHeap!");
-            ()
+            panic!("Error while locking PERSIST_MUTEX! This normally happens if one thread panics and still has access to a VNVHeap!");
         })?;
 
         let cutoff_ptr =
@@ -260,15 +259,17 @@ impl<
     /// pd = partial dirty
     pub fn allocate_pd_array<'b, T: Sized + Copy + 'b, const SIZE: usize>(
         &'b self,
-        initial_value: [T; SIZE],
+        _initial_value: [T; SIZE],
     ) -> Result<VNVArray<'b, 'a, T, SIZE, A, N, M>, ()>
     where
         'a: 'b,
     {
-        let mut inner = self.inner.borrow_mut();
+        panic!("partial dirtiness currently not 100% supported.");
+
+        /*let mut inner = self.inner.borrow_mut();
         let identifier = unsafe { inner.allocate(initial_value, true)? };
 
-        Ok(VNVArray::new(&self.inner, identifier))
+        Ok(VNVArray::new(&self.inner, identifier))*/
     }
 
     pub fn new_list<'b, T: Sized + Clone>(

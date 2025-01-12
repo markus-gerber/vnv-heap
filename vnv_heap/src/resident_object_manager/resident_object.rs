@@ -62,6 +62,9 @@ impl<T: Sized> ResidentObject<T> {
         };
 
         {
+            let (total_layout, obj_offset) = calc_resident_obj_layout_static::<T>(use_partial_dirtiness_tracking);
+            let base_ptr = (resident_ptr as *mut u8).sub(obj_offset);
+
             // IMPORTANT: lock the shared persist lock for this modify block
             // because there are race conditions between this and vnv_persist_all (deallocate is not atomar)
 
@@ -77,8 +80,6 @@ impl<T: Sized> ResidentObject<T> {
             }
 
             // now, as this item is not used anymore, deallocate it
-            let (total_layout, obj_offset) = calc_resident_obj_layout_static::<T>(use_partial_dirtiness_tracking);
-            let base_ptr = (resident_ptr as *mut u8).sub(obj_offset);
             guard
                 .as_mut()
                 .unwrap()

@@ -70,13 +70,18 @@ impl<
             let new_obj = heap.allocate([0; SMALLEST_OBJ_SIZE]).unwrap();
 
             // pin this object in RAM
-            unsafe {
+            let pin_res = unsafe {
                 heap.get_inner()
                     .borrow_mut()
                     .get_ref(new_obj.get_alloc_id(), false)
-                    .unwrap()
             };
-            others.push(new_obj);
+            if pin_res.is_err() {
+                // could not make resident
+                // deallocate and break
+                break;
+            } else {
+                others.push(new_obj);
+            }
         }
 
         // okay now we allocated too many objects, as "object" cannot be resident anymore

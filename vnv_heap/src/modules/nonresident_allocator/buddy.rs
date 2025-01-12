@@ -171,7 +171,7 @@ mod test {
 
     #[test]
     pub(super) fn test_non_resident_allocator_simple() {
-        test_non_resident_allocator_simple_generic(check_integrity);
+        test_non_resident_allocator_simple_generic(check_integrity, "test_non_resident_allocator_simple_buddy");
     }
 
     /// checks that the free list does not overlap itself

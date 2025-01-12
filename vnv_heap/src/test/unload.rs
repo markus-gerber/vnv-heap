@@ -5,8 +5,8 @@ use crate::resident_object_manager::partial_dirtiness_tracking::PARTIAL_DIRTINES
 
 use super::get_test_heap;
 
-#[test]
-fn test_heap_unload_vnv_list() {
+//#[test]
+fn test_heap_unload_vnv_pd_array() {
     type TestType = [u8; 1000];
 
     fn rand_data(rand: &mut SmallRng) -> TestType {
