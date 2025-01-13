@@ -79,27 +79,6 @@ impl<'a, 'b, A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManage
                     .init(start_ref, resident_buffer.len())
             };
 
-            /*
-            // dirty way to test which object sizes can be allocated and which cannot
-            unsafe {
-                let x = guard.as_mut().unwrap();
-                seq_macro::seq!(I in 896..1024 {
-                    {
-                        match x.allocate(std::alloc::Layout::new::<ResidentObject<[u8; I]>>()) {
-                            Err(()) => {
-                                println!("{}: error, size: {}, align: {}", I, std::alloc::Layout::new::<ResidentObject<[u8; I]>>().size(), std::alloc::Layout::new::<ResidentObject<[u8; I]>>().align());
-                            },
-                            Ok(ptr) => {
-                                println!("{}: success, size: {}, align: {}", I, std::alloc::Layout::new::<ResidentObject<[u8; I]>>().size(), std::alloc::Layout::new::<ResidentObject<[u8; I]>>().align());
-                                x.deallocate(ptr, std::alloc::Layout::new::<ResidentObject<[u8; I]>>());
-                            }
-                        }
-
-
-                    }
-                });
-            }
-            */
         }
 
         let instance = ResidentObjectManager {
@@ -142,12 +121,12 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
             // unwrap is okay here because there are no other threads concurrently accessing it
             // except from vnv_persist_all, but as it is guaranteed that no other threads run
             // during its execution, it is fine
-            let guard = self.heap.try_lock().unwrap();
+            let guard = self.heap.try_lock().unwrap(); // (WCET analysis: resident_object_manager1, resident_object_manager2)
 
             match guard.as_mut().unwrap().allocate(total_layout) {
                 Ok(res) => (res, guard),
                 Err(_) => {
-                    drop(guard);
+                    drop(guard); // (WCET analysis: this is a better case as object_manager1)
 
                     debug!(
                         "Could not allocate {} bytes in RAM, try to make some other objects non resident...",
@@ -175,7 +154,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                             // unwrap is okay here because there are no other threads concurrently accessing it
                             // except from vnv_persist_all, but as it is guaranteed that no other threads run
                             // during its execution, it is fine
-                            let guard = self.heap.try_lock().unwrap();
+                            let guard = self.heap.try_lock().unwrap();  // (WCET analysis: resident_object_manager1, resident_object_manager2)
                             (
                                 guard.as_mut().unwrap().allocate(total_layout).expect(
                                     "unload_objects should made sure that there is enough space",
@@ -205,7 +184,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
             guard.as_mut().unwrap().deallocate(obj_ptr, total_layout);
 
             // drop the guard, as it is used by sync_dirty_data (when unloading objects)
-            drop(guard);
+            drop(guard); // (WCET analysis: resident_object_manager1)
 
             // not enough dirty bytes remaining
             // sync some data now by using object manager
@@ -222,7 +201,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
 
             // reallocate
             // this should not fail as we previously already allocated the space
-            guard = self.heap.try_lock().unwrap();
+            guard = self.heap.try_lock().unwrap(); // (WCET analysis: resident_object_manager2)
             obj_ptr = guard.as_mut().unwrap().allocate(total_layout).unwrap();
         }
 
@@ -259,7 +238,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         }
 
         // FINISHED WITH CRITICAL ALLOCATE SECTION!
-        drop(guard);
+        drop(guard); // (WCET analysis: resident_object_manager2)
 
         {
             // read object data T
@@ -281,13 +260,13 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                     // unwrap is okay here because there are no other threads concurrently accessing it
                     // except from vnv_persist_all, but as it is guaranteed that no other threads run
                     // during its execution, it is fine
-                    let guard = self.heap.try_lock().unwrap();
+                    let guard = self.heap.try_lock().unwrap(); // (WCET analysis: resident_object_manager3)
 
                     // remove previously created resident object
                     let _ = self.resident_list.remove(meta_ptr);
 
                     guard.as_mut().unwrap().deallocate(obj_ptr, total_layout);
-                    drop(guard);
+                    drop(guard); // (WCET analysis: resident_object_manager3)
 
                     self.remaining_dirty_size += dirty_size;
 
@@ -361,7 +340,7 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
             return Err(data);
         }
 
-        let guard = self.heap.try_lock().unwrap();
+        let guard = self.heap.try_lock().unwrap(); // (WCET analysis: resident_object_manager4)
         let res_ptr = unsafe { guard.as_mut().unwrap().allocate(resident_obj_layout) };
         let res_ptr = match res_ptr {
             Ok(res) => res,
@@ -374,14 +353,14 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         self.remaining_dirty_size -= dirty_size;
 
         // read data now and store it to the allocated region in memory
-        let ptr = res_ptr as *mut ResidentObject<T>;
+        let ptr = res_ptr as *mut ResidentObjectMetadata;
 
         let mut metadata = ResidentObjectMetadata::new::<T>(
             storage_offset,
             use_partial_dirtiness_tracking,
         );
         metadata.inner.status.set_data_dirty(true);
-        unsafe { ptr.write(ResidentObject { metadata, data }) };
+        unsafe { ptr.write(metadata) };
 
         {
             // some checks and append to resident list
@@ -390,7 +369,6 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
             // this does not do anything if partial dirtiness tracking is disabled
             unsafe {
                 obj_ref
-                    .metadata
                     .inner
                     .partial_dirtiness_tracking_info
                     .get_wrapper(ptr as *mut ResidentObjectMetadata)
@@ -399,14 +377,18 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
 
             debug_assert_eq!(
                 dirty_size,
-                obj_ref.metadata.dirty_size(),
+                obj_ref.dirty_size(),
                 "Previously calculated dirty size should match the current/actual one"
             );
 
-            unsafe { self.resident_list.insert(&mut obj_ref.metadata) };
+            unsafe { self.resident_list.insert(obj_ref) };
         }
 
-        drop(guard);
+        drop(guard); // (WCET analysis: resident_object_manager4)
+
+        // now fill the object with data
+        let object_ref = unsafe { (ptr as *mut ResidentObject<T>).as_mut().unwrap() };
+        object_ref.data = data;
 
         Ok(())
     }
