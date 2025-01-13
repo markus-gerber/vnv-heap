@@ -96,7 +96,7 @@ impl<'a, 'b, A: AllocatorModule, TIMER: Timer>
     }
 
     fn get_name(&self) -> &'static str {
-        "resident_object_manager_2_locked_wcet"
+        "resident_object_manager_3_locked_wcet"
     }
 
     fn get_bench_options(&self) -> ResidentObjectManager3LockedWCETExecutorOptions {
