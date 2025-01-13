@@ -74,7 +74,7 @@ impl BenchmarkRunner for LockedWCETRunner {
         let mut iteration_count = 0;
         if options.run_locked_wcet_benchmarks {
             iteration_count += 1;
-            iteration_count += STEP_COUNT;
+            iteration_count += (3 + 2 * 3) * STEP_COUNT;
         }
 
         iteration_count
@@ -109,7 +109,52 @@ impl BenchmarkRunner for LockedWCETRunner {
                 let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor);
                 bench.run_benchmark::<TIMER>(run_options);
             });
+
+            for_buffer_size!(buffer_size, {
+                handle_curr_iteration();
+                let mut a = A::new();
+                let mut storage = get_storage();
+                let executor = ResidentObjectMetadata1LockedWCETExecutor::<TIMER>::new(&mut buffer[0..buffer_size], size_of::<usize>());
+                let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor);
+                bench.run_benchmark::<TIMER>(run_options);
+            });
             
+
+            for_buffer_size!(buffer_size, {
+                handle_curr_iteration();
+                let mut a = A::new();
+                let mut storage = get_storage();
+                let executor = ResidentObjectManager1LockedWCETExecutor::<TIMER>::new(&mut buffer[0..buffer_size], size_of::<usize>());
+                let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor);
+                bench.run_benchmark::<TIMER>(run_options);
+            });
+            for variant in [false, true] {
+                for_buffer_size!(buffer_size, {
+                    handle_curr_iteration();
+                    let mut a = A::new();
+                    let mut storage = get_storage();
+                    let executor = ResidentObjectManager2LockedWCETExecutor::<TIMER>::new(variant, &mut buffer[0..buffer_size], size_of::<usize>());
+                    let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor);
+                    bench.run_benchmark::<TIMER>(run_options);
+                });
+                for_buffer_size!(buffer_size, {
+                    handle_curr_iteration();
+                    let mut a = A::new();
+                    let mut storage = get_storage();
+                    let executor = ResidentObjectManager3LockedWCETExecutor::<TIMER>::new(variant, &mut buffer[0..buffer_size], size_of::<usize>());
+                    let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor);
+                    bench.run_benchmark::<TIMER>(run_options);
+                });
+                for_buffer_size!(buffer_size, {
+                    handle_curr_iteration();
+                    let mut a = A::new();
+                    let mut storage = get_storage();
+                    let executor = ResidentObjectManager4LockedWCETExecutor::<TIMER>::new(variant, &mut buffer[0..buffer_size], size_of::<usize>());
+                    let bench = LockedWCETBenchmark::new(&mut storage, &mut a, executor);
+                    bench.run_benchmark::<TIMER>(run_options);
+                });
+            }
+
             {
                 handle_curr_iteration();
                 let mut a = A::new();

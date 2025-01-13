@@ -10,19 +10,19 @@ use crate::{
 };
 
 #[derive(Serialize)]
-pub(crate) struct ObjectManager1LockedWCETExecutorOptions {
+pub(crate) struct ResidentObjectManager1LockedWCETExecutorOptions {
     buffer_size: usize,
     object_size: usize,
 }
 
-pub(crate) struct ObjectManager1LockedWCETExecutor<'a, TIMER: Timer> {
+pub(crate) struct ResidentObjectManager1LockedWCETExecutor<'a, TIMER: Timer> {
     buffer: &'a mut [u8],
     object_size: usize,
     _phantom_data: PhantomData<TIMER>,
 }
 
 impl<'a, TIMER: Timer>
-    ObjectManager1LockedWCETExecutor<'a, TIMER>
+    ResidentObjectManager1LockedWCETExecutor<'a, TIMER>
 {
     pub(crate) fn new(buffer: &'a mut [u8], object_size: usize) -> Self {
         Self {
@@ -34,8 +34,8 @@ impl<'a, TIMER: Timer>
 }
 
 impl<'a, 'b, A: AllocatorModule, TIMER: Timer>
-    LockedWCETExecutor<'a, A, ObjectManager1LockedWCETExecutorOptions>
-    for ObjectManager1LockedWCETExecutor<'b, TIMER>
+    LockedWCETExecutor<'a, A, ResidentObjectManager1LockedWCETExecutorOptions>
+    for ResidentObjectManager1LockedWCETExecutor<'b, TIMER>
 {
     fn execute(
         &mut self,
@@ -64,13 +64,14 @@ impl<'a, 'b, A: AllocatorModule, TIMER: Timer>
         }
 
         enable_measurement.store(true, std::sync::atomic::Ordering::SeqCst);
-        {
+        unsafe {
             let guard = heap.try_lock_measured::<TIMER>().unwrap();
 
-            unsafe {
-                if let Ok(ptr) = guard.as_mut().unwrap().allocate(layout.clone()) {
-                    guard.as_mut().unwrap().deallocate(ptr, layout.clone());
-                }
+            let res = guard.as_mut().unwrap().allocate(layout).unwrap(); // O(n)
+            let dirty_size = ResidentObjectMetadata::fresh_object_dirty_size::<usize>(false); // O(1)
+
+            if 1 < dirty_size {
+                guard.as_mut().unwrap().deallocate(res, layout); // O(n)
             }
 
             guard.measured_drop()
@@ -78,11 +79,11 @@ impl<'a, 'b, A: AllocatorModule, TIMER: Timer>
     }
 
     fn get_name(&self) -> &'static str {
-        "object_manager_1_locked_wcet"
+        "resident_object_manager_1_locked_wcet"
     }
 
-    fn get_bench_options(&self) -> ObjectManager1LockedWCETExecutorOptions {
-        ObjectManager1LockedWCETExecutorOptions {
+    fn get_bench_options(&self) -> ResidentObjectManager1LockedWCETExecutorOptions {
+        ResidentObjectManager1LockedWCETExecutorOptions {
             buffer_size: self.buffer.len(),
             object_size: self.object_size,
         }

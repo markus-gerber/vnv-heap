@@ -1,11 +1,108 @@
 use core::panic;
-use std::{marker::PhantomData, mem::{transmute, ManuallyDrop}, ops::{Deref, DerefMut}, sync::atomic::{AtomicBool, Ordering}};
+use std::{alloc::Layout, marker::PhantomData, mem::{transmute, ManuallyDrop}, ops::{Deref, DerefMut}, ptr::NonNull, sync::atomic::{AtomicBool, Ordering}};
 
 use try_lock::TryLock;
 
 use crate::{benchmarks::Timer, shared_persist_lock::{SharedPersistGuard, SharedPersistLock}};
 
-use super::microbenchmarks::PersistentStorageModule;
+use super::{microbenchmarks::PersistentStorageModule, AllocatorModule};
+
+/// Maximizes the hole list length while using `min_layout` to create holes.
+/// 
+/// This functions also makes sure that `target_layout` still fits after this function is finished and uses the hole
+/// at the end of the hole list (as long as `target_layout.size() > `min_layout.size()`).
+pub(super) fn maximize_hole_list_length<A: AllocatorModule>(heap: &mut A, target_layout: Layout, min_layout: Layout) -> Vec<NonNull<u8>> {
+    // maximize the amount of holes for this allocator
+    unsafe {
+        let mut res_ptrs = vec![];
+        let mut dealloc_ptrs = vec![];
+        loop {
+            if let Ok(res) = heap.allocate(min_layout) {
+                let res2 = heap.allocate(min_layout);
+                if let Ok(res2) = res2 {
+                    dealloc_ptrs.push(res);
+
+                    res_ptrs.push(res2);
+                } else {
+                    heap.deallocate(res, min_layout);
+
+                    // "target_layout" should still fit??
+                    break;
+                }
+            } else {
+                // "target_layout" should still fit??
+                break;
+            }
+
+            if let Ok(res) = heap.allocate(target_layout.clone()) {
+                // still fits, continue
+                heap.deallocate(res, target_layout.clone());
+            } else {
+                heap.deallocate(
+                    res_ptrs.pop().expect(
+                        "Should have a prev ptr, or the object did not fit in the first place!",
+                    ),
+                    min_layout,
+                );
+                break;
+            }
+        }
+
+        // deallocate every second region to create holes
+        for ptr in dealloc_ptrs {
+            heap.deallocate(ptr, min_layout);
+        }
+
+        // verify that our object really fits
+        if let Ok(res) = heap.allocate(target_layout.clone()) {
+            // still fits, continue
+            heap.deallocate(res, target_layout.clone());
+            res_ptrs
+        } else {
+            panic!("should not happen!");
+        }
+    }
+}
+
+
+/// Maximizes the resident object list length while using `min_layout` to allocate resident objects.
+/// 
+/// This functions also makes sure that `target_layout` still fits after this function is finished
+pub(super) fn maximize_resident_object_list_length<A: AllocatorModule>(heap: &mut A, target_layout: Layout, min_layout: Layout) -> Vec<NonNull<u8>> {
+    unsafe {
+        let mut res_ptrs = vec![];
+        loop {
+            if let Ok(res) = heap.allocate(min_layout) {
+                res_ptrs.push(res);
+            } else {
+                // "target_layout" should still fit??
+                break;
+            }
+
+            if let Ok(res) = heap.allocate(target_layout.clone()) {
+                // still fits, continue
+                heap.deallocate(res, target_layout.clone());
+            } else {
+                heap.deallocate(
+                    res_ptrs.pop().expect(
+                        "Should have a prev ptr, or the object did not fit in the first place!",
+                    ),
+                    min_layout,
+                );
+                break;
+            }
+        }
+
+        // verify that our object really fits
+        if let Ok(res) = heap.allocate(target_layout.clone()) {
+            // still fits, continue
+            heap.deallocate(res, target_layout.clone());
+            res_ptrs
+        } else {
+            panic!("should not happen!");
+        }
+    }
+}
 
 pub(super) struct BenchmarkablePersistAccessPointInner {
     heap_lock: &'static TryLock<()>,

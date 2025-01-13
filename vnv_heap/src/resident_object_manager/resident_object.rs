@@ -73,6 +73,8 @@ impl<T: Sized> ResidentObject<T> {
             // during its execution, it is fine
             let guard = allocator_module.try_lock().unwrap();
 
+            // (for WCET analysis: this is the same/better case as resident_object_metadata_1)
+
             {
                 // IMPORTANT: drop metadata reference at the end of this block
                 // remove from resident object list
