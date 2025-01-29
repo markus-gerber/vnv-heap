@@ -1,4 +1,4 @@
-# Virtual Non-Volatile Heap (vNV-Heap)
+# Virtually Non-Volatile Heap (vNV-Heap)
 
 I (*Markus Gerber*) developed this heap as part of my bachelor thesis at the Chair of Computer Science 4 for Systemsoftware at the *Friedrich-Alexander University Erlangen-Nuremberg, Germany* (FAU).
 
