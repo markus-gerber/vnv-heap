@@ -178,7 +178,7 @@ To setup the toolchain for compiling the zephyr projects located in the [zephyr]
         {
             "arch": "riscv32",
             "atomic-cas": true,
-            "cpu": "generic-rv32",Virtually Non-Volatile
+            "cpu": "generic-rv32",
             "data-layout": "e-m:e-p:32:32-i64:64-n32-S128",
             "eh-frame-header": false,
             "emit-debug-gdb-scripts": false,
