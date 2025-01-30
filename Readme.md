@@ -52,12 +52,12 @@ To use the vNV-Heap in your application follow these steps.
         let heap = LinkedListAllocatorModule::new();
 
         // initiate the heap and specify all modules
-        let heap: vNV-Heap<
+        let heap: VNVHeap<
             LinkedListAllocatorModule,
             NonResidentBuddyAllocatorModule<16>,
             DefaultObjectManagementModule,
             FilePersistentStorageModule
-        > = vNV-Heap::new(
+        > = VNVHeap::new(
             &mut buffer,
             storage,
             heap,
