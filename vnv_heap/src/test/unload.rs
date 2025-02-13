@@ -14,7 +14,7 @@ fn test_heap_unload_vnv_pd_array() {
     }
 
     let mut buffer = [0u8; 2000];
-    let heap = get_test_heap("test_heap_persistency", 4 * 4096, &mut buffer, 2000, |_, _| {});
+    let heap = get_test_heap("test_heap_unload_vnv_pd_array", 4 * 4096, &mut buffer, 2000, |_, _| {});
     const SEED: u64 = 5446535461589659585;
 
     let mut rand = SmallRng::seed_from_u64(SEED);
@@ -92,7 +92,7 @@ fn test_heap_unload_vnv_object() {
     }
 
     let mut buffer = [0u8; 2000];
-    let heap = get_test_heap("test_heap_persistency", 4 * 4096, &mut buffer, 1200, |_, _| {});
+    let heap = get_test_heap("test_heap_unload_vnv_object", 4 * 4096, &mut buffer, 1200, |_, _| {});
     const SEED: u64 = 5446535461589659585;
 
     let mut rand = SmallRng::seed_from_u64(SEED);
