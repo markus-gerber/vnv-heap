@@ -35,7 +35,12 @@ impl<const ORDER: usize> AllocatorModule for BuddyAllocatorModule<ORDER> {
     #[cfg(debug_assertions)]
     #[allow(unused)]
     fn debug(&mut self) {
+        todo!();
+    }
 
+    #[cfg(debug_assertions)]
+    fn dump(&mut self) -> String {
+        self.inner.dump()
     }
 }
 

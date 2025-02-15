@@ -232,6 +232,11 @@ impl Heap {
     pub fn debug(&mut self) {
         self.holes.debug();
     }
+
+    #[cfg(debug_assertions)]
+    pub(crate) fn dump(&mut self) -> String {
+        self.holes.dump()
+    }
 }
 
 /// Align downwards. Returns the greatest x with alignment `align`

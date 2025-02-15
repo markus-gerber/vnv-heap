@@ -26,6 +26,14 @@ pub trait AllocatorModule {
     #[cfg(debug_assertions)]
     #[allow(unused)]
     fn debug(&mut self);
+
+    /// Dumps all information about the heap such that the heap's state is uniquely identified.
+    /// This can be used to check, whether the heap was restored correctly.
+    /// 
+    /// This implementation could be improved by using a custom trait/struct for this kind of data instead of a string.
+    #[cfg(debug_assertions)]
+    fn dump(&mut self) -> String;
+
 }
 
 #[cfg(test)]

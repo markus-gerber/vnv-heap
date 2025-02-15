@@ -37,6 +37,11 @@ impl AllocatorModule for LinkedListAllocatorModule {
     fn debug(&mut self) {
         self.inner.debug();
     }
+
+    #[cfg(debug_assertions)]
+    fn dump(&mut self) -> String {
+        self.inner.dump()
+    }
 }
 
 impl LinkedListAllocatorModule {

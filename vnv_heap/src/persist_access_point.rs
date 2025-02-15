@@ -13,9 +13,8 @@ use crate::{
 
 /// An object containing all necessary data
 /// 
-/// We need this as the VNVHeap object can be moved (if no objects).
-/// This would would break things, as we need to store a pointer the the necessary data once the VNVHeap is created
-/// so that `vnv_persist_all()` can access the needed data
+/// We need this as the VNVHeap object can be moved (if it is not borrowed/there exist no objects)
+/// and thus a simple pointer to the VNVHeap would not suffice
 pub(crate) struct PersistAccessPoint {
     inner: TryLock<Option<PersistAccessPointInner>>,
 }
@@ -113,6 +112,11 @@ impl PersistAccessPoint {
             #[cfg(debug_assertions)]
             let metadata_backup = collect_metadata(&inner.resident_list);
 
+            #[cfg(debug_assertions)]
+            let heap_dump_original = unsafe {
+                inner.heap.as_mut().unwrap().dump()
+            };
+
             // ###### START PERSISTING STATE ######
             persist(&inner.resident_list, &mut inner.storage);
 
@@ -130,8 +134,15 @@ impl PersistAccessPoint {
             );
 
             #[cfg(debug_assertions)]
+            unsafe {
+                let heap_dump_new = inner.heap.as_mut().unwrap().dump();
+                assert_eq!(*heap_dump_original, *heap_dump_new);
+            };
+
+            #[cfg(debug_assertions)]
             check_metadata(&inner.resident_list, metadata_backup);
-            
+
+
             print_persist_debug("restore finished\n");
         }
     }

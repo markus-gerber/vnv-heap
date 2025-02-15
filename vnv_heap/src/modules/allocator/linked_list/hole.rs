@@ -630,6 +630,28 @@ impl HoleList {
         }
     }
 
+    #[cfg(debug_assertions)]
+    pub(crate) fn dump(&mut self) -> String {
+        let mut res = String::new();
+        res.push_str(format!("{:?}: {}", Some(self.top as usize), self.bottom as usize).as_str());
+        res.push_str(format!(",{:?}: {}", self.first.next.map(|x| x.as_ptr() as usize), self.first.size).as_str());
+
+        if let Some(mut cursor) = self.cursor() {
+            loop {
+                let curr = cursor.current();
+                res.push_str(format!(",{:?}: {}", curr.next.map(|x| x.as_ptr() as usize), curr.size).as_str());
+
+                if let Some(c) = cursor.next() {
+                    cursor = c;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        res
+    }
+
     /// Returns the minimal allocation size. Smaller allocations or deallocations are not allowed.
     pub fn min_size() -> usize {
         size_of::<usize>() * 2

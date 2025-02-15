@@ -7,6 +7,7 @@ use core::alloc::Layout;
 use core::cmp::{max, min};
 use core::mem::size_of;
 use core::ptr::NonNull;
+use std::array::from_fn;
 
 pub struct Heap<const ORDER: usize> {
     // buddy system with max order of `ORDER`
@@ -187,6 +188,20 @@ impl<const ORDER: usize> Heap<ORDER> {
                 }
             }
         }
+    }
+
+    #[cfg(debug_assertions)]
+    pub(crate) fn dump(&self) -> String {
+        let mut result: [String; ORDER] = from_fn(|_| String::new());
+
+        for i in 0..ORDER {
+            for item in self.free_list[i].iter() {
+                result[i].push_str((item as usize).to_string().as_str());
+                result[i].push_str(",");
+            }
+        }
+
+        result.join("|")
     }
 }
 
