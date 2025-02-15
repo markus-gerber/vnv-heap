@@ -15,8 +15,7 @@ use crate::{
     vnv_persist_all, VNVObject,
 };
 
-// TODO
-// #[test]
+#[test]
 fn test_persist_all_simple() {
     type TestType = [u8; 10];
     // type TestType2 = [u8; 200];
@@ -122,7 +121,10 @@ fn test_persist_all_simple() {
         // check_states_lists: &mut Vec<[u8; 200]>,
     ) {
         for (object, check_state) in objects.iter_mut().zip(check_states.iter()) {
+            println!("{}, {}", object.is_resident(), object.is_data_dirty());
+
             let obj_ref = object.get().unwrap();
+            
             assert_eq!(*obj_ref, *check_state)
         }
         // for (object, check_state) in lists.iter_mut().zip(check_states_lists.iter()) {

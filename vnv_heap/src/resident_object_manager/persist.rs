@@ -1,6 +1,6 @@
 use std::{
     mem::size_of,
-    ptr::{copy, null_mut, slice_from_raw_parts, slice_from_raw_parts_mut},
+    ptr::{copy, null_mut, slice_from_raw_parts},
 };
 
 use super::{calc_resident_obj_layout_dynamic, resident_list::SharedResidentListRef, ResidentObjectMetadata, ResidentObjectMetadataBackup};
@@ -104,9 +104,8 @@ pub(crate) fn restore(
 
     // step 2: read slice size    
     let slice_size: usize = unsafe { read_storage_data(storage_ref, 0).unwrap() };
-    let slice_size = slice_size - size_of::<usize>();
 
-    if slice_size == 0 {
+    if slice_size == size_of::<usize>() {
         // no object were resident
         return;
     }
@@ -114,9 +113,9 @@ pub(crate) fn restore(
     // step 3: read one metadata backup at a time to restore the heap without overwriting any data
     // this is inefficient and could probably be fixed by using a deterministic heap...
     {
-        let mut curr_offset = 0;
+        let mut curr_offset = size_of::<usize>();
         while curr_offset < slice_size {
-            let backup: ResidentObjectMetadataBackup = unsafe { read_storage_data(storage_ref, curr_offset + size_of::<usize>()).unwrap() };
+            let backup: ResidentObjectMetadataBackup = unsafe { read_storage_data(storage_ref, curr_offset).unwrap() };
             let ram_offset = backup.ram_offset;
 
             let metadata = backup.to_metadata(null_mut());
@@ -137,63 +136,46 @@ pub(crate) fn restore(
         }
     }
 
-    // step 4: read the whole backup slice to the end of the buffer so easy recovery is possible
-    let slice = unsafe {
-        let slice = slice_from_raw_parts_mut(resident_buf_base_ptr.add(resident_buf_size - slice_size), slice_size);
-        let slice = slice.as_mut().unwrap();
-
-        storage_ref.read(size_of::<usize>(), slice).unwrap();
-
-        (slice as *mut [u8]) as *mut u8
-    };
-    let slice_end = unsafe { slice.add(slice_size) };
-
-    // step 5: move and restore the metadata and user data to the right location
+    // step 4: restore metadata and user data at the right location
+    let mut curr_offset = size_of::<usize>();
     let mut prev: *mut ResidentObjectMetadata = null_mut();
-    let mut curr = slice as *mut ResidentObjectMetadataBackup;
-    while (curr as *mut u8) < slice_end {
-        let (metadata, ram_ptr, status) = {
-            let mut_ref = unsafe { curr.as_mut().unwrap() };
-            let ram_ptr = ((mut_ref.ram_offset) as *mut u8) as *mut ResidentObjectMetadata;
-            let metadata = mut_ref.to_metadata(null_mut());
-            let status = metadata.inner.status.clone();
+    while curr_offset < slice_size {
+        let backup: ResidentObjectMetadataBackup = unsafe { read_storage_data(storage_ref, curr_offset).unwrap() };
+        curr_offset += size_of::<ResidentObjectMetadataBackup>();
 
-            (metadata, ram_ptr, status)
-        };
+        let ram_offset = backup.ram_offset;
+        let ram_ptr = (ram_offset as *mut u8) as *mut ResidentObjectMetadata;
+
+        let metadata = backup.to_metadata(null_mut());
+        let data_status = metadata.inner.status;
+        let data_layout = metadata.inner.layout;
+        debug_assert!(!metadata.inner.status.is_partial_dirtiness_tracking_enabled(), "not implemented");
 
         unsafe { ram_ptr.write(metadata) };
 
         if let Some(prev) = unsafe { prev.as_ref() } {
-            // if there was a previous object, we need to update its next ptr
+            // if there was a previous object, we need to update its "next" ptr
             let ptr = prev.next_resident_object.as_ptr();
 
             unsafe { ptr.write(ram_ptr) };
         };
 
         prev = ram_ptr;
-        
-        let end_ptr = unsafe { (curr).add(1) };
 
         let mut_ref = unsafe { ram_ptr.as_mut().unwrap() };
 
-        if status.is_data_dirty() {
-            // data was stored right after, move it to its right location
-            let (data_slice, data_slice_len) = unsafe {
-                let tmp = mut_ref.dynamic_metadata_to_data_range_mut();
-
-                ((tmp as *mut [u8]) as *mut u8, tmp.len())
-            };
+        // restore data
+        if data_status.is_data_dirty() {
+            // data is dirty and was stored right next to backup metadata
+            let data_dest = unsafe { mut_ref.dynamic_metadata_to_data_range_mut() };
 
             // slices could overlap
-            unsafe { copy(end_ptr as *mut u8, data_slice, data_slice_len) };
+            storage_ref.read(curr_offset, data_dest).unwrap();
 
-            curr = unsafe { (end_ptr as *mut u8).add(data_slice_len) } as *mut ResidentObjectMetadataBackup;
+            curr_offset += data_layout.size();
         } else {
-            // data was not stored here
-            // load it from its default storage location
+            // data is not dirty and is stored at its default storage location
             unsafe { mut_ref.load_user_data(storage_ref).unwrap() };
-
-            curr = end_ptr as *mut ResidentObjectMetadataBackup;
         }
     }
 
