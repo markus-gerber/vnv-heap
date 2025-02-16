@@ -1,5 +1,5 @@
 
-use super::super::common::MemoryManager;
+use super::super::common::single_page::MemoryManager;
 
 // import benchmarks
 mod baseline_get_min;
