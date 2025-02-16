@@ -4,7 +4,7 @@ use std::{
 };
 
 use applications::event_queue::{
-    implementation::EventQueueImplementationBenchmark, ram::EventQueueRAMBenchmark,
+    ram::EventQueueRAMBenchmark, vnv_heap::EventQueueVNVHeapBenchmark,
     storage::EventQueueStorageBenchmark,
 };
 use crate::{
@@ -160,8 +160,8 @@ impl BenchmarkRunner for EventQueueBenchmarkRunner {
                     let storage = TruncatedStorageModule::<STORAGE_SIZE, S>::new(storage);
                     let mut heap = get_bench_heap(&mut buf, buf_len, storage);
 
-                    let bench: EventQueueImplementationBenchmark<A, N, M, OBJ_SIZE> =
-                        EventQueueImplementationBenchmark::new(
+                    let bench: EventQueueVNVHeapBenchmark<A, N, M, OBJ_SIZE> =
+                        EventQueueVNVHeapBenchmark::new(
                             &mut heap,
                             OBJ_CNT,
                             ITERATION_COUNT,

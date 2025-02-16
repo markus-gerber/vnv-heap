@@ -2,7 +2,7 @@ use std::hint::black_box;
 
 use crate::benchmarks::Timer;
 
-mod implementation;
+mod vnv_heap;
 mod ram;
 mod storage;
 mod runner;

@@ -10,7 +10,7 @@ use serde::Serialize;
 use super::{super::super::{Benchmark, ModuleOptions, Timer}, EventQueue};
 
 #[derive(Serialize)]
-pub struct EventQueueImplementationBenchmarkOptions {
+pub struct EventQueueVNVHeapBenchmarkOptions {
     object_size: usize,
     modules: ModuleOptions,
     queue_length: usize,
@@ -19,7 +19,7 @@ pub struct EventQueueImplementationBenchmarkOptions {
     ram_overhead: usize
 }
 
-pub struct EventQueueImplementationBenchmark<
+pub struct EventQueueVNVHeapBenchmark<
     'a,
     'b: 'a,
     A: AllocatorModule,
@@ -41,7 +41,7 @@ impl<
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
         const OBJ_SIZE: usize,
-    > EventQueueImplementationBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
+    > EventQueueVNVHeapBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
 {
     pub fn new<S: PersistentStorageModule>(
         heap: &'a VNVHeap<'b, A, N, M, S>,
@@ -69,8 +69,8 @@ impl<
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
         const OBJ_SIZE: usize,
-    > Benchmark<EventQueueImplementationBenchmarkOptions>
-    for EventQueueImplementationBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
+    > Benchmark<EventQueueVNVHeapBenchmarkOptions>
+    for EventQueueVNVHeapBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
@@ -83,8 +83,8 @@ impl<
     }
 
     #[inline]
-    fn get_bench_options(&self) -> EventQueueImplementationBenchmarkOptions {
-        EventQueueImplementationBenchmarkOptions {
+    fn get_bench_options(&self) -> EventQueueVNVHeapBenchmarkOptions {
+        EventQueueVNVHeapBenchmarkOptions {
             object_size: OBJ_SIZE,
             modules: ModuleOptions::new::<A, N>(),
             iterations: self.iterations,
@@ -102,7 +102,7 @@ impl<
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
         const OBJ_SIZE: usize,
-    > EventQueue<OBJ_SIZE> for EventQueueImplementationBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
+    > EventQueue<OBJ_SIZE> for EventQueueVNVHeapBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
 {
     fn produce(&mut self, data: [u8; OBJ_SIZE]) {
         self.list.push_front(data).unwrap();
