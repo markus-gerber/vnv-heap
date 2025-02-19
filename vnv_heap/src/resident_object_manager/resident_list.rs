@@ -18,6 +18,7 @@ impl ResidentList {
     }
 
     /// Return `true` if the list is empty
+    #[allow(unused)]
     pub(crate) fn is_empty(&self) -> bool {
         self.head.load(Ordering::SeqCst).is_null()
     }

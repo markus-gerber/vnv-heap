@@ -7,8 +7,7 @@ use resident_list::ResidentList;
 use resident_object_metadata::ResidentObjectMetadata;
 
 use crate::modules::object_management::{
-    DirtyItemList, DirtyItemListArguments, ObjectManagementModule, ResidentItemList,
-    ResidentItemListArguments,
+    ObjectManagementList, ObjectManagementListArguments, ObjectManagementModule, ObjectStatusWrapper
 };
 use crate::shared_persist_lock::SharedPersistLock;
 use crate::{
@@ -133,18 +132,18 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
                         total_layout.size()
                     );
 
-                    let mut args = ResidentItemListArguments {
+                    let mut args = ObjectManagementListArguments {
                         allocator: &self.heap,
                         remaining_dirty_size: &mut self.remaining_dirty_size,
                         storage,
                     };
 
-                    let list = ResidentItemList {
+                    let list = ObjectManagementList::<A, S> {
                         arguments: &mut args,
                         resident_list: &mut self.resident_list,
                     };
 
-                    if let Ok(()) = self.object_manager.unload_objects(&total_layout, list) {
+                    if let Ok(()) = self.object_manager.unload_objects::<A, S>(&total_layout, list) {
                         debug!(
                             "-> Success! Made Enough objects resident to allocate {} bytes in RAM",
                             total_layout.size()
@@ -390,6 +389,15 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         let object_ref = unsafe { (ptr as *mut ResidentObject<T>).as_mut().unwrap() };
         object_ref.data = data;
 
+        // finished successfully
+        // mark object as modified and accessed
+        self.object_manager.access_object(ObjectStatusWrapper {
+            metadata: &mut object_ref.metadata
+        });
+        self.object_manager.modify_object(ObjectStatusWrapper {
+            metadata: &mut object_ref.metadata
+        });
+
         Ok(())
     }
 
@@ -528,6 +536,15 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         meta_ref.inner.status.set_is_mutable_ref_active(true);
         self.check_integrity();
 
+        // finished successfully
+        // mark object as modified and accessed
+        self.object_manager.access_object(ObjectStatusWrapper {
+            metadata: meta_ref
+        });
+        self.object_manager.modify_object(ObjectStatusWrapper {
+            metadata: meta_ref
+        });
+
         Ok(&mut obj_ref.data)
     }
 
@@ -557,6 +574,15 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         meta_ref.inner.status.set_is_in_use(true);
         meta_ref.inner.status.set_is_mutable_ref_active(true);
         self.check_integrity();
+
+        // finished successfully
+        // mark object as modified and accessed
+        self.object_manager.access_object(ObjectStatusWrapper {
+            metadata: meta_ref
+        });
+        self.object_manager.modify_object(ObjectStatusWrapper {
+            metadata: meta_ref
+        });
 
         Ok((&mut obj_ref.metadata, &mut obj_ref.data))
     }
@@ -617,6 +643,15 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
 
         self.check_integrity();
 
+        // finished successfully
+        // mark object as modified and accessed
+        self.object_manager.access_object(ObjectStatusWrapper {
+            metadata: meta_ref
+        });
+        self.object_manager.modify_object(ObjectStatusWrapper {
+            metadata: meta_ref
+        });
+
         Ok(())
     }
 
@@ -648,7 +683,8 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         self.check_integrity();
         trace!("Get mutable reference (offset={})", identifier.offset);
 
-        let obj_ref = self.require_resident(identifier, use_partial_dirtiness_tracking, storage)?;
+        let obj_ref: *mut ResidentObject<T> = self.require_resident(identifier, use_partial_dirtiness_tracking, storage)?;
+        let obj_ref = obj_ref.as_mut().unwrap();
         let meta_ref = &mut obj_ref.metadata.inner;
 
         debug_assert!(
@@ -662,7 +698,13 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
 
         meta_ref.status.set_is_in_use(true);
 
-        Ok(&mut obj_ref.data)
+        // finished successfully
+        // mark object as accessed
+        self.object_manager.access_object(ObjectStatusWrapper {
+            metadata: &mut obj_ref.metadata
+        });
+
+        Ok(&obj_ref.data)
     }
 
     pub(crate) unsafe fn release_mut<T: Sized>(&mut self, identifier: &AllocationIdentifier<T>) {
@@ -806,18 +848,18 @@ unsafe fn sync_dirty_data<
 
     let prev_dirty_size = *remaining_dirty_size;
 
-    let mut args = DirtyItemListArguments {
+    let mut args = ObjectManagementListArguments {
         remaining_dirty_size,
         storage: storage,
         allocator,
     };
 
-    let dirty_list = DirtyItemList {
+    let list = ObjectManagementList::<A, S> {
         arguments: &mut args,
         resident_list,
     };
 
-    object_manager.sync_dirty_data(required_bytes, dirty_list)?;
+    object_manager.sync_dirty_data::<A, S>(required_bytes, list)?;
     assert!(
         *remaining_dirty_size >= prev_dirty_size + required_bytes,
         "should have made enough space"
