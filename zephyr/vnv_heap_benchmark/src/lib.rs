@@ -53,7 +53,12 @@ pub extern "C" fn rust_main() {
         },
         //RunAllBenchmarkOptions::all(),
         get_storage,
-        || { unsafe { helper_k_cycle_get_32() }}
+        || {
+            core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+            let res = unsafe { helper_k_cycle_get_32() };
+            core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+            res
+        }
     );
 
     time = unsafe { helper_k_uptime_get() } - time; 
