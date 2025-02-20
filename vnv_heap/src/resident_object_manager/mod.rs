@@ -39,10 +39,10 @@ pub(crate) struct ResidentObjectManager<'a: 'b, 'b, A: AllocatorModule, M: Objec
     pub(crate) remaining_dirty_size: usize,
 
     /// List of objects that are currently resident
-    resident_list: &'b mut ResidentList,
+    pub(crate) resident_list: &'b mut ResidentList,
 
     /// Object management module
-    object_manager: M,
+    pub(crate) object_manager: M,
 
     /// Phantom data to resident buffer, to bind its lifetime to `ResidentObjectManager`
     _resident_buffer: PhantomData<&'a mut [u8]>,

@@ -2,6 +2,8 @@ const IS_IN_USE: u8 = 1 << 0;
 const IS_MUTABLE_REF_ACTIVE: u8 = 1 << 1;
 const ENABLE_PARTIAL_DIRTINESS_TRACKING: u8 = 1 << 2;
 const DATA_DIRTY: u8 = 1 << 3;
+const CLOCK_ACCESSED: u8 = 1 << 4;
+const CLOCK_MODIFIED: u8 = 1 << 5;
 
 /*
 The bit usage is as follows:
@@ -10,8 +12,8 @@ The bit usage is as follows:
 1    Is Mutable Active (any mutable references currently open?)
 2    Partial Dirtiness Tracking Enabled (indicates whether to use in place dirtiness tracking or not)
 3    Is Data Dirty (also used as a cache if partial dirtiness tracking is enabled)
-4    [Unused]
-5    [Unused]
+4    Clock status bit: was accessed (for more information look into ClockObjectManagementModule)
+5    Clock status bit: was modified (for more information look into ClockObjectManagementModule)
 6    [Unused]
 7    [Unused]
 */
@@ -80,6 +82,16 @@ impl ResidentObjectStatus {
         ENABLE_PARTIAL_DIRTINESS_TRACKING,
         is_partial_dirtiness_tracking_enabled,
         set_is_partial_dirtiness_tracking_enabled
+    );
+    generate_functions!(
+        CLOCK_ACCESSED,
+        is_clock_accessed_bit_set,
+        set_clock_accessed_bit
+    );
+    generate_functions!(
+        CLOCK_MODIFIED,
+        is_clock_modified_bit_set,
+        set_clock_modified_bit
     );
 }
 

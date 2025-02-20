@@ -11,6 +11,9 @@ use core::{alloc::Layout, marker::PhantomData};
 mod default;
 pub use default::*;
 
+mod clock;
+pub use clock::*;
+
 
 pub trait ObjectManagementModule {
     fn new() -> Self;
@@ -38,6 +41,35 @@ pub struct ObjectStatusWrapper<'a> {
 }
 
 impl ObjectStatusWrapper<'_> {
+    #[inline]
+    pub fn access_object(&mut self) {
+        self.metadata.inner.status.set_clock_accessed_bit(true);
+    }
+
+    #[inline]
+    pub fn was_accessed(&self) -> bool {
+        self.metadata.inner.status.is_clock_accessed_bit_set()
+    }
+
+    #[inline]
+    pub fn set_was_accessed(&mut self, val: bool) {
+        self.metadata.inner.status.set_clock_accessed_bit(val);
+    }
+
+    #[inline]
+    pub fn modify_object(&mut self) {
+        self.metadata.inner.status.set_clock_modified_bit(true);
+    }
+
+    #[inline]
+    pub fn was_modified(&self) -> bool {
+        self.metadata.inner.status.is_clock_modified_bit_set()
+    }
+
+    #[inline]
+    pub fn set_was_modified(&mut self, val: bool) {
+        self.metadata.inner.status.set_clock_modified_bit(val);
+    }
 
     #[inline]
     pub fn is_data_dirty(&self) -> bool {
@@ -155,16 +187,12 @@ pub struct ObjectManagementIter<'a, 'b, 'c, 'd, A: AllocatorModule, S: Persisten
 
 impl<'a, 'b, 'c, A: AllocatorModule, S: PersistentStorageModule> ObjectManagementIter<'a, 'b, '_, 'c, A, S> {
     pub fn next<'d>(&'d mut self) -> Option<ObjectManagementIterItem<'a, 'b, '_, '_, 'c, 'd, A, S>> {
-        while let Some(mut item) = self.iter.next() {
-            unsafe {
-                let ptr: DeleteHandle<'c, 'd> = core::mem::transmute(item);
-
-                return Some(ObjectManagementIterItem {
-                    arguments: self.arguments,
-                    delete_handle: ptr,
-                    list: PhantomData,
-                });
-            }
+        while let Some(item) = self.iter.next() {
+            return Some(ObjectManagementIterItem {
+                arguments: self.arguments,
+                delete_handle: item,
+                list: PhantomData,
+            });
         }
         // no objects left in that iterator
         return None;
