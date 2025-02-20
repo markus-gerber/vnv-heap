@@ -32,7 +32,8 @@ To use the vNV-Heap in your application follow these steps.
     - `NonResidentAllocatorModule` (Defines a strategy to allocate data on a non-volatile external storage device. This has to be efficient due to high delay.)
         - `NonResidentBuddyAllocatorModule`
     - `ObjectManagementModule` (Defines which objects should be unloaded and persisted)
-        - `DefaultObjectManagementModule`: This module currently iterates over the list of resident objects and unloads/persists them it that order.
+        - `DefaultObjectManagementModule`: This module currently iterates over the list of resident objects and unloads/persists them it that order. This module should probably only be used for testing and not in a real application.
+        - `ClockObjectManagementModule`: This module implements a second chance algorithm for both flushing modified and unloading objects.
     - `PersistentStorageModule` (Defines an interface for reading and writing data to a storage device)
         - `FilePersistentStorageModule`: Uses files as a way to store non-volatile data. Note that this module does not ensure to flush its data.
 
