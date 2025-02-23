@@ -65,5 +65,5 @@ fn main() {
 }
 
 fn get_storage() -> FilePersistentStorageModule {
-    FilePersistentStorageModule::new("test.data".into(), 4096 * 8).unwrap()
+    FilePersistentStorageModule::new("test.data".into(), 512 * 1024).unwrap()
 }
