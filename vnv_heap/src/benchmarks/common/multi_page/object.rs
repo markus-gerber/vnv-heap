@@ -35,20 +35,23 @@ impl<
         Self { ptr, inner }
     }
 
+    #[allow(unused)]
     pub(crate) fn get_inner(
         &self,
     ) -> RefMut<'_, MemoryManagerInner<'b, PAGE_SIZE, PAGE_COUNT, A, S>> {
         self.inner.borrow_mut()
     }
 
+    #[allow(unused)]
     pub(crate) fn get_ref<'c>(
         &'c self,
-    ) -> Result<ObjectRef<'a, 'b, 'c, T, PAGE_SIZE, PAGE_COUNT, A, S>, ()> {
+    ) -> Result<&T, ()> {
         // no additional work as pages are required to be resident at all time for this implementation
 
-        Ok(unsafe { ObjectRef::new(&self.inner, self.ptr.as_ref().unwrap()) })
+        Ok(unsafe { self.ptr.as_ref().unwrap() })
     }
 
+    #[allow(unused)]
     pub(crate) fn get_mut<'c>(
         &'c self,
     ) -> Result<ObjectMutRef<'a, 'b, 'c, T, PAGE_SIZE, PAGE_COUNT, A, S>, ()> {
@@ -76,53 +79,6 @@ impl<
     }
 }
 
-pub struct ObjectRef<
-    'a,
-    'b,
-    'c,
-    T: Sized,
-    const PAGE_SIZE: usize,
-    const PAGE_COUNT: usize,
-    A: AllocatorModule,
-    S: PersistentStorageModule,
-> {
-    inner: &'a RefCell<MemoryManagerInner<'b, PAGE_SIZE, PAGE_COUNT, A, S>>,
-    data_ref: &'c T,
-}
-
-impl<
-        'a,
-        'b,
-        'c,
-        T: Sized,
-        const PAGE_SIZE: usize,
-        const PAGE_COUNT: usize,
-        A: AllocatorModule,
-        S: PersistentStorageModule,
-    > ObjectRef<'a, 'b, 'c, T, PAGE_SIZE, PAGE_COUNT, A, S>
-{
-    pub(crate) unsafe fn new(
-        inner: &'a RefCell<MemoryManagerInner<'b, PAGE_SIZE, PAGE_COUNT, A, S>>,
-        data_ref: &'c T,
-    ) -> Self {
-        ObjectRef { inner, data_ref }
-    }
-}
-
-impl<
-        T: Sized,
-        const PAGE_SIZE: usize,
-        const PAGE_COUNT: usize,
-        A: AllocatorModule,
-        S: PersistentStorageModule,
-    > Deref for ObjectRef<'_, '_, '_, T, PAGE_SIZE, PAGE_COUNT, A, S>
-{
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.data_ref
-    }
-}
 
 pub struct ObjectMutRef<
     'a,

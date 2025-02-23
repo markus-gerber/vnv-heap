@@ -322,6 +322,28 @@ impl<A: AllocatorModule, M: ObjectManagementModule> ResidentObjectManager<'_, '_
         return Ok(());
     }
 
+    pub(crate) fn flush_object<T: Sized, S: PersistentStorageModule>(
+        &mut self,
+        alloc_id: &AllocationIdentifier<T>,
+        storage: &mut S,
+    ) -> Result<(), ()> {
+        self.check_integrity();
+
+        if let Some(ptr) = unsafe { self.find_element_mut(alloc_id) } {
+            // object is resident
+            let ptr: *mut ResidentObject<T> = unsafe { ResidentObjectMetadata::ptr_to_resident_obj_ptr(ptr) };
+            let data = unsafe { ptr.as_mut().unwrap() };
+            
+            if data.metadata.inner.status.is_data_dirty() {
+                self.remaining_dirty_size += unsafe { data.persist_user_data(storage) }?;
+            }
+
+            self.check_integrity();
+        }
+
+        return Ok(());
+    }
+
     pub(crate) fn try_to_allocate<T>(
         &mut self,
         data: T,

@@ -38,6 +38,7 @@ pub struct RunAllBenchmarkOptions {
     pub run_dirty_size_persist_latency: bool,
     pub run_buffer_size_persist_latency: bool,
     pub run_event_queue_benchmarks: bool,
+    pub run_kvs_benchmarks: bool,
     pub run_locked_wcet_benchmarks: bool
 }
 
@@ -55,6 +56,7 @@ impl Default for RunAllBenchmarkOptions {
             run_dirty_size_persist_latency: false,
             run_buffer_size_persist_latency: false,
             run_event_queue_benchmarks: false,
+            run_kvs_benchmarks: false,
             run_locked_wcet_benchmarks: false
         }
     }
@@ -74,6 +76,7 @@ impl RunAllBenchmarkOptions {
             run_dirty_size_persist_latency: true,
             run_buffer_size_persist_latency: true,
             run_event_queue_benchmarks: true,
+            run_kvs_benchmarks: true,
             run_locked_wcet_benchmarks: true
         }
     }
@@ -87,13 +90,13 @@ impl RunAllBenchmarkOptions {
             run_baseline_get_benchmarks: true,
             run_persistent_storage_benchmarks: true,
             run_long_persistent_storage_benchmarks: true,
-            run_locked_wcet_benchmarks: false,
             ..Default::default()
         }
     }
     pub fn applications() -> Self {
         Self {
             run_event_queue_benchmarks: true,
+            run_kvs_benchmarks: true,
             ..Default::default()
         }
     }
@@ -127,7 +130,8 @@ pub fn run_all_benchmarks<
         *curr_iteration += 1;
     }
 
-    // the if conditions are used so the compiler can optimize and ignore runners that are not used
+    // the following if conditions are used so the compiler can optimize and ignore runners that are not used
+    // without them the binary would always include all benchmarks, which will not fit on smaller devices
     if options.run_allocate_benchmarks || options.run_get_benchmarks || options.run_deallocate_benchmarks {
         iteration_count += ImplementationBenchmarkRunner::get_iteration_count(&options);
     }
@@ -145,6 +149,9 @@ pub fn run_all_benchmarks<
     }
     if options.run_event_queue_benchmarks {
         iteration_count += EventQueueBenchmarkRunner::get_iteration_count(&options);
+    }
+    if options.run_kvs_benchmarks {
+        iteration_count += KVSBenchmarkRunner::get_iteration_count(&options);
     }
     if options.run_locked_wcet_benchmarks {
         iteration_count += LockedWCETRunner::get_iteration_count(&options);
@@ -171,6 +178,9 @@ pub fn run_all_benchmarks<
     }
     if options.run_event_queue_benchmarks {
         EventQueueBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    }
+    if options.run_kvs_benchmarks {
+        KVSBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     }
     if options.run_locked_wcet_benchmarks {
         LockedWCETRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());

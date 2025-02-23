@@ -88,6 +88,11 @@ impl<
         heap.unload_object(&self.allocation_identifier, false)
     }
 
+    pub fn flush(&mut self) -> Result<(), ()> {
+        let mut heap = self.vnv_heap.borrow_mut();
+        heap.flush_object(&self.allocation_identifier)
+    }
+
     #[allow(unused)]
     pub(crate) fn get_alloc_id(&self) -> &AllocationIdentifier<T> {
         return &self.allocation_identifier;

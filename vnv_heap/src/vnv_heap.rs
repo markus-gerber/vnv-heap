@@ -409,6 +409,16 @@ impl<'a, A: AllocatorModule, N: NonResidentAllocatorModule, M: ObjectManagementM
         )
     }
 
+    pub(crate) fn flush_object<T: Sized>(
+        &mut self,
+        identifier: &AllocationIdentifier<T>,
+    ) -> Result<(), ()> {
+        self.resident_object_manager.flush_object(
+            identifier,
+            &mut self.storage_reference,
+        )
+    }
+
     pub(crate) unsafe fn get_ref<T: Sized>(
         &mut self,
         identifier: &AllocationIdentifier<T>,

@@ -24,9 +24,9 @@ impl<
         S: PersistentStorageModule,
     > MemoryManager<'a, PAGE_SIZE, PAGE_COUNT, A, S>
 {
-    pub(crate) fn new(storage: &'a mut S, alloc: A, max_dirty_pages: usize) -> Self {
+    pub(crate) fn new(storage: &'a mut S, alloc: A, max_dirty_pages: usize, pages: &'a mut [[u8; PAGE_SIZE]; PAGE_COUNT]) -> Self {
         Self {
-            inner: RefCell::new(MemoryManagerInner::new(storage, alloc, max_dirty_pages)),
+            inner: RefCell::new(MemoryManagerInner::new(storage, alloc, max_dirty_pages, pages)),
         }
     }
 
@@ -34,6 +34,7 @@ impl<
     ///
     /// **Note**: The current implementation for this function is limited and should not be used for benchmarking
     /// as it does not 100% correctly track which pages are modified by the allocator (and thus does not flush them).
+    #[allow(unused)]
     pub(crate) fn allocate<'b, T>(
         &'b self,
         data: T,
@@ -53,6 +54,10 @@ impl<
     }
 }
 
+pub(crate) const fn multi_page_calc_metadata_size<const PAGE_SIZE: usize, const PAGE_COUNT: usize, A: AllocatorModule, S: PersistentStorageModule>() -> usize {
+    size_of::<MemoryManagerInner<PAGE_SIZE, PAGE_COUNT, A, S>>() + size_of::<S>()
+}
+
 pub(crate) struct MemoryManagerInner<
     'a,
     const PAGE_SIZE: usize,
@@ -60,12 +65,16 @@ pub(crate) struct MemoryManagerInner<
     A: AllocatorModule,
     S: PersistentStorageModule,
 > {
-    pages: [[u8; PAGE_SIZE]; PAGE_COUNT],
+    pages: &'a mut [[u8; PAGE_SIZE]; PAGE_COUNT],
     open_references: [usize; PAGE_COUNT],
     modified_pages: [bool; PAGE_COUNT],
     modified_page_count: usize,
     modified_clock: PageClock<PAGE_COUNT>,
     modified_page_limit: usize,
+
+    // just a dummy to calculate the amount of metadata needed
+    #[allow(unused)]
+    page_resident: [bool; PAGE_COUNT],
 
     storage: &'a mut S,
     allocator: A,
@@ -79,14 +88,17 @@ impl<
         S: PersistentStorageModule,
     > MemoryManagerInner<'a, PAGE_SIZE, PAGE_COUNT, A, S>
 {
-    pub(crate) fn new(storage: &'a mut S, mut allocator: A, modified_page_limit: usize) -> Self {
-        assert_eq!(size_of::<usize>() % PAGE_SIZE, 0);
-        assert!(size_of::<usize>() > PAGE_SIZE);
+    pub(crate) fn new(storage: &'a mut S, mut allocator: A, modified_page_limit: usize, pages: &'a mut [[u8; PAGE_SIZE]; PAGE_COUNT]) -> Self {
+        assert_eq!(PAGE_SIZE % size_of::<usize>(), 0, "Page size ({}) must be a multiple of usize", PAGE_SIZE);
+        assert!(size_of::<usize>() <= PAGE_SIZE, "{}", PAGE_SIZE);
 
-        unsafe { allocator.reset() };
+        unsafe {
+            allocator.reset();
+            allocator.init((&mut pages[0]) as *mut _, PAGE_SIZE * PAGE_COUNT);
+        };
 
         Self {
-            pages: [[0; PAGE_SIZE]; PAGE_COUNT],
+            pages,
             open_references: [0; PAGE_COUNT],
 
             storage,
@@ -95,9 +107,11 @@ impl<
             modified_clock: PageClock::new(),
             modified_page_count: 0,
             modified_pages: [false; PAGE_COUNT],
+            page_resident: [false; PAGE_COUNT],
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn allocator(&mut self) -> &mut A {
         &mut self.allocator
     }
@@ -167,6 +181,15 @@ impl<
         }
     }
 
+    pub(crate) fn flush<T>(&mut self, ptr: *mut T) -> Result<(), ()> {
+        let pages = self.get_pages_for_obj(ptr as *mut u8, size_of::<T>());
+        for page in pages {
+            self.flush_page(page)?;
+        }
+
+        Ok(())
+    }
+
     fn make_pages_dirty(&mut self, pages: Range<usize>) -> Result<(), ()> {
         for page in pages {
             if self.modified_pages[page] {
@@ -211,8 +234,7 @@ impl<
         let offset = (ptr as usize) - ((&self.pages[0] as *const u8) as usize);
         let start = offset / PAGE_SIZE;
         let end = div_ceil(offset + size, PAGE_SIZE);
-
-        start..(end + 1)
+        start..end
     }
 
     fn check_integrity(&self) {

@@ -7,7 +7,6 @@
 mod memory_manager;
 mod object;
 
-pub(crate) use memory_manager::MemoryManager;
-pub(crate) use object::*;
+pub(crate) use memory_manager::{MemoryManager, multi_page_calc_metadata_size};
 
 use super::*;

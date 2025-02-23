@@ -57,7 +57,13 @@ impl PersistentStorageModule for FilePersistentStorageModule {
     }
 
     fn write(&mut self, offset: usize, src: &[u8]) -> Result<(), ()> {
-        debug_assert!(offset + src.len() <= self.file_size);
+        debug_assert!(
+            offset + src.len() <= self.file_size,
+            "illegal access, offset: {}, len: {}, file_size: {}",
+            offset,
+            src.len(),
+            self.file_size
+        );
 
         self.file
             .seek(std::io::SeekFrom::Start(offset as u64))
