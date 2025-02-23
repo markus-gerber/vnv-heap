@@ -6,6 +6,7 @@ use crate::resident_object_manager::partial_dirtiness_tracking::PARTIAL_DIRTINES
 use super::get_test_heap;
 
 //#[test]
+#[allow(unused)]
 fn test_heap_unload_vnv_pd_array() {
     type TestType = [u8; 1000];
 

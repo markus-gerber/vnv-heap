@@ -9,7 +9,7 @@ use crate::{
     modules::{
         allocator::LinkedListAllocatorModule,
         nonresident_allocator::NonResidentBuddyAllocatorModule,
-        object_management::DefaultObjectManagementModule,
+        object_management::ObjectManagementModule,
     },
     test::get_test_heap,
     vnv_persist_all, VNVObject,
@@ -75,13 +75,13 @@ fn test_persist_all_simple() {
     //     };
     // }
 
-    fn update(
+    fn update<M: ObjectManagementModule>(
         objects: &mut Vec<
             VNVObject<
                 [u8; 10],
                 LinkedListAllocatorModule,
                 NonResidentBuddyAllocatorModule<16>,
-                DefaultObjectManagementModule,
+                M,
             >,
         >,
         check_states: &mut Vec<[u8; 10]>,
@@ -99,13 +99,13 @@ fn test_persist_all_simple() {
         check_states[id] = data;
     }
 
-    fn check_integrity(
+    fn check_integrity<M: ObjectManagementModule>(
         objects: &mut Vec<
             VNVObject<
                 [u8; 10],
                 LinkedListAllocatorModule,
                 NonResidentBuddyAllocatorModule<16>,
-                DefaultObjectManagementModule,
+                M,
             >,
         >,
         // lists: &mut Vec<
@@ -133,14 +133,14 @@ fn test_persist_all_simple() {
         // }
     }
 
-    fn checked_persist(
+    fn checked_persist<M: ObjectManagementModule>(
         buffer_ptr: *mut u8,
         objects: &mut Vec<
             VNVObject<
                 [u8; 10],
                 LinkedListAllocatorModule,
                 NonResidentBuddyAllocatorModule<16>,
-                DefaultObjectManagementModule,
+                M,
             >,
         >,
         // lists: &mut Vec<
