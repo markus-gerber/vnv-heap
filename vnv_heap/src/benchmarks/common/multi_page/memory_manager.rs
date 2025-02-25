@@ -115,41 +115,58 @@ impl<
     pub(crate) fn allocator(&mut self) -> &mut A {
         &mut self.allocator
     }
-
+    
+    #[allow(unused)]
     pub(crate) fn allocate<T>(&mut self, data: T) -> Result<*mut T, ()> {
-        let ptr = unsafe { self.allocator.allocate(Layout::new::<T>())? };
-        let ptr = (ptr.as_ptr()) as *mut T;
+        let ptr = (&data as *const T) as *const u8;
+        unsafe { self.allocate_untyped(ptr, Layout::new::<T>()).map(|ptr| ptr as *mut T) }
+    }
+    
+    #[allow(unused)]
+    pub(crate) unsafe fn allocate_untyped(&mut self, data: *const u8, layout: Layout) -> Result<*mut u8, ()> {
+        let ptr = self.allocator.allocate(layout.clone())?;
+        let ptr = (ptr.as_ptr()) as *mut u8;
 
-        let pages = self.get_pages_for_obj(ptr as *mut u8, size_of::<T>());
+        let pages = self.get_pages_for_obj(ptr as *mut u8, layout.size());
         match self.make_pages_dirty(pages) {
             Ok(_) => {}
             Err(_) => {
                 unsafe {
                     self.allocator
-                        .deallocate(NonNull::new(ptr as *mut u8).unwrap(), Layout::new::<T>());
+                        .deallocate(NonNull::new(ptr as *mut u8).unwrap(), layout);
                 }
                 return Err(());
             }
         }
 
-        unsafe { ptr.write(data) };
+        unsafe { ptr.copy_from(data, layout.size()); };
         Ok(ptr)
     }
 
+    #[allow(unused)]
     pub(crate) fn drop_and_deallocate<T>(&mut self, ptr: *mut T) {
-        unsafe {
-            ptr.drop_in_place();
-            self.allocator
-                .deallocate(NonNull::new(ptr as *mut u8).unwrap(), Layout::new::<T>());
-        }
+        unsafe { self.drop_and_deallocate_untyped(ptr as *mut u8, Layout::new::<T>()) };
+    }
+
+    #[allow(unused)]
+    pub(crate) unsafe fn drop_and_deallocate_untyped(&mut self, ptr: *mut u8, layout: Layout) {
+        ptr.drop_in_place();
+        self.allocator
+            .deallocate(NonNull::new(ptr as *mut u8).unwrap(), layout.clone());
 
         // try to make pages dirty
-        let pages = self.get_pages_for_obj(ptr as *mut u8, size_of::<T>());
+        let pages = self.get_pages_for_obj(ptr as *mut u8, layout.size());
         let _ = self.make_pages_dirty(pages);
     }
 
+    #[allow(unused)]
     pub(crate) fn acquire_mut<T>(&mut self, ptr: *mut T) -> Result<(), ()> {
-        let pages = self.get_pages_for_obj(ptr as *mut u8, size_of::<T>());
+        unsafe { self.acquire_mut_untyped(ptr as *mut u8, size_of::<T>()) }
+    }
+
+    #[allow(unused)]
+    pub(crate) unsafe fn acquire_mut_untyped(&mut self, ptr: *mut u8, size: usize) -> Result<(), ()> {
+        let pages = self.get_pages_for_obj(ptr, size);
 
         for page in pages.clone() {
             self.open_references[page] += 1;
@@ -171,8 +188,14 @@ impl<
         Ok(())
     }
 
+    #[allow(unused)]
     pub(crate) fn release_mut<T>(&mut self, ptr: *mut T) {
-        let pages = self.get_pages_for_obj(ptr as *mut u8, size_of::<T>());
+        unsafe { self.release_mut_untyped(ptr as *mut u8, size_of::<T>()) };
+    }
+
+    #[allow(unused)]
+    pub(crate) unsafe fn release_mut_untyped(&mut self, ptr: *mut u8, size: usize) {
+        let pages = self.get_pages_for_obj(ptr, size);
         for page in pages {
             debug_assert!(self.open_references[page] > 0);
             debug_assert!(self.modified_pages[page]);
@@ -181,8 +204,14 @@ impl<
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn flush<T>(&mut self, ptr: *mut T) -> Result<(), ()> {
-        let pages = self.get_pages_for_obj(ptr as *mut u8, size_of::<T>());
+        unsafe { self.flush_untyped(ptr as *mut u8, size_of::<T>()) }
+    }
+
+    #[allow(unused)]
+    pub(crate) unsafe fn flush_untyped(&mut self, ptr: *mut u8, size: usize) -> Result<(), ()> {
+        let pages = self.get_pages_for_obj(ptr, size);
         for page in pages {
             self.flush_page(page)?;
         }
