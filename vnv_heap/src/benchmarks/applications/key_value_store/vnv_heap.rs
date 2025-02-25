@@ -50,6 +50,8 @@ impl<
         let identifier = unsafe { inner.allocate(data, false)? };
 
         debug_assert!(inner.is_resident(&identifier));
+
+        inner.flush_object::<T>(&identifier)?;
         Ok(identifier.offset)
     }
 

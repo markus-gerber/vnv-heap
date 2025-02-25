@@ -39,8 +39,11 @@ fn run_kvs_application_equiv_obj_len<
     let mut control_rng = Xoshiro128StarStar::from_seed(CONTROL_SEED);
 
     for i in 0..value_cnt {
-        kvs.insert(i as u32, random_array::<OBJ_SIZE>(&mut data_rng))
-            .unwrap();
+        let arr = random_array::<OBJ_SIZE>(&mut data_rng);
+        kvs.insert(i as u32, arr).unwrap();
+    }
+
+    for i in 0..value_cnt {
         kvs.flush::<OBJ_SIZE>(i as u32).unwrap();
     }
 
