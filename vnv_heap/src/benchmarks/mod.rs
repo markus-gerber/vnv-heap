@@ -156,6 +156,11 @@ pub fn run_all_benchmarks<
     if options.run_locked_wcet_benchmarks {
         iteration_count += LockedWCETRunner::get_iteration_count(&options);
     }
+    if iteration_count == 0 {
+        println!("WARNING: No benchmarks selected to run! Please activate at least one benchmark via RunAllBenchmarkOptions.");
+        return;
+    }
+
     let mut handle_it = || {
         handle_curr_iteration(&mut curr_iteration, iteration_count);
     };

@@ -24,12 +24,7 @@ extern "C" {
 pub extern "C" fn rust_main() {
     zephyr_logger::init(log::LevelFilter::Trace);
     let mut time: i64 = unsafe { helper_k_uptime_get() };
-/*
-    {
-        let layout_info = VNVHeap::<LinkedListAllocatorModule, NonResidentBuddyAllocatorModule<16>, DefaultObjectManagementModule, MB85RS4MTFramStorageModule>::get_layout_info();
-        println!("layout_info: {:?}", layout_info);
-    }
-*/
+
     run_all_benchmarks::<
         ZephyrTimer,
         ZephyrPersistTrigger,
@@ -42,16 +37,23 @@ pub extern "C" fn rust_main() {
             repetitions: 10,
             result_buffer: &mut [0; 10],
         },
+        // select benchmarks to run
         RunAllBenchmarkOptions {
-            run_persistent_storage_benchmarks: true,
-            // run_baseline_get_benchmarks: true,
+            // run_allocate_benchmarks: true,
+            // run_deallocate_benchmarks: true,
             // run_get_benchmarks: true,
-            run_dirty_size_persist_latency: true,
-            run_buffer_size_persist_latency: true,
+            // run_baseline_allocate_benchmarks: true,
+            // run_baseline_deallocate_benchmarks: true,
+            // run_baseline_get_benchmarks: true,
+            // run_persistent_storage_benchmarks: true,
+            // run_long_persistent_storage_benchmarks: true,
+            // run_dirty_size_persist_latency: true,
+            // run_buffer_size_persist_latency: true,
             // run_event_queue_benchmarks: true,
+            // run_kvs_benchmarks: true,
+            // run_locked_wcet_benchmarks: true
             ..Default::default()
         },
-        //RunAllBenchmarkOptions::all(),
         get_storage,
         || {
             core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
