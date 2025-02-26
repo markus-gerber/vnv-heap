@@ -32,15 +32,23 @@ const OBJ_CNT: usize = 256;
 // one 5th of the raw object size
 const MAX_DIRTY: usize = (OBJ_CNT * OBJ_SIZE) / 5;
 
-const ACCESS_TYPES: [AccessType; 3] = [
-    AccessType::Random,
-    AccessType::Sequential,
-    AccessType::Partitioned {
-        partition_size: OBJ_CNT / 16,
-        access_count: ITERATION_COUNT / 100,
-        curr_partition: 0, // only used for internal state
-    },
-];
+fn get_access_types() -> [AccessType; 4] {
+    [
+        AccessType::Random,
+        AccessType::Sequential,
+        AccessType::Partitioned {
+            partition_size: OBJ_CNT / 16,
+            access_count: ITERATION_COUNT / 100,
+            _curr_partition: 0, // only used for internal state
+        },
+        AccessType::Distributed {
+            key_distribution: AccessType::key_distribution(
+                |i: u32| -> f64 { (((i as f64) * 40.0) / (OBJ_CNT as f64)).sin().powi(20) + 0.1 },
+                OBJ_CNT as u32,
+            ),
+        },
+    ]
+}
 
 const PAGE_SIZES: [usize; 5] = [256, 512, 1024, 2048, 4096];
 
@@ -49,12 +57,13 @@ pub(crate) struct KVSBenchmarkRunner;
 impl BenchmarkRunner for KVSBenchmarkRunner {
     fn get_iteration_count(options: &RunAllBenchmarkOptions) -> usize {
         let mut iteration_count = 0;
+        let access_types = get_access_types();
         if options.run_kvs_benchmarks {
             // ### paged ###
-            iteration_count += 2 * ACCESS_TYPES.len() * PAGE_SIZES.len();
+            iteration_count += 2 * access_types.len() * PAGE_SIZES.len();
 
             // ### vNV-Heap ###
-            iteration_count += 2 * ACCESS_TYPES.len();
+            iteration_count += 2 * access_types.len();
         }
 
         iteration_count
@@ -74,6 +83,7 @@ impl BenchmarkRunner for KVSBenchmarkRunner {
         _get_ticks: GetCurrentTicks,
     ) {
         if options.run_kvs_benchmarks {
+            let access_types = get_access_types();
             {
                 // ###### page-wise ######
 
@@ -113,7 +123,7 @@ impl BenchmarkRunner for KVSBenchmarkRunner {
                     let mut pages = [[0u8; PAGE_SIZE]; PAGE_CNT];
 
                     for bench_type in 0..2 {
-                        for &access_type in ACCESS_TYPES.iter() {
+                        for access_type in access_types.iter().cloned() {
                             handle_curr_iteration();
 
                             let kvs_impl: PagedKeyValueStoreImplementation<
@@ -150,7 +160,7 @@ impl BenchmarkRunner for KVSBenchmarkRunner {
                             } else if bench_type == 1 {
                                 let bench = KeyValueStoreDiverseBenchmark::new(
                                     kvs_impl,
-                                    "kvs_paged_diverse",
+                                    "kvs_paged",
                                     VNVHeapKeyValueStoreBenchmarkGeneralOptions {
                                         iterations: ITERATION_COUNT,
                                         object_count: OBJ_CNT,
@@ -214,7 +224,7 @@ impl BenchmarkRunner for KVSBenchmarkRunner {
                 let mut buf = [0u8; VNV_HEAP_BUF_SIZE];
 
                 for bench_type in 0..2 {
-                    for &access_type in ACCESS_TYPES.iter() {
+                    for access_type in access_types.iter().cloned() {
                         handle_curr_iteration();
 
                         let storage = get_storage();
@@ -239,7 +249,7 @@ impl BenchmarkRunner for KVSBenchmarkRunner {
                         } else if bench_type == 1 {
                             let bench = KeyValueStoreDiverseBenchmark::new(
                                 kvs_impl,
-                                "kvs_diverse",
+                                "kvs",
                                 VNVHeapKeyValueStoreBenchmarkGeneralOptions {
                                     iterations: ITERATION_COUNT,
                                     object_count: OBJ_CNT,

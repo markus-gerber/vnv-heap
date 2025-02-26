@@ -17,8 +17,9 @@ pub(super) struct VNVHeapKeyValueStoreBenchmarkGeneralOptions<KVSOptions: Serial
 
 #[derive(Serialize, Clone)]
 pub(super) struct VNVHeapKeyValueStoreBenchmarkOptions<KVSOptions: Serialize + Clone> {
-    pub(super) inner: VNVHeapKeyValueStoreBenchmarkGeneralOptions<KVSOptions>,
-    pub(super) object_size: usize,
+    inner: VNVHeapKeyValueStoreBenchmarkGeneralOptions<KVSOptions>,
+    bench_type: &'static str,
+    object_size: usize,
 }
 
 pub(super) struct KeyValueStoreBenchmark<
@@ -51,6 +52,7 @@ impl<
             name,
             options: VNVHeapKeyValueStoreBenchmarkOptions {
                 inner: options,
+                bench_type: "equiv",
                 object_size: OBJ_SIZE,
             },
         }
@@ -78,7 +80,7 @@ impl<
             &mut self.implementation,
             self.options.inner.object_count,
             self.options.inner.iterations,
-            self.options.inner.access_type,
+            self.options.inner.access_type.clone(),
         )
     }
 }
@@ -88,6 +90,7 @@ pub(super) struct VNVHeapKeyValueStoreDiverseBenchmarkOptions<KVSOptions: Serial
     pub(super) inner: VNVHeapKeyValueStoreBenchmarkGeneralOptions<KVSOptions>,
     object_sizes: [usize; KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES],
     object_count_distribution: [usize; KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES],
+    bench_type: &'static str,
 }
 
 pub(super) struct KeyValueStoreDiverseBenchmark<
@@ -115,6 +118,7 @@ impl<InternalPointer, KVSOptions: Serialize + Clone, I: KeyValueStoreImpl<Intern
             name,
             options: VNVHeapKeyValueStoreDiverseBenchmarkOptions {
                 inner: options,
+                bench_type: "diverse",
                 object_sizes: KVS_APP_DIVERSE_OBJ_LEN_OBJ_SIZES,
                 object_count_distribution: KVS_APP_DIVERSE_OBJ_LEN_OBJ_COUNT_DISTRIBUTION,
             },
@@ -139,7 +143,7 @@ impl<InternalPointer, KVSOptions: Serialize + Clone, I: KeyValueStoreImpl<Intern
             &mut self.implementation,
             self.options.inner.object_count,
             self.options.inner.iterations,
-            self.options.inner.access_type,
+            self.options.inner.access_type.clone(),
         )
     }
 }

@@ -18,7 +18,7 @@ fn random_array<const SIZE: usize>(rng: &mut Xoshiro128StarStar) -> [u8; SIZE] {
     [rng.next_u32() as u8; SIZE]
 }
 
-#[derive(Serialize, Copy, Clone)]
+#[derive(Serialize, Clone)]
 enum AccessType {
     /// totally random access over the keys
     Random,
@@ -35,12 +35,43 @@ enum AccessType {
         /// decreases the amount of total partition iterations
         access_count: usize,
 
-        curr_partition: u32,
+        _curr_partition: u32,
     },
-    // Distributed,
+    Distributed {
+        /// initialize this with AccessType::key_distribution
+        key_distribution: Vec<u32>,
+    }
 }
 
 impl AccessType {
+    fn key_distribution<F: Fn(u32) -> f64>(distribution_fn: F, num_values: u32) -> Vec<u32> {
+        // each key will get a probability assigned
+        let mut probability = Vec::with_capacity(num_values as usize);
+        let mut sum = 0.0;
+        for i in 0..num_values {
+            let val = distribution_fn(i);
+            sum += val;
+            probability.push(val);
+        }
+        // normalize
+        for i in 0..num_values {
+            probability[i as usize] /= sum;
+        }
+
+        // calculate the key distribution aka the ranges that correspond to each key
+        // for higher probabilities the range will be bigger
+        // [0.1, 0.9] -> [INT_MAX/10, INT_MAX/10*9]
+        let mut distribution = Vec::with_capacity(num_values as usize);
+        let mut offset = 0;
+        for i in 0..num_values {
+            let next = offset + (probability[i as usize] * (u32::MAX as f64)) as u32;
+            distribution.push(next);
+            offset = next;
+        }
+        distribution[(num_values - 1) as usize] = u32::MAX;
+        distribution
+    }
+
     fn next_key(
         &mut self,
         iteration: usize,
@@ -57,7 +88,7 @@ impl AccessType {
             AccessType::Partitioned {
                 partition_size,
                 access_count,
-                curr_partition,
+                _curr_partition: curr_partition,
             } => {
                 debug_assert!(*partition_size > 0);
                 debug_assert!(*access_count > 0);
@@ -70,9 +101,15 @@ impl AccessType {
                 let partition_start = (*curr_partition) * (*partition_size as u32);
                 partition_start + (control_rng.next_u32() % (*partition_size as u32))
             }
-            // AccessType::Distributed => {
-            //     todo!()
-            // }
+            AccessType::Distributed { key_distribution} => {
+                let rand_num = control_rng.next_u32();
+                for i in 0..key_distribution.len() {
+                    if rand_num <= key_distribution[i] {
+                        return i as u32;
+                    }
+                }
+                panic!()
+            }
         }
     }
 }
@@ -222,7 +259,7 @@ fn run_kvs_application_diverse_obj_len<
             }
         }
     });
-
+ 
     macro_rules! lookup_obj_size {
         ($index: ident, $key: expr, { $($inner: stmt)* }) => {
             {
@@ -397,65 +434,33 @@ trait KeyValueStoreImpl<InternalPointer> {
     fn flush<T>(&mut self, ptr: &InternalPointer) -> Result<(), ()>;
 }
 
+// uncomment to be able to run it in e.g. vscode
 // #[cfg(test)]
-// mod test {
+#[allow(unused)]
+mod measure_accessed_values {
+    use rand_xoshiro::{rand_core::SeedableRng, Xoshiro128StarStar};
 
-//     use std::time::Instant;
+    use super::AccessType;
 
-//     use crate::{
-//         benchmarks::Timer,
-//         modules::{
-//             allocator::LinkedListAllocatorModule, persistent_storage::test::get_test_storage,
-//         },
-//     };
+    // uncomment to be able to run it in e.g. vscode
+    // #[test]
+    fn measure() {
+        let num_values = 256;
 
-//     use super::{
-//         page_wise::PagedKeyValueStoreImplementation, run_kvs_application_distributed_obj_len,
-//         AccessType,
-//     };
+        let dist = |i: u32| -> f64 {
+            (((i as f64) * 40.0) / (num_values as f64)).sin().powi(20) + 0.1
+        };
+        let mut dist = AccessType::Distributed { key_distribution: AccessType::key_distribution(dist, num_values as u32) };
 
-//     #[test]
-//     fn test() {
-//         let mut storage = get_test_storage("test", 100000);
+        const CONTROL_SEED: [u8; 16] = [
+            149, 228, 163, 172, 175, 184, 104, 86, 131, 185, 95, 73, 18, 58, 248, 111,
+        ];
 
-//         let mut pages = [[0u8; 4096]; 20];
-//         let mut i = PagedKeyValueStoreImplementation::new(
-//             &mut storage,
-//             LinkedListAllocatorModule::new(),
-//             20,
-//             &mut pages,
-//         );
-//         run_kvs_application_distributed_obj_len::<_, _, T>(
-//             &mut i,
-//             25,
-//             100,
-//             AccessType::Partitioned {
-//                 partition_size: 5,
-//                 access_count: 20,
-//                 curr_partition: 0,
-//             },
-//         );
-//     }
+        let mut control_rng = Xoshiro128StarStar::from_seed(CONTROL_SEED);
 
-//     struct T {
-//         start_time: Instant,
-//     }
-
-//     impl Timer for T {
-//         fn get_ticks_per_ms() -> u32 {
-//             1000
-//         }
-
-//         #[inline]
-//         fn start() -> Self {
-//             Self {
-//                 start_time: Instant::now(),
-//             }
-//         }
-
-//         #[inline]
-//         fn stop(self) -> u32 {
-//             (Instant::now() - self.start_time).subsec_micros()
-//         }
-//     }
-// }
+        for _ in 0..100000 {
+            let k = dist.next_key(0, 0, num_values, &mut control_rng);
+            println!("{}", k);
+        }
+    }
+}
