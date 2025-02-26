@@ -124,6 +124,8 @@ pub fn run_all_benchmarks<
     let mut iteration_count = 0;
 
     fn handle_curr_iteration(curr_iteration: &mut usize, iteration_count: usize) {
+        debug_assert!(*curr_iteration < iteration_count);
+
         let percentage = (100 * *curr_iteration) / (iteration_count);
         print!("[{}%] ", percentage);
 
@@ -190,6 +192,7 @@ pub fn run_all_benchmarks<
     if options.run_locked_wcet_benchmarks {
         LockedWCETRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     }
+    debug_assert_eq!(curr_iteration, iteration_count);
     println!("")
 }
 

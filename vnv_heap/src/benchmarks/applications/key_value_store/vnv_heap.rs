@@ -91,7 +91,7 @@ impl<
 
         Ok(())
     }
-    
+
     fn flush<T>(&mut self, ptr: &InternalPointer) -> Result<(), ()> {
         let mut inner = self.manager.get_inner().borrow_mut();
         let identifier = pointer_to_identifier::<T>(*ptr);

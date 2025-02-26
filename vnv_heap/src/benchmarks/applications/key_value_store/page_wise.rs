@@ -23,7 +23,12 @@ impl<
         S: PersistentStorageModule,
     > PagedKeyValueStoreImplementation<'a, PAGE_SIZE, PAGE_COUNT, A, S>
 {
-    pub(super) fn new(storage: &'a mut S, alloc: A, modified_page_limit: usize, pages: &'a mut [[u8; PAGE_SIZE]; PAGE_COUNT]) -> Self {
+    pub(super) fn new(
+        storage: &'a mut S,
+        alloc: A,
+        modified_page_limit: usize,
+        pages: &'a mut [[u8; PAGE_SIZE]; PAGE_COUNT],
+    ) -> Self {
         Self {
             manager: MemoryManager::new(storage, alloc, modified_page_limit, pages),
         }
@@ -68,7 +73,7 @@ impl<
 
         Ok(())
     }
-    
+
     fn flush<T>(&mut self, ptr: &InternalPointer) -> Result<(), ()> {
         self.manager.get_inner().flush::<T>(*ptr as *mut T)
     }
