@@ -223,9 +223,13 @@ cargo run
 
 ### Zephyr - ESP32-C3
 
-To execute the benchmarks on an *ESP32-C3* with the *Zephyr RTOS* and a *Fujitsu MB85RS64V FRAM module*, select the benchmarks you want to execute in `./zephyr/vnv_heap_benchmark/src/lib.rs`.
-**Note**: It is not possible on the ESP32-C3 to run all benchmarks at once as the available RAM is to small (the compiled binary and additional runtime data is pretty large).
-So divide the benchmarks in smaller runs.
+The following steps show how to benchmark the vNV-Heap on the evaluation board (an *ESP32-C3* and a *Fujitsu MB85RS64V FRAM module*). This board looks like this:
+
+<img src="assets/esp32c3_w_fram.png" width="400px"/>
+
+To execute the benchmarks on the *ESP32-C3*, select the benchmarks you want to execute in `./zephyr/vnv_heap_benchmark/src/lib.rs`.
+**Note**: It is not possible on the ESP32-C3 to run all benchmarks at once as the available RAM is too small (the compiled binary and additional runtime data are pretty large).
+So it is important to divide the benchmarks in smaller runs.
 Additionally, if benchmarks seem to be stuck, the stack is probably too small and should be adjusted in `./zephyr/vnv_heap_benchmark/proj.conf` (`CONFIG_MAIN_STACK_SIZE`).
 
 If you chose the benchmarks you want to run and everything is setup correctly (according to [this section](#getting-started-with-zephyr)), run:
