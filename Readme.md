@@ -223,13 +223,18 @@ cargo run
 
 ### Zephyr - ESP32-C3
 
-To execute the benchmarks on an *ESP32-C3* with the *Zephyr RTOS* and a *Fujitsu MB85RS64V FRAM module*, run:
+To execute the benchmarks on an *ESP32-C3* with the *Zephyr RTOS* and a *Fujitsu MB85RS64V FRAM module*, select the benchmarks you want to execute in `./zephyr/vnv_heap_benchmark/src/lib.rs`.
+**Note**: It is not possible on the ESP32-C3 to run all benchmarks at once as the available RAM is to small (the compiled binary and additional runtime data is pretty large).
+So divide the benchmarks in smaller runs.
+Additionally, if benchmarks seem to be stuck, the stack is probably too small and should be adjusted in `./zephyr/vnv_heap_benchmark/proj.conf` (`CONFIG_MAIN_STACK_SIZE`).
+
+If you chose the benchmarks you want to run and everything is setup correctly (according to [this section](#getting-started-with-zephyr)), run:
 
 ```bash
 ./zephyr/vnv_heap_benchmark/run_benchmark.sh
 ```
 
-This automatically starts the benchmarks and records the results in a json file.
+This script automatically starts the benchmarks and records the results in a json file.
 This json file can then be used in the JupyterNotebooks found in [zephyr/vnv_heap_benchmark/analysis](zephyr/vnv_heap_benchmark/analysis/).
 
 Benchmark results recorded for the ESP32-C3 with a Fujitsu MB85RS64V FRAM module and the Zephyr RTOS are saved as JSON files in [zephyr/vnv_heap_benchmark/output](zephyr/vnv_heap_benchmark/output).
