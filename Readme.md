@@ -1,6 +1,6 @@
 # Virtually Non-Volatile Heap (vNV-Heap)
 
-This repository contains the implementation and evaluation for the academic paper "Ownership-based Virtual Memory for Intermittently-Powered Embedded Systems" ([https://arxiv.org/abs/2501.17707](https://arxiv.org/abs/2501.17707)).
+This repository contains the implementation and evaluation for the academic paper "vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems" ([https://arxiv.org/abs/2501.17707](https://arxiv.org/abs/2501.17707)).
 
 ## Usage
 
