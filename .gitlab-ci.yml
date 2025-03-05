@@ -3,8 +3,9 @@ stages:
 
 cargo build & run & test:
   stage: build
-  image: rust:latest
+  image: rust:1.75.0
   script:
+    - rustup toolchain install $(cat rust-toolchain)
     - cargo build --verbose
     - cargo test --verbose
     - cd counter_example
