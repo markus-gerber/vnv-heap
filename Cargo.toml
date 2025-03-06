@@ -1,10 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-    "counter_example",
-    "desktop_benchmark",
-    "desktop_persist",
-    "desktop_playground",
+    "desktop/counter_example",
+    "desktop/desktop_benchmark",
+    "desktop/desktop_persist",
     "vnv_heap"
 ]
 exclude = [

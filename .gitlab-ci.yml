@@ -8,13 +8,12 @@ cargo build & run & test:
     - rustup toolchain install $(cat rust-toolchain)
     - cargo build --verbose
     - cargo test --verbose
+    - cd desktop
     - cd counter_example
     - cargo run
     - cd ..
     - cd desktop_benchmark
     - cargo run
     - cd ..
-    - cd desktop_playground
-    - cargo run
-    - cd ..
-
+    - cd desktop_persist
+    - ./run_checked_output.sh 10

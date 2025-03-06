@@ -1,11 +1,10 @@
 [package]
-name = "desktop_playground"
+name = "counter_example"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-env_logger = "0.10.2"
 log = { version = "0.4.21", features = [ "max_level_trace", "release_max_level_warn" ] }
-vnv_heap = { path = "../vnv_heap", features = [] }
+vnv_heap = { path = "../../vnv_heap", features = [] }

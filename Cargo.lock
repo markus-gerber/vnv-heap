@@ -47,15 +47,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "desktop_playground"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "log",
- "vnv_heap",
-]
-
-[[package]]
 name = "env_logger"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

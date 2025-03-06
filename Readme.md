@@ -18,7 +18,7 @@ To use the vNV-Heap in your application follow these steps.
 
     Possible features are:
 
-    - `benchmarks`: Enable benchmarking for this application. Look at [desktop_benchmark](desktop_benchmark/) or [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/) for examples.
+    - `benchmarks`: Enable benchmarking for this application. Look at [desktop/desktop_benchmark](desktop/desktop_benchmark/) or [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/) for examples.
     - `persist_debug_prints`: Enable safe debug prints during persisting. This feature uses the `write` system call and thus depends on `libc`, meaning it cannot be used in all environments.
     - `persist_debug_unsafe_prints`: **THIS FEATURE IS UNSAFE! USE IT WITH CAUTION!!!** Enables unsafe debug prints during persisting. This features uses the standard println! macro. This however can result in undesired behavior as its implementation is commonly not reentrant.
 
@@ -128,15 +128,15 @@ To use the vNV-Heap in your application follow these steps.
     }
     ```
 
-    *This example is also available in the [counter_example](counter_example/) directory.*
+    *This example is also available in the [desktop/counter_example](desktop/counter_example/) directory.*
 
 ### Examples
 
 Examples for using vNV-Heap can be found in different directories:
 
-- [counter_example](counter_example/): Simple counter example. You can run it by executing `cargo run`.
-- [desktop_persist](desktop_persist/): Example how to use the persist interrupt to persist vNV-Heap. Run [desktop_persist/run_checked_output.sh](desktop_persist/run_checked_output.sh) to automatically persist the vNV-Heap multiple times a second.
-- [desktop_playground](desktop_playground/): Another simple usage example. You can run it by executing `cargo run`.
+- [desktop/counter_example](desktop/counter_example/): Simple counter example. You can run it by executing `cargo run`.
+- [desktop/desktop_persist](desktop/desktop_persist/): Example how to use the persist interrupt to persist vNV-Heap. Run [desktop/desktop_persist/run_checked_output.sh](desktop/desktop_persist/run_checked_output.sh) to automatically persist the vNV-Heap multiple times a second.
+- [desktop/desktop_playground](desktop/desktop_playground/): Another simple usage example. You can run it by executing `cargo run`.
 - [zephyr/vnv_heap_persist](zephyr/vnv_heap_persist/): A example that uses a button to trigger persists on an ESP32-C3 with a Fujitsu MB85RS64V FRAM module and Zephyr RTOS. Follow [these](#getting-started-with-zephyr) instructions to get started with Zephyr. Pin connections:
   - SCK: Pin 6
   - MISO: Pin 2
@@ -210,12 +210,12 @@ A big advantage of this architecture is that it allows for easy debugging (e.g. 
 
 The projects to run the benchmarks are located in:
 
-- For Desktop: [desktop_benchmark](desktop_benchmark/)
+- For Desktop: [desktop/desktop_benchmark](desktop/desktop_benchmark/)
 - For Zephyr: [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/)
 
 ### Desktop
 
-To execute the benchmarks on a desktop machine, run the following in the [desktop_benchmark](desktop_benchmark/) directory:
+To execute the benchmarks on a desktop machine, run the following in the [desktop/desktop_benchmark](desktop/desktop_benchmark/) directory:
 
 ```bash
 cargo run

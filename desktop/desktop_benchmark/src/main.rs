@@ -49,12 +49,13 @@ fn main() {
                     result_buffer: &mut [0; 5],
                 },
                 //RunAllBenchmarkOptions::default(),
-                /*RunAllBenchmarkOptions {
-                    run_persistent_storage_benchmarks: true,
-                    run_long_persistent_storage_benchmarks: true,
+                RunAllBenchmarkOptions {
+                    run_event_queue_benchmarks: true,
+                    // run_long_persistent_storage_benchmarks: true,
                     ..Default::default()
-                }*/
-                RunAllBenchmarkOptions::all_except_persist(),
+                },
+                // RunAllBenchmarkOptions::all_except_persist(),
+                
                 get_storage,
                 || 0,
             );
