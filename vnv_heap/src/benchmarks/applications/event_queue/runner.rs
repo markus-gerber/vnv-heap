@@ -12,7 +12,7 @@ use crate::{
         nonresident_allocator::{
             calc_non_resident_block_allocator_bit_list_size, NonResidentBlockAllocator,
         },
-        object_management::DefaultObjectManagementModule,
+        object_management::ClockObjectManagementModule,
         persistent_storage::{DummyStorageModule, TruncatedStorageModule},
     },
     vnv_list::{ListItemContainer, VNVList},
@@ -27,10 +27,10 @@ const BIT_LIST_SIZE: usize =
     calc_non_resident_block_allocator_bit_list_size(BLOCK_SIZE, STORAGE_SIZE);
 
 type A = LinkedListAllocatorModule;
-type M = DefaultObjectManagementModule;
+type M = ClockObjectManagementModule;
 type N = NonResidentBlockAllocator<BLOCK_SIZE, BIT_LIST_SIZE>;
 
-const ITERATION_COUNT: usize = 10;
+const ITERATION_COUNT: usize = 10000;
 const OBJ_SIZE: usize = 256;
 
 const RAM_LIMIT: usize = 4 * 1024;
