@@ -48,14 +48,23 @@ fn main() {
                     repetitions: 5,
                     result_buffer: &mut [0; 5],
                 },
-                //RunAllBenchmarkOptions::default(),
+                // RunAllBenchmarkOptions::all_except_persist(),
                 RunAllBenchmarkOptions {
-                    run_event_queue_benchmarks: true,
+                    // run_allocate_benchmarks: true,
+                    // run_deallocate_benchmarks: true,
+                    run_get_benchmarks: true,
+                    // run_baseline_allocate_benchmarks: true,
+                    // run_baseline_deallocate_benchmarks: true,
+                    run_baseline_get_benchmarks: true,
+                    run_persistent_storage_benchmarks: true,
                     // run_long_persistent_storage_benchmarks: true,
+                    // run_dirty_size_persist_latency: true,
+                    // run_buffer_size_persist_latency: true,
+                    // run_event_queue_benchmarks: true,
+                    // run_kvs_benchmarks: true,
+                    // run_locked_wcet_benchmarks: true
                     ..Default::default()
                 },
-                // RunAllBenchmarkOptions::all_except_persist(),
-                
                 get_storage,
                 || 0,
             );
