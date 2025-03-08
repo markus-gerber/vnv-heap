@@ -37,12 +37,20 @@ def set_theme(colors=2, skip=0, ignore=-1, hide_spines=False):
     style = sns.axes_style("whitegrid")
     style["grid.color"] = "#ddd"
     style["axes.edgecolor"] = "#ddd"
+    ticks_label_color = style["xtick.color"]
+    style["xtick.bottom"] = True
+    style["xtick.color"] = "#ddd"
+    style["ytick.left"] = True
+    style["ytick.color"] = "#ddd"
+
     if hide_spines:
         style["axes.spines.right"] = True
         style["axes.spines.top"] = True
 
     sns.set_theme(style=style)
     sns.set_context("paper", rc={"font.size":8, "font.family": "Libertine", "axes.titlesize":8, "axes.labelsize":8, "xtick.labelsize": 8, "ytick.labelsize": 8, "legend.title_fontsize": 9})
+    plt.rcParams["xtick.labelcolor"] = ticks_label_color
+    plt.rcParams["ytick.labelcolor"] = ticks_label_color
 
     #palette = sns.color_palette("mako", n_colors=colors)[skip:]
     #if ignore != -1:

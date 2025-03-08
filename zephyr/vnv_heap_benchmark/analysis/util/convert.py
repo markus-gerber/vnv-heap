@@ -48,14 +48,20 @@ def convert_data(raw_data, bench_name: str, columns: list[str], unwrapped: bool 
     # filter and convert data
     data = filter(lambda item: item["bench_name"] == bench_name, raw_data)
 
+    def conv_object(obj, base_key: str, res: dict):
+        for key in obj:
+            res[f"{base_key}.{key}"] = obj[key]
+            if isinstance(obj[key], dict):
+                conv_object(obj[key], f"{base_key}.{key}", res)
+
+
     def convert_item(item):
         new = dict()
         new["mean"] = sum(item["data"]) / len(item["data"])
         new["min"] = min(item["data"])
         new["max"] = max(item["data"])
 
-        for key in item["bench_options"]:
-            new["options." + key] = item["bench_options"][key]
+        conv_object(item["bench_options"], "options", new)
 
         for key in item:
             if key != "bench_options" and key != "data":
@@ -72,7 +78,8 @@ def convert_data(raw_data, bench_name: str, columns: list[str], unwrapped: bool 
 
     unflattened = list(map(convert_item, data))
     flattened = [x for xs in unflattened for x in xs]
-
+    print(flattened)
+    
     data = pd.DataFrame(flattened, columns=columns)
 
     # make sure machine name, cold start and repetitions match
