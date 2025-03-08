@@ -54,8 +54,8 @@ impl<
     }
 }
 
-pub(crate) const fn multi_page_calc_metadata_size<const PAGE_SIZE: usize, const PAGE_COUNT: usize, A: AllocatorModule, S: PersistentStorageModule>() -> usize {
-    size_of::<MemoryManagerInner<PAGE_SIZE, PAGE_COUNT, A, S>>() + size_of::<S>()
+pub(crate) const fn multi_page_calc_base_metadata_size<A: AllocatorModule, S: PersistentStorageModule>() -> usize {
+    size_of::<MemoryManagerInner<1, 1, A, S>>() + size_of::<S>() - size_of::<[bool; 1]>()
 }
 
 pub(crate) struct MemoryManagerInner<
@@ -71,10 +71,6 @@ pub(crate) struct MemoryManagerInner<
     modified_page_count: usize,
     modified_clock: PageClock<PAGE_COUNT>,
     modified_page_limit: usize,
-
-    // just a dummy to calculate the amount of metadata needed
-    #[allow(unused)]
-    page_resident: [bool; PAGE_COUNT],
 
     storage: &'a mut S,
     allocator: A,
@@ -107,7 +103,6 @@ impl<
             modified_clock: PageClock::new(),
             modified_page_count: 0,
             modified_pages: [false; PAGE_COUNT],
-            page_resident: [false; PAGE_COUNT],
         }
     }
 

@@ -114,29 +114,17 @@ impl AccessType {
     }
 }
 
-pub(super) const KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES: usize = 4;
+pub(super) const KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES: usize = 5;
 pub(super) const KVS_APP_DIVERSE_OBJ_LEN_OBJ_SIZES: [usize; KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES] =
-    [32, 128, 256, 512];
+    [32, 128, 256, 1024, 4096];
 pub(super) const KVS_APP_DIVERSE_OBJ_LEN_OBJ_COUNT_DISTRIBUTION: [usize;
-    KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES] = [20, 20, 10, 10];
+    KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES] = [16+8, 32+16, 32, 16, 8];
 
-fn run_kvs_application_diverse_obj_len<
-    InternalPointer,
-    I: KeyValueStoreImpl<InternalPointer>,
-    T: Timer,
->(
-    internal: &mut I,
-    value_cnt: usize,
-    iterations: usize,
-    mut access_type: AccessType,
-) -> u32 {
-    const DEBUG: bool = false;
+fn calc_object_count_kvs_application(value_cnt: usize) -> [usize; KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES] {
     const OBJ_VALUES: usize = KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES;
-    const OBJ_SIZES: [usize; OBJ_VALUES] = KVS_APP_DIVERSE_OBJ_LEN_OBJ_SIZES;
     const OBJ_COUNT_DISTRIBUTION: [usize; OBJ_VALUES] =
         KVS_APP_DIVERSE_OBJ_LEN_OBJ_COUNT_DISTRIBUTION;
 
-    // calculate absolute object count for each object size
     let total_object_distribution_count: usize = OBJ_COUNT_DISTRIBUTION.iter().sum();
     let mut object_count: [usize; OBJ_VALUES] =
         from_fn(|i| (value_cnt * OBJ_COUNT_DISTRIBUTION[i]) / total_object_distribution_count);
@@ -153,12 +141,31 @@ fn run_kvs_application_diverse_obj_len<
             .0;
         object_count[index] += object_count_diff;
     }
-
     debug_assert_eq!(object_count.iter().sum::<usize>(), value_cnt);
+
+    return object_count
+}
+
+fn run_kvs_application_bench<
+    InternalPointer,
+    I: KeyValueStoreImpl<InternalPointer>,
+    T: Timer,
+>(
+    internal: &mut I,
+    value_cnt: usize,
+    iterations: usize,
+    mut access_type: AccessType,
+) -> u32 {
+    const DEBUG: bool = false;
+    const OBJ_VALUES: usize = KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES;
+    const OBJ_SIZES: [usize; OBJ_VALUES] = KVS_APP_DIVERSE_OBJ_LEN_OBJ_SIZES;
+
+    // calculate absolute object count for each object size
+    let object_count = calc_object_count_kvs_application(value_cnt);
 
     macro_rules! for_obj_size_impl {
         ($index: ident, $value: expr, { $($inner: stmt)* }) => {
-            //static_assertions::const_assert_eq!(OBJ_SIZES.len(), $value);
+            static_assertions::const_assert_eq!(OBJ_SIZES.len(), $value);
             seq_macro::seq!(I in 0..$value {
                 $($inner)*
             });
@@ -167,7 +174,7 @@ fn run_kvs_application_diverse_obj_len<
 
     macro_rules! for_obj_size {
         ($index: ident, { $($inner: stmt)* }) => {
-            for_obj_size_impl!($index, 4, { $($inner)* })
+            for_obj_size_impl!($index, 5, { $($inner)* })
         };
     }
 
@@ -298,55 +305,6 @@ fn run_kvs_application_diverse_obj_len<
             }
         }
     });
-
-    duration
-}
-
-fn run_kvs_application_equiv_obj_len<
-    const OBJ_SIZE: usize,
-    InternalPointer,
-    I: KeyValueStoreImpl<InternalPointer>,
-    T: Timer,
->(
-    internal: &mut I,
-    value_cnt: usize,
-    iterations: usize,
-    mut access_type: AccessType,
-) -> u32 {
-    let mut kvs = KeyValueStore::new(internal);
-
-    const DATA_SEED: [u8; 16] = [
-        17, 47, 137, 149, 21, 154, 201, 98, 148, 76, 203, 156, 140, 247, 234, 183,
-    ];
-    const CONTROL_SEED: [u8; 16] = [
-        149, 228, 163, 172, 175, 184, 104, 86, 131, 185, 95, 73, 18, 58, 248, 111,
-    ];
-
-    // deterministic random number generators for data and control flow
-    let mut data_rng = Xoshiro128StarStar::from_seed(DATA_SEED);
-    let mut control_rng = Xoshiro128StarStar::from_seed(CONTROL_SEED);
-
-    for i in 0..value_cnt {
-        let arr = random_array::<OBJ_SIZE>(&mut data_rng);
-        kvs.insert(i as u32, arr).unwrap();
-    }
-
-    for i in 0..value_cnt {
-        kvs.flush::<OBJ_SIZE>(i as u32).unwrap();
-    }
-
-    let timer = T::start();
-
-    for i in 0..iterations {
-        let access_index = access_type.next_key(i, iterations, value_cnt, &mut control_rng);
-        kvs.update(access_index, random_array::<OBJ_SIZE>(&mut data_rng))
-            .unwrap();
-    }
-
-    let duration = timer.stop();
-    for i in 0..value_cnt {
-        kvs.remove::<OBJ_SIZE>(i as u32).unwrap();
-    }
 
     duration
 }
