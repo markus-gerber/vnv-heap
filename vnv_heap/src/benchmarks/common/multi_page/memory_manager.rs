@@ -55,7 +55,7 @@ impl<
 }
 
 pub(crate) const fn multi_page_calc_base_metadata_size<A: AllocatorModule, S: PersistentStorageModule>() -> usize {
-    size_of::<MemoryManagerInner<1, 1, A, S>>() + size_of::<S>() - size_of::<[bool; 1]>()
+    size_of::<MemoryManagerInner<1, 0, A, S>>() + size_of::<S>()
 }
 
 pub(crate) struct MemoryManagerInner<
