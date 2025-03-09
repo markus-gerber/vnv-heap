@@ -21,7 +21,8 @@ type M = DefaultObjectManagementModule;
 type N = NonResidentBuddyAllocatorModule<32>;
 
 const ITERATION_COUNT: usize = 1_000;
-const OBJ_CNT: usize = 128;
+const RAM_SIZE: usize = 120_000;
+const OBJ_CNT: usize = 256;
 
 fn get_access_types() -> [AccessType; 4] {
     [
@@ -41,7 +42,7 @@ fn get_access_types() -> [AccessType; 4] {
     ]
 }
 
-const PAGE_SIZES: [usize; 9] = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096];
+const PAGE_SIZES: [usize; 7] = [16, 32, 64, 128, 256, 512, 1024];
 
 pub(crate) struct KVSBenchmarkRunner;
 
@@ -94,7 +95,7 @@ impl BenchmarkRunner for KVSBenchmarkRunner {
                                 {
                                     const $page_size: usize = PAGE_SIZES[I];
                                     // make sure we have enough pages for all of the objects
-                                    const $page_cnt: usize = div_ceil(100000, PAGE_SIZE);
+                                    const $page_cnt: usize = div_ceil(RAM_SIZE, PAGE_SIZE);
 
                                     $inner
                                 }
@@ -105,7 +106,7 @@ impl BenchmarkRunner for KVSBenchmarkRunner {
                 }
                 macro_rules! for_page_size {
                     ($page_size: ident, $page_cnt: ident, $inner: expr) => {
-                        for_page_size_impl!(PAGE_SIZE, PAGE_CNT, $inner, 9);
+                        for_page_size_impl!(PAGE_SIZE, PAGE_CNT, $inner, 7);
                     };
                 }
 
@@ -173,7 +174,7 @@ impl BenchmarkRunner for KVSBenchmarkRunner {
 
                 // GENERAL SETTINGS
                 // make sure we have enough space for all of the objects
-                const VNV_HEAP_BUF_SIZE: usize = 100000;
+                const VNV_HEAP_BUF_SIZE: usize = RAM_SIZE;
 
                 // ETC RUNTIME CONSTANTS
                 let vnv_heap_stack_size = size_of::<VNVHeap<A, N, M, S>>();

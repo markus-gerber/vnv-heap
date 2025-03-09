@@ -114,11 +114,12 @@ impl AccessType {
     }
 }
 
-pub(super) const KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES: usize = 5;
+pub(super) const KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES: usize = 4;
 pub(super) const KVS_APP_DIVERSE_OBJ_LEN_OBJ_SIZES: [usize; KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES] =
-    [32, 128, 256, 1024, 4096];
+    [32, 128, 256, 1024];
+// note that these values are not absolute, but relative to the total amount of values
 pub(super) const KVS_APP_DIVERSE_OBJ_LEN_OBJ_COUNT_DISTRIBUTION: [usize;
-    KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES] = [16+8, 32+16, 32, 16, 8];
+    KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES] = [64, 128, 32, 32];
 
 fn calc_object_count_kvs_application(value_cnt: usize) -> [usize; KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES] {
     const OBJ_VALUES: usize = KVS_APP_DIVERSE_OBJ_LEN_OBJ_VALUES;
@@ -174,7 +175,7 @@ fn run_kvs_application_bench<
 
     macro_rules! for_obj_size {
         ($index: ident, { $($inner: stmt)* }) => {
-            for_obj_size_impl!($index, 5, { $($inner)* })
+            for_obj_size_impl!($index, 4, { $($inner)* })
         };
     }
 
