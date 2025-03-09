@@ -1,12 +1,12 @@
 use std::mem::{size_of, MaybeUninit};
 
-use crate::benchmarks::applications::event_queue::run_event_queue_application;
+use crate::benchmarks::applications::queue::run_queue_application;
 use serde::Serialize;
 
-use super::{super::super::{Benchmark, Timer}, EventQueue};
+use super::{super::super::{Benchmark, Timer}, Queue};
 
 #[derive(Serialize)]
-pub struct EventQueueRAMBenchmarkOptions {
+pub struct QueueRAMBenchmarkOptions {
     object_size: usize,
     queue_length: usize,
     iterations: usize,
@@ -14,13 +14,13 @@ pub struct EventQueueRAMBenchmarkOptions {
     ram_overhead: usize
 }
 
-pub struct EventQueueRAMBenchmark<'a, const OBJ_SIZE: usize> {
+pub struct QueueRAMBenchmark<'a, const OBJ_SIZE: usize> {
     ring_buffer: RingBuffer<'a, OBJ_SIZE>,    
     queue_length: usize,
     iterations: usize,
 }
 
-impl<'a, const OBJ_SIZE: usize> EventQueueRAMBenchmark<'a, OBJ_SIZE>
+impl<'a, const OBJ_SIZE: usize> QueueRAMBenchmark<'a, OBJ_SIZE>
 {
     pub fn new(
         buffer: &'a mut [MaybeUninit<[u8; OBJ_SIZE]>],
@@ -40,22 +40,22 @@ impl<'a, const OBJ_SIZE: usize> EventQueueRAMBenchmark<'a, OBJ_SIZE>
 impl<
         'a,
         const OBJ_SIZE: usize,
-    > Benchmark<EventQueueRAMBenchmarkOptions>
-    for EventQueueRAMBenchmark<'a, OBJ_SIZE>
+    > Benchmark<QueueRAMBenchmarkOptions>
+    for QueueRAMBenchmark<'a, OBJ_SIZE>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
-        "event_queue_ram"
+        "queue_ram"
     }
 
     #[inline]
     fn execute<T: Timer>(&mut self) -> u32 {
-        run_event_queue_application::<OBJ_SIZE, Self, T>(self, self.queue_length, self.iterations)
+        run_queue_application::<OBJ_SIZE, Self, T>(self, self.queue_length, self.iterations)
     }
 
     #[inline]
-    fn get_bench_options(&self) -> EventQueueRAMBenchmarkOptions {
-        EventQueueRAMBenchmarkOptions {
+    fn get_bench_options(&self) -> QueueRAMBenchmarkOptions {
+        QueueRAMBenchmarkOptions {
             object_size: OBJ_SIZE,
             iterations: self.iterations,
             queue_length: self.queue_length,
@@ -69,7 +69,7 @@ impl<
 impl<
         'a,
         const OBJ_SIZE: usize,
-    > EventQueue<OBJ_SIZE> for EventQueueRAMBenchmark<'a, OBJ_SIZE>
+    > Queue<OBJ_SIZE> for QueueRAMBenchmark<'a, OBJ_SIZE>
 {
     fn produce(&mut self, data: [u8; OBJ_SIZE]) {
         self.ring_buffer.push_front(data).unwrap();

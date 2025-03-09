@@ -6,9 +6,9 @@ mod vnv_heap;
 mod ram;
 mod storage;
 mod runner;
-pub(crate) use runner::EventQueueBenchmarkRunner;
+pub(crate) use runner::QueueBenchmarkRunner;
 
-fn run_event_queue_application<const OBJ_SIZE: usize, Q: EventQueue<OBJ_SIZE>, T: Timer>(
+fn run_queue_application<const OBJ_SIZE: usize, Q: Queue<OBJ_SIZE>, T: Timer>(
     queue: &mut Q,
     queue_length: usize,
     iterations: usize,
@@ -50,7 +50,7 @@ fn run_event_queue_application<const OBJ_SIZE: usize, Q: EventQueue<OBJ_SIZE>, T
     duration
 }
 
-trait EventQueue<const OBJ_SIZE: usize> {
+trait Queue<const OBJ_SIZE: usize> {
     fn produce(&mut self, data: [u8; OBJ_SIZE]);
     fn consume(&mut self) -> Option<[u8; OBJ_SIZE]>;
     fn capacity(&self) -> usize;

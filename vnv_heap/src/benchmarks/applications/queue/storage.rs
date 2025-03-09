@@ -1,25 +1,25 @@
 use std::mem::size_of;
 
-use crate::{benchmarks::applications::event_queue::run_event_queue_application, modules::persistent_storage::PersistentStorageModule};
+use crate::{benchmarks::applications::queue::run_queue_application, modules::persistent_storage::PersistentStorageModule};
 use serde::Serialize;
 
-use super::{super::super::{Benchmark, Timer}, EventQueue};
+use super::{super::super::{Benchmark, Timer}, Queue};
 
 #[derive(Serialize)]
-pub struct EventQueueStorageBenchmarkOptions {
+pub struct QueueStorageBenchmarkOptions {
     object_size: usize,
     queue_length: usize,
     iterations: usize,
     ram_overhead: usize,
 }
 
-pub struct EventQueueStorageBenchmark<'a, const OBJ_SIZE: usize, S: PersistentStorageModule> {
+pub struct QueueStorageBenchmark<'a, const OBJ_SIZE: usize, S: PersistentStorageModule> {
     ring_buffer: StorageRingBuffer<'a, OBJ_SIZE, S>,
     queue_length: usize,
     iterations: usize,
 }
 
-impl<'a, const OBJ_SIZE: usize, S: PersistentStorageModule> EventQueueStorageBenchmark<'a, OBJ_SIZE, S>
+impl<'a, const OBJ_SIZE: usize, S: PersistentStorageModule> QueueStorageBenchmark<'a, OBJ_SIZE, S>
 {
     pub fn new(
         storage: &'a mut S,
@@ -42,22 +42,22 @@ impl<
         'a,
         const OBJ_SIZE: usize,
         S: PersistentStorageModule
-    > Benchmark<EventQueueStorageBenchmarkOptions>
-    for EventQueueStorageBenchmark<'a, OBJ_SIZE, S>
+    > Benchmark<QueueStorageBenchmarkOptions>
+    for QueueStorageBenchmark<'a, OBJ_SIZE, S>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
-        "event_queue_storage"
+        "queue_storage"
     }
 
     #[inline]
     fn execute<T: Timer>(&mut self) -> u32 {
-        run_event_queue_application::<OBJ_SIZE, Self, T>(self, self.queue_length, self.iterations)
+        run_queue_application::<OBJ_SIZE, Self, T>(self, self.queue_length, self.iterations)
     }
 
     #[inline]
-    fn get_bench_options(&self) -> EventQueueStorageBenchmarkOptions {
-        EventQueueStorageBenchmarkOptions {
+    fn get_bench_options(&self) -> QueueStorageBenchmarkOptions {
+        QueueStorageBenchmarkOptions {
             object_size: OBJ_SIZE,
             iterations: self.iterations,
             queue_length: self.queue_length,
@@ -72,7 +72,7 @@ impl<
         'a,
         const OBJ_SIZE: usize,
         S: PersistentStorageModule
-    > EventQueue<OBJ_SIZE> for EventQueueStorageBenchmark<'a, OBJ_SIZE, S>
+    > Queue<OBJ_SIZE> for QueueStorageBenchmark<'a, OBJ_SIZE, S>
 {
     fn produce(&mut self, data: [u8; OBJ_SIZE]) {
         self.ring_buffer.push_front(data).unwrap();

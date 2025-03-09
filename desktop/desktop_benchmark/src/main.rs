@@ -60,7 +60,7 @@ fn main() {
                     // run_long_persistent_storage_benchmarks: true,
                     // run_dirty_size_persist_latency: true,
                     // run_buffer_size_persist_latency: true,
-                    // run_event_queue_benchmarks: true,
+                    // run_queue_benchmarks: true,
                     // run_kvs_benchmarks: true,
                     // run_locked_wcet_benchmarks: true
                     ..Default::default()

@@ -37,7 +37,7 @@ pub struct RunAllBenchmarkOptions {
     pub run_long_persistent_storage_benchmarks: bool,
     pub run_dirty_size_persist_latency: bool,
     pub run_buffer_size_persist_latency: bool,
-    pub run_event_queue_benchmarks: bool,
+    pub run_queue_benchmarks: bool,
     pub run_kvs_benchmarks: bool,
     pub run_locked_wcet_benchmarks: bool
 }
@@ -55,7 +55,7 @@ impl Default for RunAllBenchmarkOptions {
             run_long_persistent_storage_benchmarks: false,
             run_dirty_size_persist_latency: false,
             run_buffer_size_persist_latency: false,
-            run_event_queue_benchmarks: false,
+            run_queue_benchmarks: false,
             run_kvs_benchmarks: false,
             run_locked_wcet_benchmarks: false
         }
@@ -75,7 +75,7 @@ impl RunAllBenchmarkOptions {
             run_long_persistent_storage_benchmarks: true,
             run_dirty_size_persist_latency: true,
             run_buffer_size_persist_latency: true,
-            run_event_queue_benchmarks: true,
+            run_queue_benchmarks: true,
             run_kvs_benchmarks: true,
             run_locked_wcet_benchmarks: true
         }
@@ -95,7 +95,7 @@ impl RunAllBenchmarkOptions {
     }
     pub fn applications() -> Self {
         Self {
-            run_event_queue_benchmarks: true,
+            run_queue_benchmarks: true,
             run_kvs_benchmarks: true,
             ..Default::default()
         }
@@ -149,8 +149,8 @@ pub fn run_all_benchmarks<
     if options.run_buffer_size_persist_latency {
         iteration_count += BufferSizePersistLatencyRunner::get_iteration_count(&options);
     }
-    if options.run_event_queue_benchmarks {
-        iteration_count += EventQueueBenchmarkRunner::get_iteration_count(&options);
+    if options.run_queue_benchmarks {
+        iteration_count += QueueBenchmarkRunner::get_iteration_count(&options);
     }
     if options.run_kvs_benchmarks {
         iteration_count += KVSBenchmarkRunner::get_iteration_count(&options);
@@ -183,8 +183,8 @@ pub fn run_all_benchmarks<
     if options.run_buffer_size_persist_latency {
         BufferSizePersistLatencyRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     }
-    if options.run_event_queue_benchmarks {
-        EventQueueBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
+    if options.run_queue_benchmarks {
+        QueueBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());
     }
     if options.run_kvs_benchmarks {
         KVSBenchmarkRunner::run::<TIMER, TRIGGER, S, F, _>(&mut run_options, &options, &get_storage, &mut handle_it, get_ticks.clone());

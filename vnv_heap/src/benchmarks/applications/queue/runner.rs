@@ -3,9 +3,9 @@ use std::{
     mem::{size_of, MaybeUninit},
 };
 
-use applications::event_queue::{
-    ram::EventQueueRAMBenchmark, vnv_heap::EventQueueVNVHeapBenchmark,
-    storage::EventQueueStorageBenchmark,
+use applications::queue::{
+    ram::QueueRAMBenchmark, vnv_heap::QueueVNVHeapBenchmark,
+    storage::QueueStorageBenchmark,
 };
 use crate::{
     modules::{
@@ -76,12 +76,12 @@ macro_rules! for_obj_cnt {
     };
 }
 
-pub(crate) struct EventQueueBenchmarkRunner;
+pub(crate) struct QueueBenchmarkRunner;
 
-impl BenchmarkRunner for EventQueueBenchmarkRunner {
+impl BenchmarkRunner for QueueBenchmarkRunner {
     fn get_iteration_count(options: &RunAllBenchmarkOptions) -> usize {
         let mut iteration_count = 0;
-        if options.run_event_queue_benchmarks {
+        if options.run_queue_benchmarks {
             iteration_count += 3 * STEP_COUNT;
         }
 
@@ -101,7 +101,7 @@ impl BenchmarkRunner for EventQueueBenchmarkRunner {
         handle_curr_iteration: &mut G,
         _get_ticks: GetCurrentTicks,
     ) {
-        if options.run_event_queue_benchmarks {
+        if options.run_queue_benchmarks {
             {
                 const MAX_BUF_SIZE: usize = MAX_OBJ_CNT + 2;
                 let mut buffer: [MaybeUninit<[u8; OBJ_SIZE]>; MAX_BUF_SIZE] =
@@ -110,7 +110,7 @@ impl BenchmarkRunner for EventQueueBenchmarkRunner {
                 for_obj_cnt!(OBJ_CNT, {
                     handle_curr_iteration();
 
-                    let bench: EventQueueRAMBenchmark<OBJ_SIZE> = EventQueueRAMBenchmark::new(
+                    let bench: QueueRAMBenchmark<OBJ_SIZE> = QueueRAMBenchmark::new(
                         &mut buffer[0..(OBJ_CNT + 1)],
                         OBJ_CNT,
                         ITERATION_COUNT,
@@ -123,8 +123,8 @@ impl BenchmarkRunner for EventQueueBenchmarkRunner {
                 handle_curr_iteration();
 
                 let mut storage = get_storage();
-                let bench: EventQueueStorageBenchmark<OBJ_SIZE, S> =
-                    EventQueueStorageBenchmark::new(&mut storage, OBJ_CNT, ITERATION_COUNT);
+                let bench: QueueStorageBenchmark<OBJ_SIZE, S> =
+                    QueueStorageBenchmark::new(&mut storage, OBJ_CNT, ITERATION_COUNT);
                 bench.run_benchmark::<TIMER>(run_options);
             });
 
@@ -160,8 +160,8 @@ impl BenchmarkRunner for EventQueueBenchmarkRunner {
                     let storage = TruncatedStorageModule::<STORAGE_SIZE, S>::new(storage);
                     let mut heap = get_bench_heap(&mut buf, buf_len, storage);
 
-                    let bench: EventQueueVNVHeapBenchmark<A, N, M, OBJ_SIZE> =
-                        EventQueueVNVHeapBenchmark::new(
+                    let bench: QueueVNVHeapBenchmark<A, N, M, OBJ_SIZE> =
+                        QueueVNVHeapBenchmark::new(
                             &mut heap,
                             OBJ_CNT,
                             ITERATION_COUNT,

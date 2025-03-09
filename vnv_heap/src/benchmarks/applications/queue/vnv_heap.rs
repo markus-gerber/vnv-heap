@@ -1,5 +1,5 @@
 use crate::{
-    benchmarks::applications::event_queue::run_event_queue_application, modules::{
+    benchmarks::applications::queue::run_queue_application, modules::{
         allocator::AllocatorModule, nonresident_allocator::NonResidentAllocatorModule,
         object_management::ObjectManagementModule, persistent_storage::PersistentStorageModule,
     }, vnv_list::VNVList, VNVHeap
@@ -7,10 +7,10 @@ use crate::{
 use std::usize;
 use serde::Serialize;
 
-use super::{super::super::{Benchmark, ModuleOptions, Timer}, EventQueue};
+use super::{super::super::{Benchmark, ModuleOptions, Timer}, Queue};
 
 #[derive(Serialize)]
-pub struct EventQueueVNVHeapBenchmarkOptions {
+pub struct QueueVNVHeapBenchmarkOptions {
     object_size: usize,
     modules: ModuleOptions,
     queue_length: usize,
@@ -19,7 +19,7 @@ pub struct EventQueueVNVHeapBenchmarkOptions {
     ram_overhead: usize
 }
 
-pub struct EventQueueVNVHeapBenchmark<
+pub struct QueueVNVHeapBenchmark<
     'a,
     'b: 'a,
     A: AllocatorModule,
@@ -41,7 +41,7 @@ impl<
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
         const OBJ_SIZE: usize,
-    > EventQueueVNVHeapBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
+    > QueueVNVHeapBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
 {
     pub fn new<S: PersistentStorageModule>(
         heap: &'a VNVHeap<'b, A, N, M, S>,
@@ -69,22 +69,22 @@ impl<
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
         const OBJ_SIZE: usize,
-    > Benchmark<EventQueueVNVHeapBenchmarkOptions>
-    for EventQueueVNVHeapBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
+    > Benchmark<QueueVNVHeapBenchmarkOptions>
+    for QueueVNVHeapBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
 {
     #[inline]
     fn get_name(&self) -> &'static str {
-        "event_queue"
+        "queue"
     }
 
     #[inline]
     fn execute<T: Timer>(&mut self) -> u32 {
-        run_event_queue_application::<OBJ_SIZE, Self, T>(self, self.queue_length, self.iterations)
+        run_queue_application::<OBJ_SIZE, Self, T>(self, self.queue_length, self.iterations)
     }
 
     #[inline]
-    fn get_bench_options(&self) -> EventQueueVNVHeapBenchmarkOptions {
-        EventQueueVNVHeapBenchmarkOptions {
+    fn get_bench_options(&self) -> QueueVNVHeapBenchmarkOptions {
+        QueueVNVHeapBenchmarkOptions {
             object_size: OBJ_SIZE,
             modules: ModuleOptions::new::<A, N>(),
             iterations: self.iterations,
@@ -102,7 +102,7 @@ impl<
         N: NonResidentAllocatorModule,
         M: ObjectManagementModule,
         const OBJ_SIZE: usize,
-    > EventQueue<OBJ_SIZE> for EventQueueVNVHeapBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
+    > Queue<OBJ_SIZE> for QueueVNVHeapBenchmark<'a, 'b, A, N, M, OBJ_SIZE>
 {
     fn produce(&mut self, data: [u8; OBJ_SIZE]) {
         self.list.push_front(data).unwrap();
