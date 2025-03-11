@@ -20,7 +20,7 @@ def set_grid(grid_offset: int, max_x: int, ax):
     ax.set_xticks(minor_ticks, minor=True)
 
 def save_plot(name: str, save_asset: bool = False):
-    plt.savefig(f"../figures/{name}.pdf", bbox_inches='tight')
+    plt.savefig(f"figures/{name}.pdf", bbox_inches='tight')
 
     if "VNV_HEAP_THESIS_DIR" in os.environ:
         thesis_dir = os.environ["VNV_HEAP_THESIS_DIR"]
@@ -31,7 +31,7 @@ def save_plot(name: str, save_asset: bool = False):
         plt.savefig(f"{paper_dir}/assets/{name}.pdf", bbox_inches='tight')
 
     if save_asset:
-        plt.savefig(f"../../../assets/{name}_plot.svg", bbox_inches='tight')
+        plt.savefig(f"../assets/{name}_plot.svg", bbox_inches='tight')
 
 def set_theme(colors=2, skip=0, ignore=-1, hide_spines=False):
     style = sns.axes_style("whitegrid")

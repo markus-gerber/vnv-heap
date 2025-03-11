@@ -239,9 +239,9 @@ If you chose the benchmarks you want to run and everything is setup correctly (a
 ```
 
 This script automatically starts the benchmarks and records the results in a json file.
-This json file can then be used in the JupyterNotebooks found in [zephyr/vnv_heap_benchmark/analysis](zephyr/vnv_heap_benchmark/analysis/).
+This json file can then be used in the JupyterNotebooks found in [evaluation/](evaluation/).
 
-Benchmark results recorded for the ESP32-C3 with a Fujitsu MB85RS64V FRAM module and the Zephyr RTOS are saved as JSON files in [zephyr/vnv_heap_benchmark/output](zephyr/vnv_heap_benchmark/output).
+Benchmark results recorded for the ESP32-C3 with a Fujitsu MB85RS64V FRAM module and the Zephyr RTOS are saved as JSON files in [evaluation/data/](evaluation/data/).
 
 <details>
   <summary>Running benchmarks looks like this on zephyr (benchmarks also include a nice progress indicator which depends on the selected benchmarks for one specific run):</summary>
@@ -266,7 +266,7 @@ Benchmark results recorded for the ESP32-C3 with a Fujitsu MB85RS64V FRAM module
 -> Finished persistent_storage_write: mean=150486, min=150486, max=150486
 
 [BENCH-STATUS] Finished in 0h 44m 6s
-Saved file to "output/2024-08-27 11-40-37.json"
+Saved file to "../../evaluation/data/2024-08-27 11-40-37.json"
 ```
 
 </details>
@@ -281,3 +281,7 @@ cargo test
 
 Currently, this includes a total of **33 tests** ranging from simple module tests to large system tests.
 Of course these tests don't catch all cases, but give a first indication when a major invariant is violated.
+
+## License
+
+Distributed under the GNU GPL v3 License. See `LICENSE` for more information.
