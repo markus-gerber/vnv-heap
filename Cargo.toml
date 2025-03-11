@@ -8,6 +8,7 @@ members = [
 ]
 exclude = [
     "zephyr/spi_fram_sample",
+    "zephyr/vnv_heap_auto_benchmark",
     "zephyr/vnv_heap_benchmark",
     "zephyr/vnv_heap_sample",
     "zephyr/vnv_heap_info",

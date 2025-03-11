@@ -10,6 +10,7 @@ use vnv_heap::benchmarks::{
 };
 use vnv_heap::modules::persistent_storage::SlicedStorageModule;
 use core::mem::{MaybeUninit, size_of};
+use std::option_env;
 
 extern "C" {
     pub fn helper_k_cycle_get_32() -> u32;
@@ -24,6 +25,11 @@ extern "C" {
 pub extern "C" fn rust_main() {
     let mut time: i64 = unsafe { helper_k_uptime_get() };
 
+    {
+        // make sure that the stack size was configured
+        static_assertions::const_assert!(option_env!("CONFIG_MAIN_STACK_SIZE").is_some());
+    }
+
     run_all_benchmarks::<
         ZephyrTimer,
         ZephyrPersistTrigger,
@@ -33,25 +39,23 @@ pub extern "C" fn rust_main() {
         BenchmarkRunOptions {
             cold_start: 0,
             machine_name: "esp32c3",
-            repetitions: 10,
-            result_buffer: &mut [0; 10],
+            repetitions: 100,
+            result_buffer: &mut [0; 100],
         },
-        // select benchmarks to run
         RunAllBenchmarkOptions {
-            // run_allocate_benchmarks: true,
-            // run_deallocate_benchmarks: true,
-            // run_get_benchmarks: true,
-            // run_baseline_allocate_benchmarks: true,
-            // run_baseline_deallocate_benchmarks: true,
-            // run_baseline_get_benchmarks: true,
-            // run_persistent_storage_benchmarks: true,
-            // run_long_persistent_storage_benchmarks: true,
-            // run_dirty_size_persist_latency: true,
-            // run_buffer_size_persist_latency: true,
-            // run_queue_benchmarks: true,
-            // run_kvs_benchmarks: true,
-            // run_locked_wcet_benchmarks: true
-            ..Default::default()
+            run_allocate_benchmarks: option_env!("VNV_HEAP_RUN_ALLOCATE_BENCHMARKS").is_some(),
+            run_deallocate_benchmarks: option_env!("VNV_HEAP_RUN_DEALLOCATE_BENCHMARKS").is_some(),
+            run_get_benchmarks: option_env!("VNV_HEAP_RUN_GET_BENCHMARKS").is_some(),
+            run_baseline_allocate_benchmarks: option_env!("VNV_HEAP_RUN_BASELINE_ALLOCATE_BENCHMARKS").is_some(),
+            run_baseline_deallocate_benchmarks: option_env!("VNV_HEAP_RUN_BASELINE_DEALLOCATE_BENCHMARKS").is_some(),
+            run_baseline_get_benchmarks: option_env!("VNV_HEAP_RUN_BASELINE_GET_BENCHMARKS").is_some(),
+            run_persistent_storage_benchmarks: option_env!("VNV_HEAP_RUN_PERSISTENT_STORAGE_BENCHMARKS").is_some(),
+            run_long_persistent_storage_benchmarks: option_env!("VNV_HEAP_RUN_LONG_PERSISTENT_STORAGE_BENCHMARKS").is_some(),
+            run_dirty_size_persist_latency: option_env!("VNV_HEAP_RUN_DIRTY_SIZE_PERSIST_LATENCY").is_some(),
+            run_buffer_size_persist_latency: option_env!("VNV_HEAP_RUN_BUFFER_SIZE_PERSIST_LATENCY").is_some(),
+            run_queue_benchmarks: option_env!("VNV_HEAP_RUN_QUEUE_BENCHMARKS").is_some(),
+            run_kvs_benchmarks: option_env!("VNV_HEAP_RUN_KVS_BENCHMARKS").is_some(),
+            run_locked_wcet_benchmarks: option_env!("VNV_HEAP_RUN_LOCKED_WCET_BENCHMARKS").is_some()
         },
         get_storage,
         || {
@@ -69,25 +73,6 @@ pub extern "C" fn rust_main() {
     let hours: i64 = time / (1000 * 60 * 60);
 
     println!("[BENCH-STATUS] Finished in {}h {}m {}s", hours, mins, secs);
-}
-
-#[allow(unused)]
-fn measure_timer() {
-    let mut x = [0u32; 1000];
-    for _ in 0..100 { 
-        for i in 0..1000 {
-            let timer = ZephyrTimer::start();
-            x[i] = timer.stop();
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        for i in 0..1000 {
-            println!("{}", x[i]);
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
-    // dirty way to stop the CPU
-    assert!(false);
 }
 
 struct ZephyrTimer {

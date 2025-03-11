@@ -1,0 +1,6 @@
+{
+    "C_Cpp.default.includePath": [
+        "build/zephyr/include/generated",
+        "$(ZEPHYR_BASE)/include"
+    ]
+}

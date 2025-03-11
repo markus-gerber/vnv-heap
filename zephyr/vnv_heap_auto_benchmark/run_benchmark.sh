@@ -1,6 +1,6 @@
 #!/bin/bash
 
-west build -b esp32c3_devkitm .
+west build -b esp32c3_devkitm . -- -DCONFIG_MAIN_STACK_SIZE="$CONFIG_MAIN_STACK_SIZE"
 status=$?
 
 # only run this command if building was successful and FLASH != 0

@@ -200,7 +200,7 @@ To setup the toolchain for compiling the zephyr projects located in the [zephyr]
         ```
 
     2. If you now connect an ESP32-C3 you should now be able to run the pre-defined scripts e.g. `run_debug.sh`, `run_release.sh`. Use `FLASH=0` to only compile the code and to disable flashing it.
-    3. Additionally, if you attach an MB85RS64V FRAM module as in [this configuration](#examples) you can run the pre-defined benchmarks in [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/) yourself. A easy way to do this is to execute the `run_benchmark.sh` script.
+    3. Additionally, if you attach an MB85RS64V FRAM module as in [this configuration](#examples) you can run the pre-defined benchmarks in [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/) and [zephyr/vnv_heap_auto_benchmark](zephyr/vnv_heap_auto_benchmark/) yourself. A easy way to do this is to execute the `run_benchmark.sh` or `run_all_benchmarks.sh` script.
 
 ## Benchmarking
 
@@ -211,7 +211,7 @@ A big advantage of this architecture is that it allows for easy debugging (e.g. 
 The projects to run the benchmarks are located in:
 
 - For Desktop: [desktop/desktop_benchmark](desktop/desktop_benchmark/)
-- For Zephyr: [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/)
+- For Zephyr: [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/), [zephyr/vnv_heap_auto_benchmark](zephyr/vnv_heap_auto_benchmark/)
 
 ### Desktop
 
@@ -242,6 +242,12 @@ This script automatically starts the benchmarks and records the results in a jso
 This json file can then be used in the JupyterNotebooks found in [evaluation/](evaluation/).
 
 Benchmark results recorded for the ESP32-C3 with a Fujitsu MB85RS64V FRAM module and the Zephyr RTOS are saved as JSON files in [evaluation/data/](evaluation/data/).
+
+If you want to **run all benchmarks automatically** (and split automatically split them up in different runs) use the zephyr project located in [zephyr/vnv_heap_auto_benchmark/](zephyr/vnv_heap_auto_benchmark/) and run:
+
+```bash
+./zephyr/vnv_heap_auto_benchmark/run_all_benchmarks.sh
+```
 
 <details>
   <summary>Running benchmarks looks like this on zephyr (benchmarks also include a nice progress indicator which depends on the selected benchmarks for one specific run):</summary>
