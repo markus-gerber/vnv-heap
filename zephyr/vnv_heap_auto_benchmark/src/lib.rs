@@ -9,8 +9,8 @@ use vnv_heap::benchmarks::{
     PersistTrigger, BenchmarkRunOptions, Timer, run_all_benchmarks, RunAllBenchmarkOptions
 };
 use vnv_heap::modules::persistent_storage::SlicedStorageModule;
-use core::mem::{MaybeUninit, size_of};
-use std::option_env;
+use core::mem::MaybeUninit;
+use std::{option_env, env};
 
 extern "C" {
     pub fn helper_k_cycle_get_32() -> u32;
@@ -30,6 +30,9 @@ pub extern "C" fn rust_main() {
         static_assertions::const_assert!(option_env!("CONFIG_MAIN_STACK_SIZE").is_some());
     }
 
+    const REPETITIONS_STR: &'static str = env!("VNV_HEAP_REPETITIONS");
+    const REPETITIONS: usize = const_str::parse!(REPETITIONS_STR, usize);
+
     run_all_benchmarks::<
         ZephyrTimer,
         ZephyrPersistTrigger,
@@ -39,8 +42,8 @@ pub extern "C" fn rust_main() {
         BenchmarkRunOptions {
             cold_start: 0,
             machine_name: "esp32c3",
-            repetitions: 100,
-            result_buffer: &mut [0; 100],
+            repetitions: REPETITIONS as u32,
+            result_buffer: &mut [0; REPETITIONS],
         },
         RunAllBenchmarkOptions {
             run_allocate_benchmarks: option_env!("VNV_HEAP_RUN_ALLOCATE_BENCHMARKS").is_some(),

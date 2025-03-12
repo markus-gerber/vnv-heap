@@ -70,6 +70,7 @@ except KeyboardInterrupt:
 
         if i == "y":
             break
-
+    
+    sys.exit(1)
 finally:
     ser.close()
