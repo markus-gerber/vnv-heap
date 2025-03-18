@@ -200,7 +200,7 @@ To setup the toolchain for compiling the zephyr projects located in the [zephyr]
         ```
 
     2. If you now connect an ESP32-C3 you should now be able to run the pre-defined scripts e.g. `run_debug.sh`, `run_release.sh`. Use `FLASH=0` to only compile the code and to disable flashing it.
-    3. Additionally, if you attach an MB85RS64V FRAM module as in [this configuration](#examples) you can run the pre-defined benchmarks in [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/) and [zephyr/vnv_heap_auto_benchmark](zephyr/vnv_heap_auto_benchmark/) yourself. A easy way to do this is to execute the `run_benchmark.sh` or `run_all_benchmarks.sh` script.
+    3. Additionally, if you attach an MB85RS64V FRAM module as in [this configuration](#examples) you can run the pre-defined benchmarks in [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/) yourself. A easy way to do this is to execute the `run_benchmark.sh` script.
 
 ## Benchmarking
 
@@ -211,7 +211,7 @@ A big advantage of this architecture is that it allows for easy debugging (e.g. 
 The projects to run the benchmarks are located in:
 
 - For Desktop: [desktop/desktop_benchmark](desktop/desktop_benchmark/)
-- For Zephyr: [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/), [zephyr/vnv_heap_auto_benchmark](zephyr/vnv_heap_auto_benchmark/)
+- For Zephyr: [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/)
 
 ### Desktop
 
@@ -239,15 +239,9 @@ If you chose the benchmarks you want to run and everything is setup correctly (a
 ```
 
 This script automatically starts the benchmarks and records the results in a json file.
-This json file can then be used in the JupyterNotebooks found in [evaluation/](evaluation/).
+This json file can then be used in the JupyterNotebooks found in [zephyr/vnv_heap_benchmark/analysis](zephyr/vnv_heap_benchmark/analysis/).
 
-Benchmark results recorded for the ESP32-C3 with a Fujitsu MB85RS64V FRAM module and the Zephyr RTOS are saved as JSON files in [evaluation/data/](evaluation/data/).
-
-If you want to **run all benchmarks automatically** (and split automatically split them up in different runs) use the zephyr project located in [zephyr/vnv_heap_auto_benchmark/](zephyr/vnv_heap_auto_benchmark/) and run:
-
-```bash
-./zephyr/vnv_heap_auto_benchmark/run_all_benchmarks.sh
-```
+Benchmark results recorded for the ESP32-C3 with a Fujitsu MB85RS64V FRAM module and the Zephyr RTOS are saved as JSON files in [zephyr/vnv_heap_benchmark/output](zephyr/vnv_heap_benchmark/output).
 
 <details>
   <summary>Running benchmarks looks like this on zephyr (benchmarks also include a nice progress indicator which depends on the selected benchmarks for one specific run):</summary>
@@ -272,7 +266,7 @@ If you want to **run all benchmarks automatically** (and split automatically spl
 -> Finished persistent_storage_write: mean=150486, min=150486, max=150486
 
 [BENCH-STATUS] Finished in 0h 44m 6s
-Saved file to "../../evaluation/data/2024-08-27 11-40-37.json"
+Saved file to "output/2024-08-27 11-40-37.json"
 ```
 
 </details>
@@ -287,7 +281,3 @@ cargo test
 
 Currently, this includes a total of **33 tests** ranging from simple module tests to large system tests.
 Of course these tests don't catch all cases, but give a first indication when a major invariant is violated.
-
-## License
-
-Distributed under the GNU GPL v3 License. See `LICENSE` for more information.
