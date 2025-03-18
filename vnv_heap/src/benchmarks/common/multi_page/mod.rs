@@ -1,4 +1,4 @@
-// This module implements a system inspired by https://dl.acm.org/doi/10.1145/3316781.3317812
+// This module implements a system inspired by https://dl.acm.org/doi/10.1145/3316781.3317812 (ManagedState)
 // This implementation manages multiple pages and limits the number of dirty pages.
 // Differences to the previously mentioned paper are:
 // 1. Unloading pages is not implemented
