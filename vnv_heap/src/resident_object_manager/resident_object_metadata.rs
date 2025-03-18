@@ -31,6 +31,25 @@ const fn calc_dirty_metadata_dirty_byte_cnt(
     }
 }
 
+/// This is an unoptimized version of the metadata for resident objects (uses a total of 20 bytes for 32-bit architectures).
+/// 
+/// However, this information can be boiled down to 3 bytes (for 32-bit architectures) in total by using bitfields and bitmasks.
+///  
+/// **Constraints**:
+/// 
+/// - buddy allocator for storage data (store at addresses of 2\^x - with a global offset)
+/// - buddy allocator for resident data (store at addresses of 2\^x - with a global offset)
+/// - max heap size: 2\^22
+/// - max object size: 2\^13 (or 2\^14 with offset of one + disallowing allocations with the size of zero)
+/// - only object sizes of 2\^x are allocatable
+/// - (partial dirtiness tracking not supported)
+/// 
+/// | Memeber                                | Size                       | Align |
+/// | -------------------------------------- | -------------------------- | ----- |
+/// | status, next_ptr [difference to next]  | 1 (6x status, 2x next_ptr) | 1     |
+/// | next_ptr, offset - power of 2          | 1 (3x next_ptr, 5x offset) | 1     |
+/// | layout.align, layout.size - power of 2 | 1 (4x align, 4x size)      | 1     |
+/// | **=**                                  | **3**                      | **1** |
 pub(crate) struct ResidentObjectMetadata {
     /// Actual metadata
     pub(crate) inner: ResidentObjectMetadataInner,
@@ -46,6 +65,10 @@ pub(crate) struct ResidentObjectMetadataInner {
 
     /// Gives a nice interface for accessing partial dirtiness data
     /// This data will not be persisted (as it is reconstructible from `status`).
+    /// 
+    /// **Note**: This is currently not used, as partial dirtiness tracking
+    /// is currently not 100% supported by `vnv_persist_all()`.
+    /// However, as long the target architecture has an address width of >=32 no storage is wasted here.
     pub(crate) partial_dirtiness_tracking_info: PartialDirtinessTrackingInfo,
 
     pub(crate) offset: usize,
