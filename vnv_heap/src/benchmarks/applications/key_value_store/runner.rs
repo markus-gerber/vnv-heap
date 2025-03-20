@@ -20,7 +20,7 @@ type A = LinkedListAllocatorModule;
 type M = DefaultObjectManagementModule;
 type N = NonResidentBuddyAllocatorModule<32>;
 
-const ITERATION_COUNT: usize = 1_000;
+const ITERATION_COUNT: usize = 10_000;
 const RAM_SIZE: usize = 120_000;
 const OBJ_CNT: usize = 256;
 
@@ -35,14 +35,14 @@ fn get_access_types() -> [AccessType; 4] {
         },
         AccessType::Distributed {
             key_distribution: AccessType::key_distribution(
-                |i: u32| -> f64 { (((i as f64) * 40.0) / (OBJ_CNT as f64)).sin().powi(20) + 0.1 },
+                |i: u32| -> f64 { (((i as f64) * 40.0) / (OBJ_CNT as f64)).sin().powi(4) + 0.1 },
                 OBJ_CNT as u32,
             ),
         },
     ]
 }
 
-const PAGE_SIZES: [usize; 7] = [16, 32, 64, 128, 256, 512, 1024];
+const PAGE_SIZES: [usize; 5] = [32, 64, 128, 256, 512];
 
 pub(crate) struct KVSBenchmarkRunner;
 
@@ -106,7 +106,7 @@ impl BenchmarkRunner for KVSBenchmarkRunner {
                 }
                 macro_rules! for_page_size {
                     ($page_size: ident, $page_cnt: ident, $inner: expr) => {
-                        for_page_size_impl!(PAGE_SIZE, PAGE_CNT, $inner, 7);
+                        for_page_size_impl!(PAGE_SIZE, PAGE_CNT, $inner, 5);
                     };
                 }
 
