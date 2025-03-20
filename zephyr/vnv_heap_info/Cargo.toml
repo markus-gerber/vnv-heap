@@ -1,5 +1,5 @@
 [package]
-name = "vnv_heap_zephyr_info"
+name = "app"
 version = "0.1.0"
 edition = "2018"
 authors = ["Markus Elias Gerber <markus.gerber@fau.de>"]
