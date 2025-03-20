@@ -281,3 +281,7 @@ cargo test
 
 Currently, this includes a total of **33 tests** ranging from simple module tests to large system tests.
 Of course these tests don't catch all cases, but give a first indication when a major invariant is violated.
+
+## License
+
+Distributed under the GNU GPL v3 License. See `LICENSE` for more information.

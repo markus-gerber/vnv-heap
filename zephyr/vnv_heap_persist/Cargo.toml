@@ -3,7 +3,7 @@ name = "app"
 version = "0.1.0"
 edition = "2018"
 authors = ["Markus Elias Gerber <markus.gerber@fau.de>"]
-license = "GPL-3.0"
+license = GPL-3.0-or-later
 
 [dependencies]
 cstr = "0.2.10"
