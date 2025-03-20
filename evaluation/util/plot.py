@@ -108,6 +108,10 @@ def plot_lines(options: dict | list[dict]):
         axes = [axes]
         
     for (i, options) in enumerate(option_list):
+        if "palette" in options and options["palette"] is not None:
+            palette = options["palette"]
+            sns.set_palette(palette=palette)
+
         ax = axes[i]
 
         ax.set_xmargin(0)
@@ -214,4 +218,8 @@ plot_colors = {
     "baseline": sns.color_palette("tab10")[3], # red
     "baseline2": sns.color_palette("tab10")[1] # orange
 }
-
+# plot_colors = {
+#     "heap": sns.color_palette("colorblind")[0], # blue
+#     "baseline": sns.color_palette("colorblind")[3], # red
+#     "baseline2": sns.color_palette("colorblind")[1] # orange
+# }
