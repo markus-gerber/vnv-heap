@@ -1,5 +1,6 @@
-// original code from https://github.com/rust-osdev/linked-list-allocator
-// modifications: added allocate_at
+// Copyright (c) 2016 Philipp Oppermann
+// https://github.com/rust-osdev/linked-list-allocator
+// modifications: removed statistics, added allocate_at
 
 #![allow(dead_code)]
 

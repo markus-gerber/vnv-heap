@@ -1,3 +1,6 @@
+// Copyright 2019-2020 Jiajie Chen
+// https://github.com/rcore-os/buddy_system_allocator
+
 //! Provide the intrusive LinkedList
 
 use core::marker::PhantomData;

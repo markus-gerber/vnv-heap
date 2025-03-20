@@ -1,4 +1,6 @@
-// code modified from: https://github.com/rcore-os/buddy_system_allocator
+// Copyright 2019-2020 Jiajie Chen
+// https://github.com/rcore-os/buddy_system_allocator
+// modifications: added allocate_at, made linked list sorted, removed statistics and added persistent storage support
 
 use log::trace;
 

@@ -1,3 +1,6 @@
+// Copyright (c) 2016 Philipp Oppermann
+// https://github.com/rust-osdev/linked-list-allocator
+
 #![allow(dead_code)]
 
 use core::alloc::Layout;
