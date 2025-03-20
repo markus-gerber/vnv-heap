@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2015-2021 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 // https://github.com/espressif/esp-idf/blob/b01c197505b80d09598a14bd567a9a8f418d8619/components/newlib/stdatomic.c
 
 #include <stdbool.h>
