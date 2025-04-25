@@ -173,7 +173,7 @@ To setup the toolchain for compiling the zephyr projects located in the [zephyr]
     ```
 
 4. *[Optional]*: Only necessary if you want to run this on an ESP32-C3. (*Explanation*: These steps are necessary because the vNV-Heap requires atomics, but the ESP32-C3 does not provide the "a" cpu extension as it only contains a single RISC-V core. However, atomics can be "simulated" solely by turning off interrupts until an atomic operation is finished.)
-    1. Enable atomics for the target by editing the file in `zephyr-rust/rust/tagets/riscv32imc-unknown-zephyr-elf.json`. Now set `atomic-cas` to `true` and `target-pointer-width` to `32`. The contents of the file should now look like this:
+    1. Enable atomics for the target by editing the file in `zephyr-rust/rust/targets/riscv32imc-unknown-zephyr-elf.json`. Now set `atomic-cas` to `true` and `target-pointer-width` to `32`. The contents of the file should now look like this:
 
         ```json
         {
