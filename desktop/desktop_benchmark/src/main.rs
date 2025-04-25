@@ -67,20 +67,19 @@ fn main() {
                 },
                 // RunAllBenchmarkOptions::all_except_persist(),
                 RunAllBenchmarkOptions {
-                    // run_allocate_benchmarks: true,
-                    // run_deallocate_benchmarks: true,
+                    run_allocate_benchmarks: true,
+                    run_deallocate_benchmarks: true,
                     run_get_benchmarks: true,
-                    // run_baseline_allocate_benchmarks: true,
-                    // run_baseline_deallocate_benchmarks: true,
+                    run_baseline_allocate_benchmarks: true,
+                    run_baseline_deallocate_benchmarks: true,
                     run_baseline_get_benchmarks: true,
                     run_persistent_storage_benchmarks: true,
-                    // run_long_persistent_storage_benchmarks: true,
-                    // run_dirty_size_persist_latency: true,
-                    // run_buffer_size_persist_latency: true,
-                    // run_queue_benchmarks: true,
-                    // run_kvs_benchmarks: true,
-                    // run_locked_wcet_benchmarks: true
-                    ..Default::default()
+                    run_long_persistent_storage_benchmarks: true,
+                    run_dirty_size_persist_latency: false, // NOT SUPPORTED ON DESKTOP!
+                    run_buffer_size_persist_latency: false, // NOT SUPPORTED ON DESKTOP!
+                    run_queue_benchmarks: true,
+                    run_kvs_benchmarks: true,
+                    run_locked_wcet_benchmarks: true,
                 },
                 get_storage,
                 || 0,
