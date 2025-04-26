@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 west build -b esp32c3_devkitm .
 status=$?

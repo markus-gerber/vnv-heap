@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 west build -b esp32c3_devkitm . -- -DCONFIG_MAIN_STACK_SIZE="$CONFIG_MAIN_STACK_SIZE"
 status=$?

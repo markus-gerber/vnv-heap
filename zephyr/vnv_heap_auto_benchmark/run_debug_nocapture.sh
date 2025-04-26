@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # enable debug assertions
 export CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS=true
