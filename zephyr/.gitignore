@@ -1,3 +1,4 @@
 # ignore zephyr-rust repository
 # install options: place zephyr-rust in this directory, or create symbolic link
 zephyr-rust
+zephyr-rust.original

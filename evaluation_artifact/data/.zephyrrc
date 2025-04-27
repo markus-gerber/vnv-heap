@@ -1,0 +1,3 @@
+export ZEPHYR_EXTRA_MODULES=~/zephyr-rust
+export WEST_BASE=~/zephyrproject
+export ZEPHYR_BASE=~/zephyrproject/zephyr

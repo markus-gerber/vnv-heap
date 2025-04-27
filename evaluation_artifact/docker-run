@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+bash -n "$(command -v "$0")"
+shopt -s nullglob
+
+PROJECT_DIR=$(realpath $(realpath $(dirname ${BASH_SOURCE[0]})/..))
+
+
+if [ -e ${PROJECT_DIR}/zephyr/zephyr-rust ] | [ -h ${PROJECT_DIR}/zephyr/zephyr-rust ]; then
+	echo "${PROJECT_DIR}/zephyr/zephyr-rust exists. Renaming it to ${PROJECT_DIR}/zephyr/zephyr-rust.original"
+
+	if [ -e ${PROJECT_DIR}/zephyr/zephyr-rust.original ]; then
+		echo "ERROR: ${PROJECT_DIR}/zephyr/zephyr-rust.original already exists. Please make sure to remove it before running this script."
+		echo "Exiting..."
+		exit 1
+	fi
+
+	mv ${PROJECT_DIR}/zephyr/zephyr-rust ${PROJECT_DIR}/zephyr/zephyr-rust.original
+fi
+
+set -x
+
+
+export name=$(basename $(pwd))
+./docker-build.sh $name
+
+
+docker run --tty --interactive \
+	--volume $PROJECT_DIR:$HOME/vnv_heap:Z \
+	--network=host \
+	--privileged \
+	-h $name.$(hostname) \
+	--env USER=$USER \
+	$name env -C $HOME/vnv_heap/evaluation_artifact/scripts /bin/bash
+
+if [ -h ${PROJECT_DIR}/zephyr/zephyr-rust ]; then
+	rm -f ${PROJECT_DIR}/zephyr/zephyr-rust
+fi
+
+if [ -e ${PROJECT_DIR}/zephyr/zephyr-rust.original ]; then
+	mv ${PROJECT_DIR}/zephyr/zephyr-rust.original ${PROJECT_DIR}/zephyr/zephyr-rust
+fi
+
+echo "Done."
