@@ -115,8 +115,8 @@ RUN git checkout --recurse-submodules ff51ff709f79b2adbcbd0c34644eab59bce0dc11
 WORKDIR $HOME
 
 # Patch zephyr-rust
-COPY evaluation_artifact/data/riscv32imc-unknown-zephyr-elf.json $HOME/data/riscv32imc-unknown-zephyr-elf.json
-COPY evaluation_artifact/data/wrapper.h $HOME/data/wrapper.h
+COPY assets/riscv32imc-unknown-zephyr-elf.json $HOME/data/riscv32imc-unknown-zephyr-elf.json
+COPY assets/wrapper.h $HOME/data/wrapper.h
 RUN cp $HOME/data/riscv32imc-unknown-zephyr-elf.json $HOME/zephyr-rust/rust/targets/riscv32imc-unknown-zephyr-elf.json
 RUN cat $HOME/data/wrapper.h >> $HOME/zephyr-rust/rust/zephyr-sys/wrapper.h
 RUN sudo rm -rf $HOME/data
@@ -126,7 +126,7 @@ RUN echo "ln -s $HOME/zephyr-rust $HOME/vnv_heap/zephyr/zephyr-rust" >> $HOME/.b
 
 # ------ Finalize Zephyr installation ------
 
-COPY evaluation_artifact/data/.zephyrrc $HOME/.zephyrrc
+COPY assets/.zephyrrc $HOME/.zephyrrc
 RUN echo "source ~/zephyrproject/zephyr/zephyr-env.sh" >> $HOME/.bashrc
 
 # ------ Install additional development tools ------

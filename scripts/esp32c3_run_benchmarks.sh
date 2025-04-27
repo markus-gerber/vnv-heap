@@ -2,7 +2,7 @@
 
 SCRIPT_ACTION=${SCRIPT_ACTION:-run}
 
-cd $(dirname ${BASH_SOURCE[0]})/../../zephyr/vnv_heap_auto_benchmark
+cd $(dirname ${BASH_SOURCE[0]})/../zephyr/vnv_heap_auto_benchmark
 
 echo "Available Benchmarks:"
 echo "(1) Get reference"

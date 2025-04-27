@@ -6,4 +6,4 @@ fi
 
 SCRIPT_DIR=$(realpath $(dirname ${BASH_SOURCE[0]}))
 
-jupyter lab --notebook-dir=${SCRIPT_DIR}/../../evaluation/
+jupyter lab --notebook-dir=${SCRIPT_DIR}/../evaluation/

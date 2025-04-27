@@ -3,7 +3,7 @@ set -euo pipefail
 bash -n "$(command -v "$0")"
 shopt -s nullglob
 
-PROJECT_DIR=$(realpath $(realpath $(dirname ${BASH_SOURCE[0]})/..))
+PROJECT_DIR=$(realpath $(dirname ${BASH_SOURCE[0]}))
 
 
 if [ -e ${PROJECT_DIR}/zephyr/zephyr-rust ] | [ -h ${PROJECT_DIR}/zephyr/zephyr-rust ]; then
@@ -31,7 +31,7 @@ docker run --tty --interactive \
 	--privileged \
 	-h $name.$(hostname) \
 	--env USER=$USER \
-	$name env -C $HOME/vnv_heap/evaluation_artifact/scripts /bin/bash
+	$name env -C $HOME/vnv_heap/scripts /bin/bash
 
 if [ -h ${PROJECT_DIR}/zephyr/zephyr-rust ]; then
 	rm -f ${PROJECT_DIR}/zephyr/zephyr-rust

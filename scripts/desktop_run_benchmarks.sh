@@ -4,8 +4,10 @@ echo "Note: This script will run all benchmarks except for the persist benchmark
 echo "Note: This script is only meant to verify that the benchmarks are working and not for latency measurements."
 echo "Note: For latency measurements, please use the \"esp32c3_run_benchmarks.sh\" script."
 echo ""
+echo "Note: Also note that these benchmarks will run for a few minutes."
+echo ""
 
 read -p "Press Enter to continue..." PROMPT
 
-cd $(dirname ${BASH_SOURCE[0]})/../../desktop/desktop_benchmark
+cd $(dirname ${BASH_SOURCE[0]})/../desktop/desktop_benchmark
 cargo run
