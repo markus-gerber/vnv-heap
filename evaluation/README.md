@@ -77,7 +77,7 @@ scripts/
 ├── desktop_run_benchmarks.sh     # Run all benchmarks (except for the persist benchmark) on the desktop machine. This is not meant for any latency measurements, but for debugging/testing.
 ├── desktop_run_testsuite.sh      # Run the whole testsuite for the vNV-Heap library
 ├── esp32c3_build_benchmarks.sh   # Build image for one specific or all benchmarks
-├── esp32c3_run_benchmarks.sh     # Build and run one specific or all benchmarks. Note: You nee
+├── esp32c3_run_benchmarks.sh     # Build and run one specific or all benchmarks.
 ├── notebooks_generate_plots.sh   # Generate the plots using the existing Jupyter notebooks
 └── notebooks_start_server.sh     # Start the graphical Jupyter Notebook server. This can be used for example to choose select different raw data to be used for the plots
 ```
