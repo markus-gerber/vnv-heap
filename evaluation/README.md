@@ -15,7 +15,7 @@ We seek to receive the following badges:
   - Consistent: We include the full source code and evaluation scripts for the current version of the paper.
   - Complete: We include everything except for the hardware which we can
     not include directly. If you seek to reproduce the results using the
-    hardware, please contact us and we will do our best to give you
+    hardware, please contact us. We will do our best to give you
     access to the board.
   - Exercisable: See "Run the Test Suite in a VM" and "Plot Evaluation Results"
 - Artifacts Evaluated – Reusable v1.1
@@ -50,7 +50,7 @@ Then run the main script to build and enter the development environment:
 
 The script has been tested on Debian 12 Bookworm, Fedora 42 and Ubuntu
 25.04. If you encounter any problems consider starting the script from
-any of these distros or consider building the cotainer manually using
+any of these distros or consider building the container manually using
 `docker build` (see `Dockerfile`). You can of course also follow the
 instructions from the Dockerfile to set up all dependencies on your
 local machine.
@@ -58,9 +58,12 @@ local machine.
 *Note*: Running this script will take some time on the first run. This
 is because this script does not download a pre-built Docker image, but
 manually builds it (e.g. by installing Rust, Zephyr, Rust support for
-Zephyr and a Python environment used by the evaluation plots).
+Zephyr and a Python environment used by the evaluation plots). This is
+required to prevent conflicts regarding the UIDs in the mounted
+directories.
 
-Once the Docker image was built, a container is automatically started and a bash shell is opened.
+Once the Docker image was built, the container is automatically started
+and a bash shell is opened.
 
 *Note*: For your convenience, *(1)* the directory containing the `vnv_heap` repository, *(2)* network, and *(3)* all devices are shared between your host machine and the Docker container.
 
@@ -88,8 +91,8 @@ scripts/
 
 This command build and runs the vNV-Heap library test suite.
 
-This allows you to validate out claims regarding implementation,
-functionality, and features.
+This allows you to validate out claims regarding completeness of the
+implementation, functionality, and features.
 
 ### Run Evaluation in a VM
 
@@ -101,17 +104,17 @@ This command build and runs the vNV-Heap library and runs the evaluation
 in a VM. Because the VM does not replicate the performance
 characteristics, the numbers do not match out evaluation. If you have
 the hardware available, please follow the instructions in the following
-section. Otherwise skip the following section and skip to "Plot
+section. Otherwise, skip the following section and continue with "Plot
 Evaluation Results".
 
-This allows you to validate our claims regarding the functionality of
-the evaluation.
+This allows you to validate our claims regarding the completeness of the
+evaluation.
 
 ### Run Evaluation on Hardware (Informative)
 
 *This section is informative if you do not have similar hardware available locally. If desired we can provide you access to our hardware upon request.*
 
-All of the latency measurements used for evaluations require
+All the latency measurements used for evaluations require
 *Espressif's ESP32-C3* microcontroller connected over *SPI* to a
 *Fujitsu MB85RS64V FRAM* module. Reproducing the values from these
 evaluations cannot be achieved inside the virtual machine for the
@@ -141,24 +144,23 @@ Figures 3-7, use the Jupyter Notebooks stored in `evaluation/`.
 
 1. First, start the local Jupyter server in the Docker container:
 
-``` bash
-(.venv) USER@vnvheapae:~/vnv_heap/scripts$ ./notebooks_start_server.sh 
-```
+   ``` bash
+   (.venv) USER@vnvheapae:~/vnv_heap/scripts$ ./notebooks_start_server.sh 
+   ```
 
 2. Then, open the displayed URL (e.g.
-`http://localhost:8888/lab?token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
-in a browser. You can use your browser of your host system for that. If
-you are working on a remote server system, SSH to the remote machine
-with port forwarding using `ssh -L 8888:localhost:8888 $REMOTE_HOST`.
-Thereafter, you can use your Laptop's browser to navigate to the
-displayed URL.
+   `http://localhost:8888/lab?token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
+   in a browser. You can use your browser of your host system for that.
+   If you are working on a remote server system, SSH to the remote
+   machine with port forwarding using `ssh -L 8888:localhost:8888 $REMOTE_HOST`. Thereafter, you can use your Laptop's browser to
+   navigate to the displayed URL.
 
 3. Now, open the `*.ipynb` notebook file (double click in the sidebar) to
    validate our claims regarding the evaluation results:
-- Fig. 3: Bottom of `get_ref.ipynb`
-- Fig. 4: Bottom of `queue.ipynb`
-- Fig. 5: Bottom of `persist.ipynb`
-- Fig. 6 and Fig. 7: Bottom of `kvs.ipynb`
+   - Fig. 3: Bottom of `get_ref.ipynb`
+   - Fig. 4: Bottom of `queue.ipynb`
+   - Fig. 5: Bottom of `persist.ipynb`
+   - Fig. 6 and Fig. 7: Bottom of `kvs.ipynb`
 
 *Optionally*: If you want to plot other measurements than the one used
 in the paper, update `file_name` (at the top of the notebook).
