@@ -21,11 +21,11 @@ Then run the main script to build and enter the development environment:
 ./docker-run # 30min
 ```
 
-The script has been tested on Fedora 42. If you encounter any problems
-consider starting the script from that distro or consider building the
-cotainer manually using `docker build` (see `Dockerfile`). You can also
-follow the instructions from the Dockerfile to set up all dependencies
-on your local machine.
+The script has been tested on Fedora 42 and Ubuntu 25.04. If you
+encounter any problems consider starting the script from that distro or
+consider building the cotainer manually using `docker build` (see
+`Dockerfile`). You can also follow the instructions from the Dockerfile
+to set up all dependencies on your local machine.
 
 *Note*: Running this script will take some time on the first run. This
 is because this script does not download a pre-built Docker image, but
