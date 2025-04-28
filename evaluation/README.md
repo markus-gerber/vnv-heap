@@ -2,6 +2,33 @@
 
 This document contains instructions on how to set up and test the evaluation artifact for the paper "*vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems*".
 
+We seek to receive the following badges:
+- Artifacts Available v1.1
+  - The `artifact` subdirectory in the archive is a copy of
+    https://gitos.rrze.fau.de/i4/openaccess/vnv-heap which is publicly
+    available (and FAU's hoster guarantees long-term availability). We
+    will upload the evaluated version to Zotero with a DOI for the
+    Camera-Ready version.
+- Artifacts Evaluated – Functional v1.1
+  - Documented: See `artifact/evaluation/README.md`,
+    `artifact/README.md` as well as the source code.
+  - Consistent: We include the full source code and evaluation scripts
+  - Complete: We include everything except for the hardware which we can
+    not include directly. If you seek to reproduce the results using the
+    hardware, please contact us and we will do our best to give you
+    access to the board.
+  - Exercisable: See "Run the Test Suite in a VM" and "Plot Evaluation Results"
+- Artifacts Evaluated – Reusable v1.1
+  - We are sure you agree that our source code is very carefully
+    documented and well-structured to the extent that reuse and
+    repurposing is facilitated. In particular, norms and standards of
+    the research community for artifacts of this type are strictly
+    adhered to (e.g., we use a standard toolchain and publish our Git
+    repository).
+- Results Reproduced v1.1
+  - See "Run Evaluation in a VM", "Run Evaluation on Hardware
+    (Informative)", and "Plot Evaluation Results".
+
 ## Getting Started Guide
 
 Start by navigating to the `artifact` directory which contains a copy of https://gitos.rrze.fau.de/i4/openaccess/vnv-heap
