@@ -10,9 +10,9 @@ We seek to receive the following badges:
     will upload the evaluated version to Zotero with a DOI for the
     Camera-Ready version.
 - Artifacts Evaluated – Functional v1.1
-  - Documented: See `artifact/evaluation/README.md`,
+  - Documented: See `artifact/evaluation/README.md` (this file),
     `artifact/README.md` as well as the source code.
-  - Consistent: We include the full source code and evaluation scripts
+  - Consistent: We include the full source code and evaluation scripts for the current version of the paper.
   - Complete: We include everything except for the hardware which we can
     not include directly. If you seek to reproduce the results using the
     hardware, please contact us and we will do our best to give you
@@ -139,13 +139,13 @@ The resulting measurements are automatically saved to a *.json* file, which can 
 To plot measured data (saved as *.json* files) and therefore reproduce
 Figures 3-7, use the Jupyter Notebooks stored in `evaluation/`.
 
-First, start the local Jupyter server in the Docker container:
+1. First, start the local Jupyter server in the Docker container:
 
 ``` bash
 (.venv) USER@vnvheapae:~/vnv_heap/scripts$ ./notebooks_start_server.sh 
 ```
 
-Then, open the displayed URL (e.g.
+2. Then, open the displayed URL (e.g.
 `http://localhost:8888/lab?token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
 in a browser. You can use your browser of your host system for that. If
 you are working on a remote server system, SSH to the remote machine
@@ -153,8 +153,8 @@ with port forwarding using `ssh -L 8888:localhost:8888 $REMOTE_HOST`.
 Thereafter, you can use your Laptop's browser to navigate to the
 displayed URL.
 
-Now, open the `*.ipynb` notebook file (double click in the sidebar) to
-validate our claims regarding the evaluation results:
+3. Now, open the `*.ipynb` notebook file (double click in the sidebar) to
+   validate our claims regarding the evaluation results:
 - Fig. 3: Bottom of `get_ref.ipynb`
 - Fig. 4: Bottom of `queue.ipynb`
 - Fig. 5: Bottom of `persist.ipynb`
