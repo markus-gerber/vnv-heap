@@ -1,10 +1,16 @@
-# vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems (Evaluation Artifact)
+# vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems (Artifact)
 
-This document contains instructions on how to set up and test the evaluation artifact for the scientific paper "*vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems*".
+This document contains instructions on how to set up and test the evaluation artifact for the paper "*vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems*".
 
 ## Getting Started Guide
 
-For your convenience, the development and evaluation environment can easily be set-up via docker containers.\
+Start by navigating to the `artifact` directory which contains a copy of https://gitos.rrze.fau.de/i4/openaccess/vnv-heap
+
+``` sh
+cd artifact
+```
+
+For your convenience, the development and evaluation environment can easily be set-up via docker containers.
 To do this, please follow the next steps.
 
 First, install Docker: [https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/).
@@ -14,6 +20,8 @@ Then run the main script to build and enter the development environment:
 ```bash
 ./docker-run
 ```
+
+The script has been tested on Fedora 42. 
 
 *Note*: Running this script will take some time on the first run.
 This is because this script does not download a pre-built docker image, but manually builds it (e.g. by installing Rust, Zephyr, Rust support for Zephyr and a Python environment used by the evaluation plots).
