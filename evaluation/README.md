@@ -18,14 +18,15 @@ First, install Docker: [https://docs.docker.com/engine/install/](https://docs.do
 Then run the main script to build and enter the development environment:
 
 ```bash
-./docker-run # 30min
+./docker-run # 30min, 20GB free disk space
 ```
 
-The script has been tested on Fedora 42 and Ubuntu 25.04. If you
-encounter any problems consider starting the script from that distro or
-consider building the cotainer manually using `docker build` (see
-`Dockerfile`). You can also follow the instructions from the Dockerfile
-to set up all dependencies on your local machine.
+The script has been tested on Debian 12 Bookworm, Fedora 42 and Ubuntu
+25.04. If you encounter any problems consider starting the script from
+any of these distros or consider building the cotainer manually using
+`docker build` (see `Dockerfile`). You can of course also follow the
+instructions from the Dockerfile to set up all dependencies on your
+local machine.
 
 *Note*: Running this script will take some time on the first run. This
 is because this script does not download a pre-built Docker image, but
@@ -52,10 +53,39 @@ scripts/
 
 *Note*: The following instructions require the Docker development container introduced in the [Getting Started Guide](#getting-started-guide).
 
-### Running Benchmarks & Measuring Latency
+### Run the Test Suite in a VM
 
-All of the latency measurements used for evaluations require *Espressif's ESP32-C3* microcontroller connected over *SPI* to a *Fujitsu MB85RS64V FRAM* module.
-Reproducing the values from these evaluations cannot be achieved inside the virtual machine for the artifact evaluation, since the exact hardware setup is required to carry out the evaluations.
+``` bash
+scripts$ ./desktop_run_testsuite.sh # 2min
+```
+
+This command build and runs the vNV-Heap library test suite.
+
+This allows you to validate out claims regarding functionality.
+
+### Run Evaluation in a VM
+
+``` bash
+scripts$ ./desktop_run_benchmarks.sh # 7min
+```
+
+This command build and runs the vNV-Heap library and runs the evaluation
+in a VM. Because the VM does not replicate the performance
+characteristics, the numbers do not match out evaluation. If you have
+the hardware available, please follow the instructions in the following
+section. Otherwise skip the following section and skip to "Plot
+Evaluation Results".
+
+### Run Evaluation on Hardware
+
+*This section is informative. If desired we can provide you access to the hardware.*
+
+All of the latency measurements used for evaluations require
+*Espressif's ESP32-C3* microcontroller connected over *SPI* to a
+*Fujitsu MB85RS64V FRAM* module. Reproducing the values from these
+evaluations cannot be achieved inside the virtual machine for the
+artifact evaluation, since the exact hardware setup is required to carry
+out the evaluations.
 
 Follow the next steps to run benchmarks on the target device:
 
@@ -73,9 +103,10 @@ Follow the next steps to run benchmarks on the target device:
 
 The resulting measurements are automatically saved to a *.json* file, which can be used for further analysis or for plotting.
 
-### Plotting Measured Data
+### Plot Evaluation Results
 
-To plot measured data (saved as *.json* files) and therefore reproduce Figures 3-7, use the Jupyter Notebooks stored in `evaluation/`.
+To plot measured data (saved as *.json* files) and therefore reproduce
+Figures 3-7, use the Jupyter Notebooks stored in `evaluation/`.
 
 First, start the local Jupyter server with `scripts/notebooks_start_server.sh` and open the displayed URL (e.g. `http://localhost:8888/lab?token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`) in a browser.\
 You may use your browser of your host system for that.
@@ -88,10 +119,3 @@ Now, run all cells to generate the new plot.\
 The generated plot is also saved in `evaluation/figures/` for your convenience.
 
 If you want to generate the plots for all notebooks, run the following script: `scripts/notebooks_generate_plots.sh`.
-
-### Testing
-
-The implementation of the vNV-Heap can be tested on desktop machines by:
-
-1. Running the benchmarks (except for the persist benchmarks): `scripts/desktop_run_benchmarks.sh` (this will run for several minutes)
-2. Running the testsuite: `scripts/desktop_run_testsuite.sh`
