@@ -60,7 +60,10 @@ is because this script does not download a pre-built Docker image, but
 manually builds it (e.g. by installing Rust, Zephyr, Rust support for
 Zephyr and a Python environment used by the evaluation plots). This is
 required to prevent conflicts regarding the UIDs in the mounted
-directories.
+directories. Furthermore, the time that would be required for
+downloading a prebuilt Docker image from our servers would be equivalent
+to the time required to build the container (most of the time is spent
+downloading dependencies).
 
 Once the Docker image was built, the container is automatically started
 and a bash shell is opened.
