@@ -21,7 +21,7 @@ Then run the main script to build and enter the development environment:
 ./docker-run
 ```
 
-The script has been tested on Fedora 42. 
+The script has been tested on Fedora 42 and Ubuntu 25.04.
 
 *Note*: Running this script will take some time on the first run.
 This is because this script does not download a pre-built docker image, but manually builds it (e.g. by installing Rust, Zephyr, Rust support for Zephyr and a Python environment used by the evaluation plots).
