@@ -10,7 +10,7 @@ Start by navigating to the `artifact` directory which contains a copy of https:/
 cd artifact
 ```
 
-For your convenience, the development and evaluation environment can easily be set-up via docker containers.
+For your convenience, the development and evaluation environment can easily be set-up via Docker containers.
 To do this, please follow the next steps.
 
 First, install Docker: [https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/).
@@ -18,19 +18,25 @@ First, install Docker: [https://docs.docker.com/engine/install/](https://docs.do
 Then run the main script to build and enter the development environment:
 
 ```bash
-./docker-run
+./docker-run # 30min
 ```
 
-The script has been tested on Fedora 42. 
+The script has been tested on Fedora 42. If you encounter any problems
+consider starting the script from that distro or consider building the
+cotainer manually using `docker build` (see `Dockerfile`). You can also
+follow the instructions from the Dockerfile to set up all dependencies
+on your local machine.
 
-*Note*: Running this script will take some time on the first run.
-This is because this script does not download a pre-built docker image, but manually builds it (e.g. by installing Rust, Zephyr, Rust support for Zephyr and a Python environment used by the evaluation plots).
+*Note*: Running this script will take some time on the first run. This
+is because this script does not download a pre-built Docker image, but
+manually builds it (e.g. by installing Rust, Zephyr, Rust support for
+Zephyr and a Python environment used by the evaluation plots).
 
-Once the docker image was built, a container is started and a bash shell is opened.
+Once the Docker image was built, a container is automatically started and a bash shell is opened.
 
-*Note*: For your convenience, *(1)* the directory containing the `vnv_heap` repository, *(2)* network, and *(3)* all devices are shared between your host machine and the docker container.
+*Note*: For your convenience, *(1)* the directory containing the `vnv_heap` repository, *(2)* network, and *(3)* all devices are shared between your host machine and the Docker container.
 
-Inside the docker container, you can now run the following scripts:
+Inside the Docker container, you can now run the following scripts:
 
 ```bash
 scripts/
@@ -44,7 +50,7 @@ scripts/
 
 ## Step-by-Step Instructions
 
-*Note*: The following instructions require the docker development container introduced in the [Getting Started Guide](#getting-started-guide).
+*Note*: The following instructions require the Docker development container introduced in the [Getting Started Guide](#getting-started-guide).
 
 ### Running Benchmarks & Measuring Latency
 
@@ -61,9 +67,9 @@ Follow the next steps to run benchmarks on the target device:
 2. Connect the ESP32-C3 with your machine.
 3. Check the path to the connected ESP32-C3. If this differs from `/dev/ttyUSB0` update `serial_port` in `zephyr/vnv_heap_auto_benchmark/record_benchmark.py`.
 4. Check the baud rate of the connected ESP32-C3. If this differs from `115200` update `baud_rate` in `zephyr/vnv_heap_auto_benchmark/record_benchmark.py`.
-5. If your docker docker development container is currently running, stop it. This is required, as the development container does not support hot plugging.
+5. If your Docker development container is currently running, stop it. This is required, as the development container does not support hot plugging.
 6. Start the development container by running the `docker-run` script.
-7. Finally, run the `esp32c3_run_benchmarks.sh` and select the benchmark you want to run. Note that running the benchmarks takes a long time (especially for the queue and the key-value store)! For all four benchmarks this might take up to one day. To reduce this time, you might reduce the amount of repetitions (`VNV_HEAP_REPETITIONS`) in `scripts/esp32c3_run_benchmarks.sh` and reduce the iteration count (`ITERATION_COUNT`) in both `vnv_heap/src/benchmarks/applications/key_value_store/runner.rs` and `vnv_heap/src/benchmarks/applications/queue/runner.rs`.
+7. Run the `esp32c3_run_benchmarks.sh` and select the benchmark you want to run. Note that running the benchmarks takes a long time (especially for the queue and the key-value store)! For all four benchmarks this might take up to one day. To reduce this time, you might reduce the amount of repetitions (`VNV_HEAP_REPETITIONS`) in `scripts/esp32c3_run_benchmarks.sh` and reduce the iteration count (`ITERATION_COUNT`) in both `vnv_heap/src/benchmarks/applications/key_value_store/runner.rs` and `vnv_heap/src/benchmarks/applications/queue/runner.rs`.
 
 The resulting measurements are automatically saved to a *.json* file, which can be used for further analysis or for plotting.
 
