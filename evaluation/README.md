@@ -56,17 +56,18 @@ scripts/
 ### Run the Test Suite in a VM
 
 ``` bash
-scripts$ ./desktop_run_testsuite.sh # 2min
+(.venv) USER@vnvheapae:~/vnv_heap/scripts$ ./desktop_run_testsuite.sh # 2min
 ```
 
 This command build and runs the vNV-Heap library test suite.
 
-This allows you to validate out claims regarding functionality.
+This allows you to validate out claims regarding implementation,
+functionality, and features.
 
 ### Run Evaluation in a VM
 
 ``` bash
-scripts$ ./desktop_run_benchmarks.sh # 7min
+(.venv) USER@vnvheapae:~/vnv_heap/scripts$ ./desktop_run_benchmarks.sh # 7min
 ```
 
 This command build and runs the vNV-Heap library and runs the evaluation
@@ -76,9 +77,12 @@ the hardware available, please follow the instructions in the following
 section. Otherwise skip the following section and skip to "Plot
 Evaluation Results".
 
-### Run Evaluation on Hardware
+This allows you to validate our claims regarding the functionality of
+the evaluation.
 
-*This section is informative. If desired we can provide you access to the hardware.*
+### Run Evaluation on Hardware (Informative)
+
+*This section is informative if you do not have similar hardware available locally. If desired we can provide you access to our hardware upon request.*
 
 All of the latency measurements used for evaluations require
 *Espressif's ESP32-C3* microcontroller connected over *SPI* to a
@@ -108,14 +112,32 @@ The resulting measurements are automatically saved to a *.json* file, which can 
 To plot measured data (saved as *.json* files) and therefore reproduce
 Figures 3-7, use the Jupyter Notebooks stored in `evaluation/`.
 
-First, start the local Jupyter server with `scripts/notebooks_start_server.sh` and open the displayed URL (e.g. `http://localhost:8888/lab?token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`) in a browser.\
-You may use your browser of your host system for that.
+First, start the local Jupyter server in the Docker container:
 
-Now, open the notebook that you are interested in.
+``` bash
+(.venv) USER@vnvheapae:~/vnv_heap/scripts$ ./notebooks_start_server.sh 
+```
 
-*Optionally*: If you want to plot other measurements than the one used in the paper, update `file_name` (at the top of the notebook).
+Then, open the displayed URL (e.g.
+`http://localhost:8888/lab?token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
+in a browser. You can use your browser of your host system for that. If
+you are working on a remote server system, SSH to the remote machine
+with port forwarding using `ssh -L 8888:localhost:8888 $REMOTE_HOST`.
+Thereafter, you can use your Laptop's browser to navigate to the
+displayed URL.
 
-Now, run all cells to generate the new plot.\
-The generated plot is also saved in `evaluation/figures/` for your convenience.
+Now, open the `*.ipynb` notebook file (double click in the sidebar) to
+validate our claims regarding the evaluation results:
+- Fig. 3: Bottom of `get_ref.ipynb`
+- Fig. 4: Bottom of `queue.ipynb`
+- Fig. 5: Bottom of `persist.ipynb`
+- Fig. 6 and Fig. 7: Bottom of `kvs.ipynb`
 
-If you want to generate the plots for all notebooks, run the following script: `scripts/notebooks_generate_plots.sh`.
+*Optionally*: If you want to plot other measurements than the one used
+in the paper, update `file_name` (at the top of the notebook).
+
+Now, run all cells to generate the new plot. The generated plot is also
+saved in `evaluation/figures/` for your convenience.
+
+If you want to generate the plots for all notebooks, run the following
+script: `scripts/notebooks_generate_plots.sh`.
