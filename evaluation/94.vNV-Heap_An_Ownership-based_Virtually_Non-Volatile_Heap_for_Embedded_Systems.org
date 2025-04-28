@@ -1,0 +1,15 @@
+#+LATEX_CLASS_OPTIONS: [a4paper,onecolumn]
+#+OPTIONS: toc:nil date:t
+#+LATEX_HEADER: \hypersetup{hidelinks}
+#+language: en
+#+title: vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems
+#+author: Markus Elias Gerber et al.
+#+subtitle: Artifact
+Please download the archive including the detailed instructions, the
+paper, and the source code from the following URL (less than 20MB):
+#+begin_quote
+https://drive.google.com/drive/folders/1dfgx5Enge0feHZWa_A37__8BuzTigUSf?usp=drive_link
+#+end_quote
+Open the contained ~README.txt~ file (or ~README.md~) for the detailed
+instructions. It includes the sought badges, "Getting Started Guide",
+and "Step-by-Step Instructions".
