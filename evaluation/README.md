@@ -29,6 +29,53 @@ We seek to receive the following badges:
   - See "Run Evaluation in a VM", "Run Evaluation on Hardware
     (Informative)", and "Plot Evaluation Results".
 
+The following list of claims is supported by the artifact:
+
+- *7.2 Reference Retrieval [Figure 3]*
+  - **Claim**: Using the vNV-Heap is more energy efficient than existing approaches (due to lower runtime).
+  - **Claim**: The vNV-Heap provides runtime guarantees by static worst-case bounds.
+  - **Supported by**:
+    - The *get_ref* benchmark to be run on the target platform (runnable through [scripts/esp32c3_run_benchmarks.sh](scripts/esp32c3_run_benchmarks.sh)). Contain the measurements of different code paths for (best- and worst-case latency)
+    - The measured raw data [evaluation/data/2025-03-13 08-27-11 get.json](<evaluation/data/2025-03-13 08-27-11 get.json>)
+    - The corresponding plot in [evaluation/get_ref.ipynb](evaluation/get_ref.ipynb)
+- *7.3 Read/Write Cache [Figure 4]*
+  - **Claim**: Using the vNV-Heap is more energy efficient than existing approaches (due to lower runtime).
+  - **Claim**: The vNV-Heap only marginally reduces performance when for larger data, while increasing performance significantly for a smaller dataset compared with an exclusive Non-Volatile Memory approach.
+  - **Claim**: The vNV-Heap increases the amount of usable memory compared with an exclusive volatile RAM approach.
+  - **Supported by**:
+    - The *queue* benchmark to be run on the target platform (runnable through [scripts/esp32c3_run_benchmarks.sh](scripts/esp32c3_run_benchmarks.sh))
+    - The measured raw data [evaluation/data/2025-03-13 20-31-26 queue.json](<evaluation/data/2025-03-13 20-31-26 queue.json>)
+    - The corresponding plot in [evaluation/queue.ipynb](evaluation/queue.ipynb)
+- *7.4 Predictable Checkpointing [Figure 5]*
+  - **Claim**: The vNV-Heap provides runtime guarantees by static worst-case bounds (regarding creating a checkpoint).
+  - **Claim**: The vNV-Heap is able to limit the WCEC for persisting data by specifying the amount of state.
+  - **Claim**: The vNV-Heap is able to reduce the WCEC for persisting data compared to unmanaged RAM by reducing the amount of modified state.
+  - **Supported by**:
+    - The *persist* benchmark to be run on the target platform (runnable through [scripts/esp32c3_run_benchmarks.sh](scripts/esp32c3_run_benchmarks.sh)) (consists of following subbenchmarks: *dirty_size*, *buffer_size*, *locked_wcet*, and *persistent_storage* - for more information, have a look at [scripts/esp32c3_run_benchmarks.sh](scripts/esp32c3_run_benchmarks.sh) and [vnv_heap/src/benchmarks/mod.rs](vnv_heap/src/benchmarks/mod.rs))
+    - The measured raw data [evaluation/data/2025-03-13 16-17-54 persist.json](<evaluation/data/2025-03-13 16-17-54 persist.json>) (and [evaluation/data/2025-03-13 08-27-11 get.json](<evaluation/data/2025-03-13 08-27-11 get.json>) for *persistent_storage* subbenchmark)
+    - The corresponding plot in [evaluation/persist.ipynb](evaluation/persist.ipynb)
+- *7.5 Key-Value Store [Figure 6]*
+  - **Claim**: Even though the vNV-Heap is more feature-rich, its performance is comparable to ManagedState for small page sizes.
+  - **Claim**: For large page sizes, vNV-Heap clearly outperforms ManagedState.
+  - **Supported by**:
+    - The *kvs* benchmark to be run on the target platform (runnable through [scripts/esp32c3_run_benchmarks.sh](scripts/esp32c3_run_benchmarks.sh))
+    - The measured raw data [evaluation/data/2025-03-19 00-00-16 kvs.json](<evaluation/data/2025-03-19 00-00-16 kvs.json>)
+    - The corresponding plots in [evaluation/kvs.ipynb](evaluation/kvs.ipynb)
+- *7.5 Key-Value Store (1) [Figure 7]*
+  - **Claim**: The vNV-Heap can reduce the size of its internal metadata for each resident object to 3 bytes.
+  - **Supported by**:
+    - The comments inside the ResidentObjectManager in [vnv_heap/src/resident_object_manager/resident_object_metadata.rs](vnv_heap/src/resident_object_manager/resident_object_metadata.rs)
+- *7.5 Key-Value Store (2) [Figure 7]*
+  - **Claim**: Managed-State’s metadata overhead is significant for small page sizes.
+  - **Claim**: The vNV-Heap has a lower metadata per chunk compared with ManagedState using page sizes 32 and 64.
+  - **Supported by**:
+    - The calculations in [evaluation/kvs.ipynb](evaluation/kvs.ipynb) and the corresponding plot
+
+The following list of claims is not supported by the artifact:
+
+- **Claim**: Managed-State’s metadata overhead is 1 byte per page.
+  - This claim is not supported by this work, as it originates from the paper "Efficient State Retention through Paged Memory Management for Reactive Transient Computing"
+
 ## Getting Started Guide
 
 Start by navigating to the `artifact` directory which contains a copy of https://gitos.rrze.fau.de/i4/openaccess/vnv-heap
