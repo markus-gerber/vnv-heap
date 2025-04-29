@@ -3,6 +3,7 @@
 This document contains instructions on how to set up and test the evaluation artifact for the paper "*vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems*".
 
 We seek to receive the following badges:
+
 - Artifacts Available v1.1
   - The `artifact` subdirectory in the archive is a copy of
     https://gitos.rrze.fau.de/i4/openaccess/vnv-heap which is publicly
