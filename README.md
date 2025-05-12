@@ -2,6 +2,10 @@
 
 This repository contains the implementation and evaluation for the academic paper "vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems".
 
+## Artifact Evaluation
+
+See [evaluation/README.md](./evaluation/README.md) to reproduce the results from the academic paper.
+
 ## Usage
 
 ### Overview
