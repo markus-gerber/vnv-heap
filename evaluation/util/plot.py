@@ -63,9 +63,11 @@ def set_theme(colors=2, skip=0, ignore=-1, hide_spines=False):
         style["axes.spines.top"] = True
 
     sns.set_theme(style=style)
-    sns.set_context("paper", rc={"font.size":8, "font.family": "Libertine", "axes.titlesize":8, "axes.labelsize":8, "xtick.labelsize": 8, "ytick.labelsize": 8, "legend.title_fontsize": 9})
+    sns.set_context("paper", rc={"font.size":8, "axes.titlesize":8, "axes.labelsize":8, "xtick.labelsize": 8, "ytick.labelsize": 8, "legend.title_fontsize": 9})
     plt.rcParams["xtick.labelcolor"] = ticks_label_color
     plt.rcParams["ytick.labelcolor"] = ticks_label_color
+    plt.rcParams['pdf.fonttype'] = 42
+    plt.rcParams['ps.fonttype'] = 42
 
     #palette = sns.color_palette("mako", n_colors=colors)[skip:]
     #if ignore != -1:
