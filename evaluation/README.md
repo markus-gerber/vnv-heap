@@ -184,7 +184,7 @@ Follow the next steps to run benchmarks on the target device:
 4. Check the baud rate of the connected ESP32-C3. If this differs from `115200` update `baud_rate` in `zephyr/vnv_heap_auto_benchmark/record_benchmark.py`.
 5. If your Docker development container is currently running, stop it. This is required, as the development container does not support hot plugging.
 6. Start the development container by running the `docker-run` script.
-7. Run the `esp32c3_run_benchmarks.sh` and select the benchmark you want to run. Note that running the benchmarks takes a long time (especially for the queue and the key-value store)! For all four benchmarks this might take up to one day. To reduce this time, you might reduce the amount of repetitions (`VNV_HEAP_REPETITIONS`) in `scripts/esp32c3_run_benchmarks.sh` and reduce the iteration count (`ITERATION_COUNT`) in both `vnv_heap/src/benchmarks/applications/key_value_store/runner.rs` and `vnv_heap/src/benchmarks/applications/queue/runner.rs`.
+7. Run the `esp32c3_run_benchmarks.sh` and select the benchmark you want to run. Note that running all benchmarks with the current configuration currently takes around three hours. To reduce this time, you might reduce the amount of repetitions (`VNV_HEAP_REPETITIONS`) in `scripts/esp32c3_run_benchmarks.sh`. If you set `VNV_HEAP_REPETITIONS` to 1, all benchmarks should finish under one hour.
 
 The resulting measurements are automatically saved to a *.json* file, which can be used for further analysis or for plotting.
 

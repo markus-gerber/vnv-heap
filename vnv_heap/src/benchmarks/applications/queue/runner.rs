@@ -47,7 +47,7 @@ type A = LinkedListAllocatorModule;
 type M = ClockObjectManagementModule;
 type N = NonResidentBlockAllocator<BLOCK_SIZE, BIT_LIST_SIZE>;
 
-const ITERATION_COUNT: usize = 10000;
+const ITERATION_COUNT: usize = 100;
 const OBJ_SIZE: usize = 256;
 
 const RAM_LIMIT: usize = 4 * 1024;
