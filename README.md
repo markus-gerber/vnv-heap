@@ -10,7 +10,7 @@ This repository contains the implementation and evaluation for the academic pape
 >
 > We present vNV-Heap, the first ownership-based virtually Non-Volatile Heap for intermittently powered systems with guaranteed power-failure resilience. The heap exploits ownership systems, a zero-cost (i.e., compile-time) abstraction for example implemented by Rust, to track modifications and virtualize object persistence. To achieve power-failure resilience, our heap is designed and implemented to guarantee bounded operations by static program code analysis: For example, the heap allows for determining a worst-case energy consumption for the operation of persisting modified and currently volatile objects. The evaluation of our open-source implementation on an embedded hardware platform (i.e., ESP32-C3) shows that using our heap abstraction is more energy efficient than existing approaches while also providing runtime guarantees by static worst-case bounds.
 
-## What does the vNV-Heap do?
+## Features
 
 The *vNV-Heap* provides the following features:
 
