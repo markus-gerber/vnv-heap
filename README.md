@@ -1,6 +1,25 @@
 # Virtually Non-Volatile Heap (vNV-Heap)
 
-This repository contains the implementation and evaluation for the academic paper "vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems".
+This repository contains the implementation and evaluation for the academic paper "**[vNV-Heap: An Ownership-based Virtually Non-Volatile Heap for Embedded Systems](https://doi.org/10.1145/3735452.3735534)**".
+
+> Markus Elias Gerber, Luis Gerhorst, Ishwar Mudraje, Kai Vogelgesang, Thorsten Herfet, and Peter Wägemann. 2025. VNV-Heap: An Ownership-Based Virtually Non-Volatile Heap for Embedded Systems. In Proceedings of the 26th ACM SIGPLAN/SIGBED International Conference on Languages, Compilers, and Tools for Embedded Systems (LCTES '25). Association for Computing Machinery, New York, NY, USA, 97–108. [https://doi.org/10.1145/3735452.3735534](https://doi.org/10.1145/3735452.3735534)
+
+**Abstract**:
+
+> The Internet of Batteryless Things might revolutionize our understanding of connected devices by harvesting required operational energy from the environment. These systems come with the system-software challenge that the intermittently powered IoT devices have to checkpoint their state in non-volatile memory to later resume with this state when sufficient energy is available. The scarce energy resources demand that only modified data is persisted before a power failure, which requires precise modification tracking.
+>
+> We present vNV-Heap, the first ownership-based virtually Non-Volatile Heap for intermittently powered systems with guaranteed power-failure resilience. The heap exploits ownership systems, a zero-cost (i.e., compile-time) abstraction for example implemented by Rust, to track modifications and virtualize object persistence. To achieve power-failure resilience, our heap is designed and implemented to guarantee bounded operations by static program code analysis: For example, the heap allows for determining a worst-case energy consumption for the operation of persisting modified and currently volatile objects. The evaluation of our open-source implementation on an embedded hardware platform (i.e., ESP32-C3) shows that using our heap abstraction is more energy efficient than existing approaches while also providing runtime guarantees by static worst-case bounds.
+
+## What does the vNV-Heap do?
+
+The *vNV-Heap* provides the following features:
+
+- Dynamic allocation and deallocation of heap objects, like a conventional heap.
+- A **configurable upper bound on modified (dirty) state** kept only in volatile memory.
+    This bound is used to provide a worst-case energy consumption (WCEC) required to persist the entire state managed by the *vNV-Heap*.
+    Ensuring an energy buffer (e.g., through low-cost capacitors) with at least this amount, ensures that the *vNV-Heap's* state remains persistent across power failures.
+- **Software-managed swapping** between RAM and non-volatile storage (e.g., unloading/persisting less-recently used objects).
+- **Software-only library**: No additional hardware is required.
 
 ## Artifact Evaluation
 
@@ -24,7 +43,7 @@ To use the vNV-Heap in your application follow these steps.
 
     - `benchmarks`: Enable benchmarking for this application. Look at [desktop/desktop_benchmark](desktop/desktop_benchmark/) or [zephyr/vnv_heap_benchmark](zephyr/vnv_heap_benchmark/) for examples.
     - `persist_debug_prints`: Enable safe debug prints during persisting. This feature uses the `write` system call and thus depends on `libc`, meaning it cannot be used in all environments.
-    - `persist_debug_unsafe_prints`: **THIS FEATURE IS UNSAFE! USE IT WITH CAUTION!!!** Enables unsafe debug prints during persisting. This features uses the standard println! macro. This however can result in undesired behavior as its implementation is commonly not reentrant.
+    - `persist_debug_unsafe_prints`: Enables *unsafe* debug prints during persisting. This features uses the standard println! macro. This however can result in undesired behavior as its implementation is commonly not reentrant.
 
 2. Define your own modules if needed:
 
